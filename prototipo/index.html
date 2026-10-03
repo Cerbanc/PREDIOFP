@@ -1344,18 +1344,23 @@ function setMontoCobro(m) {
 }
 /* Cobrar por separado: cada persona paga sus productos. Se elige cuántos de cada uno (0, 1, 2…), se cobra, y la siguiente ve lo que queda. */
 const lineaKey = it => it.turnoId ? 'T' + it.turnoId : it.prodId + '|' + (it.nota || '');
+/* Cada línea se paga por unidades; si se reparte entre varios (el agua grande, el turno), se paga por partes */
+function repN(i) {
+  const S = UI.sep, c = getCom(S.key), it = c.items[i], k = lineaKey(it);
+  return (c.divN || {})[k] || S.n[i] || (it.turnoId ? 1 : 0);
+}
 function restanSeparado(i) {
-  const S = UI.sep, c = getCom(S.key), it = c.items[i], k = lineaKey(it), pag = (c.divPag || {})[k] || 0;
-  return it.turnoId ? ((c.divN || {})[k] || S.n[i] || 1) - pag : it.cant - pag;
+  const c = getCom(UI.sep.key), it = c.items[i], pag = (c.divPag || {})[lineaKey(it)] || 0, n = repN(i);
+  return n ? n - pag : it.cant - pag;
 }
 const maxSeparado = i => Math.max(0, restanSeparado(i));
+function precioLinea(it) {
+  if (it.turnoId) { const t = DB.turnos.find(x => x.id === it.turnoId); return t ? t.precio : 0; }
+  const pr = prod(it.prodId); return pr ? pr.precio * it.cant : 0;
+}
 function montoSeparado() {
   const S = UI.sep, c = getCom(S.key);
-  return Math.round(c.items.reduce((a, it, i) => {
-    const q = S.sel[i] || 0; if (!q) return a;
-    if (it.turnoId) { const t = DB.turnos.find(x => x.id === it.turnoId); const n = (c.divN || {})[lineaKey(it)] || S.n[i] || 1; return a + (t ? t.precio / n * q : 0); }
-    const pr = prod(it.prodId); return a + (pr ? pr.precio * q : 0);
-  }, 0));
+  return Math.round(c.items.reduce((a, it, i) => { const q = S.sel[i] || 0; if (!q) return a; const n = repN(i); return a + (n ? precioLinea(it) / n * q : (precioLinea(it) / it.cant) * q); }, 0));
 }
 function abrirSeparado() {
   if (!cajaAbierta()) return modalAbrirCaja(() => abrirSeparado());
@@ -1368,17 +1373,18 @@ function abrirSeparado() {
 function renderSeparado() {
   const S = UI.sep, c = getCom(S.key), saldo = saldoDe(c), monto = montoSeparado();
   const filas = c.items.map((it, i) => {
-    const rest = restanSeparado(i), sel = S.sel[i] || 0, k = lineaKey(it);
+    const rest = restanSeparado(i), sel = S.sel[i] || 0, k = lineaKey(it), n = repN(i), empezo = !!(c.divPag || {})[k];
     const nombre = it.turnoId ? (() => { const t = DB.turnos.find(x => x.id === it.turnoId); return t ? nombreTurno(t) : 'Turno'; })() : (prod(it.prodId) ? prod(it.prodId).nombre : '?');
     if (rest <= 0) return `<div class="sprow done"><span>${esc(nombre)}</span><span class="pill good">ya pagado</span></div>`;
-    const turnoN = it.turnoId ? ((c.divN || {})[k] || S.n[i] || 1) : 0, libreN = it.turnoId && !((c.divPag || {})[k]);
-    return `<div class="sprow ${sel ? 'on' : ''}"><div class="nm"><b>${esc(nombre)}</b><small class="muted">${it.turnoId ? `se reparte entre ${turnoN}${libreN ? ` <button class="mini" data-act="sp-n" data-i="${i}" data-d="-1">−</button><button class="mini" data-act="sp-n" data-i="${i}" data-d="1">+</button>` : ''} · quedan ${rest} partes` : `quedan ${rest}`}</small></div>
+    const sub = n ? `repartido entre ${n}${empezo ? '' : ` <button class="mini" data-act="sp-n" data-i="${i}" data-d="-1">−</button><button class="mini" data-act="sp-n" data-i="${i}" data-d="1">+</button>`} · quedan ${rest} partes${!empezo && !it.turnoId ? ` · <button class="mini" data-act="sp-rep" data-i="${i}">no repartir</button>` : ''}`
+      : `quedan ${rest}${empezo ? '' : ` · <button class="mini" data-act="sp-rep" data-i="${i}">repartir entre varios</button>`}`;
+    return `<div class="sprow ${sel ? 'on' : ''}"><div class="nm"><b>${esc(nombre)}</b><small class="muted">${sub}</small></div>
       <div class="qty"><button class="icon" data-act="sp-menos" data-i="${i}" aria-label="Menos">−</button><span>${sel}</span><button class="icon" data-act="sp-mas" data-i="${i}" aria-label="Más">+</button><button class="mini" data-act="sp-todo" data-i="${i}">todo</button></div></div>`;
   }).join('');
   const ultimo = monto >= saldo;
   modal({
     title: 'Cobrar por separado · ' + tituloCuenta(S.key),
-    body: `<p class="muted">Elegí cuántos de cada producto paga esta persona. Después se cobra y pasás a la siguiente.</p><div class="stack" style="gap:2px">${filas}</div>
+    body: `<p class="muted">Elegí cuántos de cada producto paga esta persona. Si algo se comparte (el agua grande, el turno), tocá "repartir entre varios". Después se cobra y pasás a la siguiente.</p><div class="stack" style="gap:2px">${filas}</div>
       <div class="chips">${metodosReales().map(m => `<button class="chip" data-act="sp-medio" data-id="${m.id}" aria-pressed="${S.medio === m.id}">${esc(m.nombre)}</button>`).join('')}</div>
       <label class="fld">¿Quién paga? (opcional)<input class="in" data-in="sp-quien" value="${esc(S.quien)}" placeholder="Ej: Juan"></label>
       <div class="big-total"><span>Esta persona paga</span><b>${money(monto)}</b></div><p class="muted">En la cuenta quedan por cobrar ${money(saldo)}${monto > 0 && !ultimo ? `, después de este pago ${money(saldo - monto)}` : ''}.</p>`,
@@ -1392,7 +1398,7 @@ function cobrarSeparado() {
   const r = tx(() => {
     registrarAbono(S.key, [{ metodoId: S.medio, monto }], S.quien);
     const cc = DB.comandas[S.key]; cc.divPag = cc.divPag || {}; cc.divN = cc.divN || {};
-    cc.items.forEach((it, i) => { const q = S.sel[i] || 0; if (!q) return; const k = lineaKey(it); cc.divPag[k] = (cc.divPag[k] || 0) + q; if (it.turnoId) cc.divN[k] = cc.divN[k] || S.n[i] || 1; });
+    cc.items.forEach((it, i) => { const q = S.sel[i] || 0; if (!q) return; const k = lineaKey(it); cc.divPag[k] = (cc.divPag[k] || 0) + q; const n = repN(i); if (n) cc.divN[k] = n; });
   });
   if (!r.ok) return false;
   toast('Cobrado ' + money(monto) + (S.quien ? ' a ' + S.quien : '') + '. Sigue la próxima persona.');
@@ -2614,6 +2620,7 @@ const A = {
   'sp-menos': d => { const S = UI.sep; S.sel[+d.i] = Math.max(0, (S.sel[+d.i] || 0) - 1); renderSeparado(); },
   'sp-todo': d => { UI.sep.sel[+d.i] = maxSeparado(+d.i); renderSeparado(); },
   'sp-medio': d => { UI.sep.medio = d.id; renderSeparado(); },
+  'sp-rep': d => { const S = UI.sep; S.n[+d.i] = S.n[+d.i] ? 0 : 2; S.sel[+d.i] = 0; renderSeparado(); },
   'sp-n': d => { const S = UI.sep; S.n[+d.i] = Math.max(1, Math.min(8, (S.n[+d.i] || 1) + (+d.d))); S.sel[+d.i] = Math.min(S.sel[+d.i] || 0, maxSeparado(+d.i)); renderSeparado(); },
   'dv-toggle': () => { UI.pago.dividirAbierto = !UI.pago.dividirAbierto; renderCobro(); },
   'dv-igual': d => { const P = UI.pago; setMontoCobro(Math.min(P.saldo, Math.ceil(P.total / +d.n))); },
