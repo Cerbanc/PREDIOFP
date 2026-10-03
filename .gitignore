@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+/build/
+/dist/
+*.spec.bak
+# Datos reales: nunca al repositorio
+/Predio/
+*.db
+*.db-wal
+*.db-shm
+configuracion.json
+clave_api.txt
+.env
