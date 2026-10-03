@@ -51,5 +51,15 @@ def abrir_ventana(url: str, perfil: Path, completa: bool = True) -> subprocess.P
         except OSError:
             log.exception("No se pudo abrir %s", exe)
     log.warning("No se encontró Edge ni Chrome: se abre en el navegador predeterminado")
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(      # type: ignore[attr-defined]
+                0, "No encontré Microsoft Edge ni Google Chrome en esta PC, que son los que usa el programa para mostrar la pantalla.\n\n"
+                   "Se va a intentar abrir con el navegador que tengas, pero si se ve mal o no funciona, instalá Google Chrome (es gratis) y volvé a abrir el programa.",
+                "Caja del Predio", 0x30)
+        except Exception:      # noqa: BLE001
+            pass
     webbrowser.open(url)
     return None

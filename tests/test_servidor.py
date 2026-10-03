@@ -186,3 +186,33 @@ def test_cerrar_pide_apagar(srv):
 def test_imagen_desde_link_rechaza_cosas_raras(srv):
     assert pedir(srv, "POST", "/api/imagen-desde-link", {"url": "file:///etc/passwd"})[0] == 400
     assert pedir(srv, "POST", "/api/imagen-desde-link", {"url": "ftp://x/y.png"})[0] == 400
+
+
+def test_una_sola_copia_del_programa_por_carpeta_de_datos(srv, rutas):
+    from predio.app import bloquear_instancia, buscar_instancia
+
+    primero = bloquear_instancia(rutas)
+    assert primero is not None
+    assert bloquear_instancia(rutas) is None          # la segunda copia no puede usar los mismos datos
+    assert buscar_instancia(srv.puerto, rutas) == srv.puerto
+    primero.close()
+    otro = bloquear_instancia(rutas)                  # al cerrarse el primero, se libera
+    assert otro is not None
+    otro.close()
+
+
+def test_aviso_si_la_base_esta_vacia_pero_hay_copias(rutas):
+    from predio import app as app_mod
+
+    app1 = app_mod.crear_aplicacion(rutas, dict(AJUSTES_POR_DEFECTO), "real")
+    app1.almacen.aplicar({**base_inicial()}, "Sistema", 0)
+    app1.copias.crear("manual")
+    app_mod.cerrar_aplicacion(app1)
+    rutas.base.unlink()
+    for ext in ("-wal", "-shm"):
+        rutas.base.with_name(rutas.base.name + ext).unlink(missing_ok=True)
+    app2 = app_mod.crear_aplicacion(rutas, dict(AJUSTES_POR_DEFECTO), "real")
+    try:
+        assert app2.almacen.esta_vacia() and any("copias de seguridad anteriores" in a for a in app2.avisos)
+    finally:
+        app_mod.cerrar_aplicacion(app2)

@@ -111,6 +111,11 @@ def crear_aplicacion(rutas: Rutas, ajustes: dict, modo: str = "real") -> Aplicac
     if db.version_actual() > 0 and db.necesita_migrar():
         copias.crear("seguridad_antes_de_migrar")
     db.migrar()
+    previas = copias.listar()
+    if previas and almacen.esta_vacia() and not avisos:
+        u = previas[0]
+        avisos.append(f"La base de datos está vacía pero hay copias de seguridad anteriores (la última, del {u['dia'].split('-')[2]}/{u['dia'].split('-')[1]} a las {u['hora']}). "
+                      "Si no esperabas empezar de cero, restaurala desde Admin → Datos y seguridad → Copias de seguridad.")
     diario = ArchivosDiarios(db, rutas)
     app = Aplicacion(rutas=rutas, ajustes=ajustes, db=db, almacen=almacen, copias=copias, diario=diario, modo=modo, avisos=avisos)
     preparar_pagina(app)
@@ -163,13 +168,44 @@ def cerrar_aplicacion(app: Aplicacion) -> None:
     app.db.cerrar()
 
 
-def hay_otra_instancia(puerto: int, rutas: Rutas) -> bool:
+def buscar_instancia(puerto: int, rutas: Rutas, espera: float = 0.0) -> int | None:
+    """Devuelve el puerto donde ya está corriendo el programa con estos mismos datos (esperando hasta `espera` segundos)."""
+    limite = time.time() + espera
+    while True:
+        for p in range(puerto, puerto + 10):
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{p}/api/ping", timeout=1.0) as r:
+                    datos = json.loads(r.read().decode())
+                if datos.get("app") == "predio" and Path(datos.get("datos", "")).resolve() == rutas.raiz.resolve():
+                    return p
+            except Exception:      # noqa: BLE001
+                continue
+        if time.time() >= limite:
+            return None
+        time.sleep(0.5)
+
+
+def bloquear_instancia(rutas: Rutas):
+    """Candado del sistema operativo: dos copias del programa no pueden usar la misma carpeta de datos a la vez.
+    Se libera solo cuando el programa termina (aunque se cuelgue o se corte la luz)."""
+    f = open(rutas.datos / "predio.lock", "a+b")
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{puerto}/api/ping", timeout=1.5) as r:
-            datos = json.loads(r.read().decode())
-        return datos.get("app") == "predio" and Path(datos.get("datos", "")).resolve() == rutas.raiz.resolve()
-    except Exception:      # noqa: BLE001
-        return False
+        if f.tell() == 0:
+            f.write(b"0")
+            f.flush()
+        f.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)      # type: ignore[attr-defined]
+        else:
+            import fcntl
+
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -193,11 +229,16 @@ def main(argv: list[str] | None = None) -> int:
     puerto = args.puerto or ajustes["puerto"] + (1 if args.demo else 0)
     modo = "demo" if args.demo else "real"
 
-    if hay_otra_instancia(puerto, rutas):
-        log.info("El programa ya está abierto: se muestra esa ventana")
-        if not args.sin_ventana:
-            abrir_ventana(f"http://127.0.0.1:{puerto}/", rutas.perfil_navegador, ajustes["ventana_completa"])
-        return 0
+    candado = bloquear_instancia(rutas)
+    if candado is None:                       # ya hay una copia del programa abierta con estos datos
+        otro = buscar_instancia(puerto, rutas, espera=15)
+        if otro:
+            log.info("El programa ya está abierto: se muestra esa ventana")
+            if not args.sin_ventana:
+                abrir_ventana(f"http://127.0.0.1:{otro}/", rutas.perfil_navegador, ajustes["ventana_completa"])
+            return 0
+        mostrar_error("El programa ya está abierto en esta PC (o todavía se está cerrando). Esperá unos segundos y probá de nuevo.")
+        return 1
 
     asegurar_leeme(rutas)
     try:

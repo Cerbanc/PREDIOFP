@@ -414,6 +414,7 @@ let STORAGE_OK = true;
 let REV = 0;                       // versión de los datos que tiene esta pantalla (así no se pisa a otra ventana)
 let VENTANA_DESDE = null;          // desde qué día están cargadas las ventas, la caja y el stock (null = todo). Lo anterior se pide al mirar tickets o reportes viejos
 let ORIGEN = null;                 // quién hace un cambio cuando no es una persona (ej.: 'Sistema')
+let QUIEN_ANTES = null;            // quién estaba a cargo de la caja antes de la operación (así el cierre de caja queda a nombre de quien cerró)
 const ESTADO_GUARDADO = { ok: true, ts: 0, error: '' };
 const UI = {
   view: 'venta', cat: 'all', q: '', com: 'M', turFecha: dayKey(Date.now()), turSel: null, lgTipo: 'all', cliQ: '', repTab: 'resumen', repCob: 7,
@@ -491,28 +492,42 @@ function guardarSync() {
     return;
   }
   const { ops, strs, formas } = cambiosPendientes();
-  if (!ops.length && !Object.keys(formas).length) return;
+  if (!ops.length && !Object.keys(formas).length) {
+    if (!ESTADO_GUARDADO.ok) {             // no queda nada pendiente: si el programa responde, está todo al día
+      http('POST', '/api/latido', {});
+      ESTADO_GUARDADO.ok = true; ESTADO_GUARDADO.error = ''; pintarEstadoGuardado();
+    }
+    return;
+  }
   let r;
-  try { r = http('POST', '/api/guardar', { base_rev: REV, usuario: ORIGEN || USUARIO(), ops, formas }); }
+  const quien = ORIGEN || (QUIEN_ANTES && !/^Caja( \(|$)/.test(QUIEN_ANTES) ? QUIEN_ANTES : USUARIO());
+  try { r = http('POST', '/api/guardar', { base_rev: REV, usuario: quien, ops, formas }); }
   catch (e) { ESTADO_GUARDADO.ok = false; ESTADO_GUARDADO.error = e.message; pintarEstadoGuardado(); throw e; }
   REV = r.rev;
-  ops.forEach((op, i) => {
-    const m = SAVED[op.c] || (SAVED[op.c] = new Map());
-    if (op.del) m.delete(op.id); else m.set(op.id, strs[i]);
-  });
-  Object.keys(formas).forEach(k => { FORMAS_OK[k] = true; if (!SAVED[k]) SAVED[k] = new Map(); });
-  (r.reemplazos || []).forEach(rp => {          // p. ej. una foto que pasó a ser un archivo de la carpeta imagenes
-    const reg = Array.isArray(DB[rp.c]) ? DB[rp.c].find(x => String(x.id) === rp.id) : DB[rp.c] && DB[rp.c][rp.id];
-    if (reg) { reg[rp.campo] = rp.valor; SAVED[rp.c].set(rp.id, JSON.stringify(reg)); }
-  });
-  ESTADO_GUARDADO.ok = true; ESTADO_GUARDADO.ts = Date.now(); ESTADO_GUARDADO.error = '';
-  pintarEstadoGuardado();
+  try {                                         // ya está guardado en el programa: de acá en adelante nada puede hacer fallar la operación
+    ops.forEach((op, i) => {
+      const m = SAVED[op.c] || (SAVED[op.c] = new Map());
+      if (op.del) m.delete(op.id); else m.set(op.id, strs[i]);
+    });
+    Object.keys(formas).forEach(k => { FORMAS_OK[k] = true; if (!SAVED[k]) SAVED[k] = new Map(); });
+    (r.reemplazos || []).forEach(rp => {        // p. ej. una foto que pasó a ser un archivo de la carpeta imagenes
+      const reg = Array.isArray(DB[rp.c]) ? DB[rp.c].find(x => String(x.id) === rp.id) : DB[rp.c] && DB[rp.c][rp.id];
+      if (reg) { reg[rp.campo] = rp.valor; SAVED[rp.c].set(rp.id, JSON.stringify(reg)); }
+    });
+    ESTADO_GUARDADO.ok = true; ESTADO_GUARDADO.ts = Date.now(); ESTADO_GUARDADO.error = '';
+    pintarEstadoGuardado();
+  } catch (e) { console.error('Después de guardar:', e); }
 }
 /* Para los cambios que no pasan por tx(): si falla, avisa y se reintenta solo. */
 function persist() {
   try { guardarSync(); }
   catch (e) { toast('No se pudo guardar: ' + e.message, 'bad'); }
 }
+/* Lo que se escribe tecla por tecla o con una barra deslizante se guarda cuando se deja de tocar (no en cada letra). */
+let PERSIST_T = null;
+function persistSoon() { if (PERSIST_T) clearTimeout(PERSIST_T); PERSIST_T = setTimeout(() => { PERSIST_T = null; persist(); }, 500); }
+function flushPersist() { if (PERSIST_T) { clearTimeout(PERSIST_T); PERSIST_T = null; persist(); } }
+document.addEventListener('focusout', flushPersist);
 /* Ventas, caja y stock de los últimos días se cargan al abrir; si se mira algo más viejo, se trae de la base y se suma. */
 const HISTORICAS = ['ventas', 'caja', 'movimientos', 'movCaja', 'log'];
 function asegurarDesde(dia) {
@@ -570,6 +585,7 @@ function tx(fn) {
   if (TX_NIVEL > 0) return { ok: true, value: fn() };      // dentro de otra transacción: la de afuera guarda o deshace todo junto
   const snap = JSON.stringify(DB);
   TX_NIVEL++;
+  QUIEN_ANTES = USUARIO();
   try {
     const value = fn();
     guardarSync();
@@ -3407,8 +3423,8 @@ const I = {
   rp: () => { const sel = parseInt($('#rp-hora').value, 10); llenarHorasReprogramar(isNaN(sel) ? null : sel); },
   'rp-hora': () => pintarInfoReprogramar(),
   'cli-pick': el => { const c = DB.clientes.find(x => norm(x.nombre) === norm(el.value)), t = $(el.dataset.tel); if (c && t && !t.value) t.value = c.tel || ''; },
-  'cfg-wa-pais': el => { DB.config.paisWa = soloDigitos(el.value) || '54'; persist(); },
-  'cfg-wa-msg': el => { DB.config.msgTurno = el.value; persist(); },
+  'cfg-wa-pais': el => { DB.config.paisWa = soloDigitos(el.value) || '54'; persistSoon(); },
+  'cfg-wa-msg': el => { DB.config.msgTurno = el.value; persistSoon(); },
   cc: () => pintarCierre(),
   cliq: el => { UI.cliQ = el.value; views.clientes(); const n = $('#cliq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
   aj: () => {
@@ -3432,11 +3448,11 @@ const I = {
     else if (f === 'ci') c.ci = num(v) * 60;
     else if (f === 'dur') c.dur = Math.max(15, num(v));
     else c[f] = num(v);
-    persist();
+    persistSoon();
   },
   'mesa-tipo': el => { const m = mesaSel(); if (m) { m.tipo = el.value; persist(); views.mesas(); } },
-  'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
-  'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
+  'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
+  'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
   'mesa-rapido': el => { const m = mesaSel(); if (m) { m.rapido = el.checked; persist(); renderSide(); views.mesas(); } },
   'foto-file': el => { const f = el.files && el.files[0]; if (f) $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`; },
   'foto-row': el => { const i = el.id.split('-')[2]; fotoResumen(+i); },
@@ -3444,7 +3460,7 @@ const I = {
   dest: el => { UI.com = el.value; renderCart(); },
   pg: el => { UI.pago.rows[+el.dataset.i].monto = num(el.value); updateCobro(); },
   'pg-cliente': el => { UI.pago.cliente = el.value; updateCobro(); },
-  'mesa-name': el => { const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (m && el.value.trim()) { m.nombre = el.value.trim(); persist(); const b = $(`.mesa[data-id="${m.id}"] b`); if (b) b.textContent = m.nombre; } },
+  'mesa-name': el => { const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (m && el.value.trim()) { m.nombre = el.value.trim(); persistSoon(); const b = $(`.mesa[data-id="${m.id}"] b`); if (b) b.textContent = m.nombre; } },
   stockq: el => { UI.stockQ = el.value; views.stock(); const n = $('#stockq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
   stockmov: el => { UI.stockMov = el.value; views.stock(); },
   ing: () => { const u = unidadesIngreso(), p = prod(UI.ing.id); $('#ing-prev').textContent = `Se suman ${u} unidades. El stock pasa de ${p.stock} a ${p.stock + u}.`; },
@@ -3455,11 +3471,11 @@ const I = {
   reph: el => { if (el.value) { UI.repHasta = el.value; views.reportes(); } },
   admq: el => { UI.admQ = el.value; admBody.productos(); const n = $('#admq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
   'pf-tipo': el => { leerPF(); UI.pf.tipo = el.value; if (el.value === 'receta' && !UI.pf.receta.length) { const ins = DB.productos.find(p => p.tipo === 'insumo'); if (ins) UI.pf.receta.push({ id: ins.id, cant: 1 }); } mostrarFormProducto(); },
-  'cat-name': el => { const c = catDe(el.dataset.id); if (c && el.value.trim()) { c.nombre = el.value.trim(); persist(); } },
+  'cat-name': el => { const c = catDe(el.dataset.id); if (c && el.value.trim()) { c.nombre = el.value.trim(); persistSoon(); } },
   'cat-color': el => { const r = tx(() => { catDe(el.dataset.id).color = el.value; }); if (r.ok) views.admin(); },
-  'met-name': el => { const m = metodo(el.dataset.id); if (m && el.value.trim()) { m.nombre = el.value.trim(); persist(); } },
+  'met-name': el => { const m = metodo(el.dataset.id); if (m && el.value.trim()) { m.nombre = el.value.trim(); persistSoon(); } },
   'met-act': el => { const r = tx(() => { const m = metodo(el.dataset.id); if (m.efectivo && !el.checked) throw new Error('El efectivo tiene que estar siempre activo'); m.activo = el.checked; }); if (!r.ok) views.admin(); },
-  negocio: el => { DB.negocio = el.value.trim() || 'Predio Deportivo'; persist(); renderSide(); },
+  negocio: el => { DB.negocio = el.value.trim() || 'Predio Deportivo'; persistSoon(); renderSide(); },
 };
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-in]');
@@ -3524,7 +3540,7 @@ if (!DB.productos.length) UI.admTab = 'planilla';
 render();
 setInterval(() => { if (!MODAL && revisarTurnos()) render(); }, 30000);
 if (SERVIDOR) {
-  setInterval(() => { if (!ESTADO_GUARDADO.ok) persist(); }, 8000);            // si falló un guardado, se reintenta solo
+  setInterval(() => { if (!ESTADO_GUARDADO.ok) { try { guardarSync(); } catch (e) { /* sigue sin guardar: ya se ve en pantalla */ } } }, 8000);   // si falló un guardado, se reintenta solo
   window.addEventListener('beforeunload', e => { if (!ESTADO_GUARDADO.ok) { e.preventDefault(); e.returnValue = ''; } });
   setTimeout(() => {
     try {
