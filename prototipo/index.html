@@ -1,0 +1,1350 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Caja del Predio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: barra lateral fija (barra inferior en celular). La caja usa dos columnas: productos | comanda.
+   Paleta: verdes grisáceos de cancha + un acento verde esmeralda; ámbar/azul/rojo quedan para las categorías. */
+:root{
+  --bg:#eef2f0; --surface:#ffffff; --surface2:#e6ece9; --line:#d3dcd8;
+  --fg:#14201c; --muted:#5a6a65;
+  --accent:#0a7a5a; --accent-fg:#ffffff; --accent-soft:#d3eee3;
+  --good:#17803f; --good-soft:#d9f0e1;
+  --warn:#9a5b00; --warn-soft:#fbebc8;
+  --bad:#bb3326; --bad-soft:#f9dad6;
+  --side-bg:#12261f; --side-fg:#dcebe5; --side-mute:#8fb0a4;
+  --shadow:0 1px 2px rgba(10,30,22,.08),0 4px 14px rgba(10,30,22,.06);
+  --font:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1412; --surface:#151f1b; --surface2:#1c2924; --line:#2a3a33;
+  --fg:#e5eee9; --muted:#93a79e;
+  --accent:#3fc79a; --accent-fg:#04241a; --accent-soft:#143a2d;
+  --good:#52cf86; --good-soft:#153725;
+  --warn:#f0b24a; --warn-soft:#3b2d0f;
+  --bad:#ff7d6e; --bad-soft:#41191a;
+  --side-bg:#09100e; --side-fg:#d5e4dd; --side-mute:#7f9a8f;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1412; --surface:#151f1b; --surface2:#1c2924; --line:#2a3a33;
+  --fg:#e5eee9; --muted:#93a79e;
+  --accent:#3fc79a; --accent-fg:#04241a; --accent-soft:#143a2d;
+  --good:#52cf86; --good-soft:#153725;
+  --warn:#f0b24a; --warn-soft:#3b2d0f;
+  --bad:#ff7d6e; --bad-soft:#41191a;
+  --side-bg:#09100e; --side-fg:#d5e4dd; --side-mute:#7f9a8f;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:24px} h2{font-size:17px} h3{font-size:15px}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#app{display:grid;grid-template-columns:212px minmax(0,1fr);height:100%}
+.side{background:var(--side-bg);color:var(--side-fg);display:flex;flex-direction:column;padding:16px 12px;gap:6px;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-style:normal;font-size:15px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;padding:10px 12px;border:0;background:transparent;color:inherit;border-radius:8px;font-weight:500;cursor:pointer;text-align:left;width:100%}
+.nav button:hover{background:rgba(255,255,255,.08)}
+.nav button[aria-current=page]{background:var(--accent);color:var(--accent-fg);font-weight:700}
+.nav .badge{margin-left:auto;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,.16)}
+.nav .badge.warn{background:var(--warn-soft);color:var(--warn)}
+.nav [aria-current=page] .badge{background:rgba(0,0,0,.18)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:10px 6px 0;font-size:12px;color:var(--side-mute)}
+.side-foot button{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,.18);color:var(--side-fg);border-radius:8px;padding:7px 10px;cursor:pointer}
+.side-foot button:hover{background:rgba(255,255,255,.08)}
+.demo-tag{background:var(--warn-soft);color:var(--warn);padding:6px 8px;border-radius:8px;font-weight:600;line-height:1.3}
+
+main{overflow:auto;padding:20px 24px 28px;display:flex;flex-direction:column;min-width:0}
+main>*{flex:none}
+main>.pos{flex:1 1 auto}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.ph p{margin-top:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;min-height:38px}
+.btn:hover{background:var(--surface2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{padding:5px 10px;min-height:30px;font-size:13px}
+.btn.lg{min-height:52px;font-size:17px;padding:12px 18px}
+.icon{border:1px solid var(--line);background:var(--surface);border-radius:7px;width:30px;height:30px;cursor:pointer;display:grid;place-items:center;font-weight:700}
+.icon:hover{background:var(--surface2)}
+.in{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 11px;min-height:38px}
+.in:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+textarea.in{resize:vertical}
+.fld{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13px}
+.fld .in{font-weight:400;font-size:14px}
+.fld small{font-weight:400;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 13px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+.chip:hover{background:var(--surface2)}
+.chip.sm{padding:3px 10px;font-size:12px}
+.chip[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.dot{width:9px;height:9px;border-radius:50%;background:hsl(var(--h,160) 62% 46%);display:inline-block;flex:none}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h2{margin-bottom:10px}
+
+/* Caja */
+.pos{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:16px;flex:1;min-height:0}
+.pos-l{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+.pos-top{display:flex;gap:10px;flex-wrap:wrap}
+.pos-top .chips{flex:1 1 auto}
+.search{max-width:260px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;overflow:auto;padding:2px 2px 8px;align-content:start;flex:1;min-height:0}
+.tile{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 12px 12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:104px;box-shadow:var(--shadow);overflow:hidden}
+.tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:hsl(var(--h,160) 62% 46%)}
+.tile:hover{border-color:var(--accent)}
+.tile:active{transform:scale(.985)}
+.tile b{font-size:15px;line-height:1.2}
+.tile .pr{font-weight:800;font-size:16px;margin-top:auto;font-variant-numeric:tabular-nums}
+.tile .st{font-size:12px;font-weight:600;color:var(--muted)}
+.tile .st.warn{color:var(--warn)} .tile .st.bad{color:var(--bad)}
+.pos-r{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow)}
+.cart-h{padding:14px 14px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.cart-h label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.lines{flex:1;overflow:auto;padding:6px 14px;min-height:120px}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 10px;padding:10px 0;border-bottom:1px dashed var(--line);align-items:center}
+.line:last-child{border-bottom:0}
+.line .nm{min-width:0}
+.line .nm b{display:block;overflow-wrap:anywhere}
+.line .nm small{color:var(--muted)}
+.qty{display:flex;align-items:center;gap:6px}
+.qty span{min-width:22px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
+.ln-sub{font-weight:700;min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+.ln-tools{grid-column:1/-1;display:flex;gap:6px}
+.ln-tools button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-decoration:underline}
+.ln-tools button:hover{color:var(--fg)}
+.empty{display:grid;place-items:center;text-align:center;color:var(--muted);padding:28px 10px;gap:6px}
+.cart-f{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.total-row{display:flex;justify-content:space-between;align-items:baseline}
+.total-row span{font-weight:700;color:var(--muted)}
+.total-row b{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* Mesas */
+.salon{position:relative;border:1px solid var(--line);border-radius:var(--r);background:
+  linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 10%,
+  linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/10% 100%, var(--surface);
+  background-blend-mode:normal;height:min(62vh,540px);min-height:360px;touch-action:pan-y;overflow:hidden}
+.salon.editing{outline:2px dashed var(--accent);outline-offset:-2px}
+.mesa{position:absolute;width:118px;height:88px;border-radius:14px;border:2px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;box-shadow:var(--shadow);padding:4px}
+.mesa b{font-size:15px} .mesa span{font-weight:700;font-variant-numeric:tabular-nums}
+.mesa small{color:var(--muted);font-size:11px;min-height:14px}
+.mesa:not(.busy) span{color:var(--good)}
+.mesa.busy{border-color:var(--warn);background:var(--warn-soft)}
+.mesa.busy span{color:var(--warn)}
+.salon.editing .mesa{cursor:grab;touch-action:none}
+.mesa.sel{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.legend{display:flex;gap:14px;color:var(--muted);font-size:12px;margin-top:10px;flex-wrap:wrap}
+
+/* Tablas */
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--surface2);position:sticky;top:0;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+td.num{font-variant-numeric:tabular-nums}
+tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
+.actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.toolbar .in{width:auto;max-width:240px}
+
+/* Reportes */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi span{display:block;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.kpi b{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.bar{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0}
+.bar .track{height:12px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent);border-radius:99px}
+.bar .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.bar .val{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+
+/* Modal */
+.scrim{position:fixed;inset:0;background:rgba(5,15,11,.55);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(480px,100%);max-height:calc(100% - 8px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal.wide{width:min(720px,100%)}
+.modal header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.modal .x{border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--muted);width:32px;height:32px}
+.mbody{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.modal footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.err{color:var(--bad);font-weight:600}
+.big-total{display:flex;justify-content:space-between;align-items:baseline;background:var(--surface2);border-radius:10px;padding:12px 14px}
+.big-total b{font-size:32px;font-weight:800;font-variant-numeric:tabular-nums}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 150px auto auto;gap:8px;align-items:center}
+.prow .pm{font-weight:700}
+.money-in{display:flex;align-items:center;gap:6px}
+.money-in span{color:var(--muted);font-weight:700}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 4px}
+.pg-sum{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:var(--surface2);font-weight:600}
+.pg-sum .l{display:flex;justify-content:space-between}
+.pg-sum .vuelto b{font-size:22px;color:var(--good)}
+.pg-sum .falta b{color:var(--warn)}
+.paper{font-family:var(--mono);font-size:12.5px;line-height:1.45;background:#fff;color:#111;padding:16px 14px;border-radius:6px;border:1px solid var(--line);white-space:pre-wrap;overflow:auto;margin:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+.rrow{display:grid;grid-template-columns:minmax(0,1fr) 90px auto;gap:8px;align-items:center}
+.note{background:var(--accent-soft);color:var(--fg);border-radius:10px;padding:10px 12px;font-size:13px}
+.note.warn{background:var(--warn-soft)}
+
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;max-width:min(380px,calc(100% - 32px))}
+.toast{background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);animation:in .18s ease-out}
+.toast.warn{background:var(--warn);color:#fff}
+.toast.bad{background:var(--bad);color:#fff}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+@media (max-width:980px){
+  .pos,main>.pos{grid-template-columns:1fr;flex:none}
+  .grid{overflow:visible;flex:none}
+  .pos-r{min-height:380px}
+  body{overflow:auto}
+}
+@media (max-width:820px){
+  body{overflow:hidden}
+  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .side{order:2;flex-direction:row;padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));overflow:hidden}
+  .brand,.side-foot .demo-tag,.side-foot span{display:none}
+  .nav{flex-direction:row;flex:1;overflow-x:auto;gap:0}
+  .nav button{flex-direction:column;gap:1px;font-size:11px;padding:6px 8px;align-items:center;width:auto;flex:1 0 auto;position:relative}
+  .nav .badge{position:absolute;top:2px;right:2px;margin:0;padding:0 5px;font-size:10px}
+  .side-foot{margin:0;padding:0;flex-direction:row}
+  .side-foot button{border:0;padding:6px}
+  .side-foot button b{display:none}
+  main{padding:14px 16px 20px}
+  #toasts{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  .grid2{grid-template-columns:1fr}
+  .prow{grid-template-columns:minmax(0,1fr) 120px auto}
+  .search{max-width:none;width:100%}
+  h1{font-size:21px}
+}
+@media print{
+  body *{visibility:hidden}
+  #ticket-paper,#ticket-paper *{visibility:visible}
+  #ticket-paper{position:fixed;left:0;top:0;width:80mm;border:0;box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="side">
+    <div class="brand"><i>●</i><span id="brand-name">Predio</span></div>
+    <nav class="nav" id="nav" aria-label="Secciones"></nav>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="modal-root"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   PROTOTIPO "CAJA DEL PREDIO"
+   Simula el sistema real (Python + SQLite) dentro del navegador.
+   - Los datos se guardan en este navegador (localStorage).
+   - tx() hace lo mismo que commit/rollback en SQLite: si algo falla a la
+     mitad de una operación, se vuelve al estado anterior y no queda nada a medias.
+   ===================================================================== */
+
+/* ---------- utilidades ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const pad = n => String(n).padStart(2, '0');
+const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const hhmm = ts => { const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const fechaHora = ts => { const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + hhmm(ts); };
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const num = v => Math.max(0, Math.round(parseFloat(String(v).replace(',', '.')) || 0));
+const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+const hace = ts => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min'; };
+const CAT_HUES = { ambar: 38, azul: 205, rojo: 8, verde: 150, violeta: 265, gris: 200 };
+const TIPOS = {
+  directo:  { n: 'Stock propio', d: 'Descuenta su propio stock (gaseosas, golosinas, pelotas).' },
+  receta:   { n: 'Receta / combo', d: 'Al venderlo descuenta insumos (pancho = 1 salchicha + 1 pan).' },
+  servicio: { n: 'Servicio sin stock', d: 'No se controla stock (turno de cancha, café, minutas).' },
+  alquiler: { n: 'Alquiler (sale y vuelve)', d: 'Se presta y vuelve: el stock sale al cobrar y regresa al devolver.' },
+  insumo:   { n: 'Insumo (no se vende solo)', d: 'Sólo se usa dentro de recetas (salchichas, panes).' },
+};
+const MOV = { ingreso: ['Ingreso', 'good'], venta: ['Venta', ''], ajuste: ['Ajuste', 'warn'], alquiler_salida: ['Alquiler sale', ''], alquiler_devolucion: ['Alquiler vuelve', 'good'], baja: ['Baja', 'bad'], anulacion: ['Anulación', 'warn'] };
+
+/* ---------- íconos ---------- */
+const ICON = {
+  venta: '<path d="M3 4h2l2.4 11h10.2L20 7H6"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/>',
+  mesas: '<rect x="3" y="5" width="7" height="6" rx="1.5"/><rect x="14" y="5" width="7" height="6" rx="1.5"/><rect x="3" y="14" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/>',
+  alq: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
+  stock: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  tickets: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  rep: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  admin: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  tema: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+};
+const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* ---------- base de datos (en memoria + localStorage) ---------- */
+const LS_KEY = 'predio_pos_proto_v1';
+let DB = null;
+let STORAGE_OK = true;
+const UI = {
+  view: 'venta', cat: 'all', q: '', com: 'M',
+  stockTab: 'inv', stockQ: '', stockF: 'all', stockMov: 'all',
+  repDesde: dayKey(Date.now()), repHasta: dayKey(Date.now()),
+  tkDesde: dayKey(Date.now() - 6 * 864e5), tkHasta: dayKey(Date.now()), tkQ: '',
+  editSalon: false, mesaEdit: null, admTab: 'productos', admQ: '', adminUntil: 0,
+};
+
+function uid(prefix) { return prefix + (DB.seq++).toString(36); }
+function persist() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(DB)); STORAGE_OK = true; }
+  catch (e) { STORAGE_OK = false; }
+}
+function cargar() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) { const d = JSON.parse(raw); if (d && d.productos && d.ventas) return d; }
+  } catch (e) { STORAGE_OK = false; }
+  return null;
+}
+function normalizar() {
+  DB.comandas = DB.comandas || {};
+  if (!DB.comandas.M) DB.comandas.M = { items: [] };
+  DB.negocio = DB.negocio || 'Predio Deportivo';
+}
+
+/* Transacción: ejecuta fn; si lanza un error, restaura el estado anterior (rollback). */
+function tx(fn) {
+  const snap = JSON.stringify(DB);
+  try {
+    const value = fn();
+    persist();
+    return { ok: true, value };
+  } catch (e) {
+    DB = JSON.parse(snap);       // ROLLBACK
+    toast('Operación cancelada, no se guardó nada: ' + e.message, 'bad');
+    return { ok: false, error: e };
+  }
+}
+
+/* ---------- acceso a datos ---------- */
+const prod = id => DB.productos.find(p => p.id === id);
+const metodo = id => DB.metodos.find(m => m.id === id);
+const catDe = id => DB.categorias.find(c => c.id === id);
+const hueDe = id => { const c = catDe(id); return c ? CAT_HUES[c.color] ?? 160 : 200; };
+const stk = id => { const p = prod(id); return p ? p.stock : 0; };
+
+/* Qué stock real consume vender `cant` unidades de un producto */
+function consumo(p, cant) {
+  if (p.tipo === 'servicio') return [];
+  if (p.tipo === 'receta') return (p.receta || []).map(r => ({ id: r.id, cant: r.cant * cant }));
+  return [{ id: p.id, cant }];
+}
+function consumoItems(items) {
+  const m = {};
+  items.forEach(it => { const p = prod(it.prodId); if (p) consumo(p, it.cant).forEach(c => { m[c.id] = (m[c.id] || 0) + c.cant; }); });
+  return m;
+}
+function reservadoOtros(key) {
+  const m = {};
+  Object.entries(DB.comandas).forEach(([k, c]) => {
+    if (k === key) return;
+    const u = consumoItems(c.items);
+    Object.entries(u).forEach(([id, n]) => { m[id] = (m[id] || 0) + n; });
+  });
+  return m;
+}
+function faltantes(items, key, conReservas) {
+  const need = consumoItems(items);
+  const res = conReservas ? reservadoOtros(key) : {};
+  return Object.entries(need)
+    .filter(([id, n]) => n > stk(id) - (res[id] || 0))
+    .map(([id, n]) => ({ id, nombre: prod(id) ? prod(id).nombre : '(borrado)', need: n, sistema: stk(id), reservado: res[id] || 0 }));
+}
+function restante(p, res) {
+  if (p.tipo === 'servicio') return Infinity;
+  const need = consumo(p, 1);
+  if (!need.length) return 0;
+  return Math.min(...need.map(n => Math.floor((stk(n.id) - (res[n.id] || 0)) / n.cant)));
+}
+
+/* Movimiento de stock: único punto por donde cambia el stock. Nunca permite quedar negativo. */
+function moverStock(id, delta, tipo, o = {}) {
+  const p = prod(id);
+  if (!p) throw new Error('Producto inexistente');
+  const antes = p.stock, despues = antes + delta;
+  if (despues < 0) throw new Error(`Stock insuficiente de ${p.nombre} (hay ${antes}, se necesitan ${-delta})`);
+  p.stock = despues;
+  DB.movimientos.push({ id: uid('mv'), ts: o.ts || Date.now(), prodId: id, nombre: p.nombre, tipo, cant: delta, antes, despues, ref: o.ref || null, motivo: o.motivo || '' });
+}
+
+/* Registrar una venta completa (stock + ticket + pagos + alquileres), todo dentro de una transacción */
+function evalPago(total, rows) {
+  const filas = rows.filter(r => r.monto > 0);
+  const noCash = sum(filas.filter(r => !metodo(r.metodoId).efectivo), r => r.monto);
+  const cashIn = sum(filas.filter(r => metodo(r.metodoId).efectivo), r => r.monto);
+  const pagado = noCash + cashIn;
+  const out = { noCash, cashIn, pagado, applied: 0, vuelto: 0, falta: 0, ok: false, error: '' };
+  if (noCash > total) { out.error = 'Lo que se paga con medios que no son efectivo supera el total.'; return out; }
+  out.applied = Math.min(cashIn, total - noCash);
+  out.vuelto = cashIn - out.applied;
+  out.falta = total - noCash - out.applied;
+  out.ok = out.falta === 0 && total > 0;
+  return out;
+}
+function commitVenta(o) {
+  const ts = o.ts || Date.now();
+  const lineas = o.items.map(it => {
+    const p = prod(it.prodId);
+    if (!p) throw new Error('Un producto de la comanda ya no existe');
+    return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, nota: it.nota || '' };
+  });
+  if (!lineas.length) throw new Error('La comanda está vacía');
+  const total = sum(lineas, l => l.cant * l.precio);
+  const ev = evalPago(total, o.pagos);
+  if (ev.error) throw new Error(ev.error);
+  if (ev.falta > 0) throw new Error('Falta cobrar ' + money(ev.falta));
+
+  const ventaId = uid('v');
+  const nro = ++DB.contadores.venta;
+  lineas.forEach(l => {
+    const p = prod(l.prodId);
+    consumo(p, l.cant).forEach(c => moverStock(c.id, -c.cant, p.tipo === 'alquiler' ? 'alquiler_salida' : 'venta', { ref: ventaId, ts, motivo: `Ticket #${nro} · ${l.nombre}` }));
+    if (p.tipo === 'alquiler') {
+      for (let i = 0; i < l.cant; i++) DB.alquileres.push({ id: uid('al'), ts, ventaId, nro, prodId: p.id, nombre: p.nombre, cliente: o.cliente || '', estado: 'prestado', tsDev: null });
+    }
+  });
+  // Pagos guardados por el monto realmente aplicado (el efectivo ya sin el vuelto)
+  const pagos = [];
+  const cashRow = o.pagos.find(r => r.monto > 0 && metodo(r.metodoId).efectivo);
+  o.pagos.filter(r => r.monto > 0 && !metodo(r.metodoId).efectivo).forEach(r => pagos.push({ metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto }));
+  if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied });
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos, recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '' });
+  return ventaId;
+}
+function anularVenta(id) {
+  const v = DB.ventas.find(x => x.id === id);
+  if (!v || v.estado !== 'ok') throw new Error('Ese ticket ya está anulado');
+  DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta').forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, motivo: `Anulación ticket #${v.nro}` }));
+  DB.alquileres.filter(a => a.ventaId === id && a.estado === 'prestado').forEach(a => {
+    moverStock(a.prodId, 1, 'anulacion', { ref: id, motivo: `Anulación ticket #${v.nro} (alquiler sin devolver)` });
+    a.estado = 'anulado';
+  });
+  v.estado = 'anulada'; v.tsAnul = Date.now();
+}
+function devolverAlquiler(id, perdido) {
+  const a = DB.alquileres.find(x => x.id === id);
+  if (!a || a.estado !== 'prestado') throw new Error('Ese alquiler ya está cerrado');
+  if (perdido) moverStock(a.prodId, 0, 'baja', { ref: a.ventaId, motivo: `No volvió: ${a.nombre} (${a.cliente || 'sin nombre'})` });
+  else moverStock(a.prodId, 1, 'alquiler_devolucion', { ref: a.ventaId, motivo: `Devolvió ${a.nombre} (${a.cliente || 'sin nombre'})` });
+  a.estado = perdido ? 'perdido' : 'devuelto'; a.tsDev = Date.now();
+}
+
+/* ---------- datos de ejemplo ---------- */
+function seed() {
+  const d = { v: 1, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], alquileres: [], contadores: { venta: 0 } };
+  DB = d;
+  const t0 = Date.now() - 9 * 3600e3;
+  const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
+  const met = (nombre, efectivo) => { const m = { id: uid('mp'), nombre, activo: true, efectivo: !!efectivo }; d.metodos.push(m); return m.id; };
+  const add = o => {
+    const p = { id: uid('p'), activo: true, precio: 0, stock: 0, minimo: 0, paqueteNombre: '', paqueteUnidades: 1, receta: [], tipo: 'directo', ...o };
+    const st = p.stock; p.stock = 0; d.productos.push(p);
+    if (st > 0) moverStock(p.id, st, 'ingreso', { ts: t0, motivo: 'Stock inicial' });
+    return p.id;
+  };
+  const kiosco = cat('Kiosco', 'ambar'), padel = cat('Pádel', 'azul'), buffet = cat('Buffet', 'rojo');
+  const efe = met('Efectivo', true), mp = met('Mercado Pago'), tr = met('Transferencia'), tj = met('Tarjeta');
+
+  const coca = add({ nombre: 'Coca-Cola 500 ml', catId: kiosco, precio: 2200, stock: 8, minimo: 6, paqueteNombre: 'Bulto 6 × 12', paqueteUnidades: 72 });
+  const agua = add({ nombre: 'Agua mineral 500 ml', catId: kiosco, precio: 1500, stock: 24, minimo: 6, paqueteNombre: 'Pack × 6', paqueteUnidades: 6 });
+  add({ nombre: 'Gatorade 500 ml', catId: kiosco, precio: 2600, stock: 18, minimo: 6, paqueteNombre: 'Pack × 12', paqueteUnidades: 12 });
+  const alfa = add({ nombre: 'Alfajor', catId: kiosco, precio: 1200, stock: 40, minimo: 10, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
+  add({ nombre: 'Papas fritas', catId: kiosco, precio: 2000, stock: 15, minimo: 5, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
+  add({ nombre: 'Chicles', catId: kiosco, precio: 500, stock: 60, minimo: 10, paqueteNombre: 'Caja × 20', paqueteUnidades: 20 });
+  const turno = add({ nombre: 'Turno cancha 90 min', catId: padel, precio: 28000, tipo: 'servicio' });
+  const pelotas = add({ nombre: 'Pelotas (tubo × 3)', catId: padel, precio: 9000, stock: 10, minimo: 3, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
+  add({ nombre: 'Grip', catId: padel, precio: 3500, stock: 14, minimo: 4, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
+  const paleta = add({ nombre: 'Alquiler de paleta', catId: padel, precio: 3000, tipo: 'alquiler', stock: 6, minimo: 2 });
+  const salch = add({ nombre: 'Salchicha', catId: buffet, tipo: 'insumo', stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const pan = add({ nombre: 'Pan de pancho', catId: buffet, tipo: 'insumo', stock: 30, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const medal = add({ nombre: 'Medallón de carne', catId: buffet, tipo: 'insumo', stock: 20, minimo: 5, paqueteNombre: 'Caja × 10', paqueteUnidades: 10 });
+  const panH = add({ nombre: 'Pan de hamburguesa', catId: buffet, tipo: 'insumo', stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const queso = add({ nombre: 'Feta de queso', catId: buffet, tipo: 'insumo', stock: 60, minimo: 10, paqueteNombre: 'Paquete × 20', paqueteUnidades: 20 });
+  const pancho = add({ nombre: 'Pancho', catId: buffet, precio: 3500, tipo: 'receta', receta: [{ id: salch, cant: 1 }, { id: pan, cant: 1 }] });
+  const hamb = add({ nombre: 'Hamburguesa completa', catId: buffet, precio: 8500, tipo: 'receta', receta: [{ id: medal, cant: 1 }, { id: panH, cant: 1 }, { id: queso, cant: 2 }] });
+  add({ nombre: 'Porción de muzzarella', catId: buffet, precio: 2800, stock: 16, minimo: 4, paqueteNombre: 'Pizza × 8 porciones', paqueteUnidades: 8 });
+  add({ nombre: 'Milanesa con papas', catId: buffet, precio: 9500, tipo: 'servicio' });
+  const cerv = add({ nombre: 'Cerveza 1 L', catId: buffet, precio: 4200, stock: 18, minimo: 6, paqueteNombre: 'Cajón × 12', paqueteUnidades: 12 });
+  add({ nombre: 'Café', catId: buffet, precio: 1800, tipo: 'servicio' });
+
+  const pos = [[8, 10], [27, 10], [46, 10], [65, 10], [84 - 4, 10], [8, 48], [27, 48], [46, 48], [65, 48], [80, 48]];
+  ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 4', 'Mesa 5', 'Mesa 6', 'Mesa 7', 'Mesa 8', 'Barra', 'Quincho'].forEach((n, i) => d.mesas.push({ id: uid('m'), nombre: n, x: pos[i][0], y: pos[i][1] }));
+
+  // ventas de ejemplo de hoy (pasan por la misma función que las ventas reales)
+  const demo = [
+    { items: [[pancho, 2], [coca, 1]], pagos: [[efe, 10000]], mesa: 'Mesa 2' },
+    { items: [[hamb, 1], [cerv, 1]], pagos: [[mp, 12700]], mesa: 'Mesa 4' },
+    { items: [[turno, 1]], pagos: [[efe, 10000], [tr, 18000]], cliente: 'Cancha 1' },
+    { items: [[paleta, 1]], pagos: [[efe, 3000]], cliente: 'Cancha 2 · Martín' },
+    { items: [[alfa, 2], [agua, 1]], pagos: [[efe, 5000]] },
+    { items: [[pelotas, 1]], pagos: [[mp, 9000]] },
+    { items: [[coca, 2]], pagos: [[tj, 4400]] },
+    { items: [[paleta, 1]], pagos: [[efe, 3000]], cliente: 'Cancha 1 · Lucía' },
+  ];
+  demo.forEach((x, i) => commitVenta({
+    ts: Date.now() - (demo.length - i) * 17 * 60000,
+    items: x.items.map(([prodId, cant]) => ({ prodId, cant })),
+    pagos: x.pagos.map(([metodoId, monto]) => ({ metodoId, monto })),
+    mesaNombre: x.mesa, cliente: x.cliente,
+  }));
+  const dev = d.alquileres.find(a => a.cliente.includes('Lucía'));
+  dev.estado = 'devuelto'; dev.tsDev = Date.now() - 5 * 60000;
+  moverStock(paleta, 1, 'alquiler_devolucion', { motivo: 'Devolvió Alquiler de paleta (Cancha 1 · Lucía)' });
+  // comandas abiertas de ejemplo
+  d.comandas[d.mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }] };
+  d.comandas[d.mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
+  return d;
+}
+
+/* ---------- avisos y ventanas ---------- */
+function toast(msg, kind = '', tag = '') {
+  if (tag) document.querySelectorAll('.toast[data-tag="' + tag + '"]').forEach(t => t.remove());
+  const el = document.createElement('div');
+  if (tag) el.dataset.tag = tag;
+  el.className = 'toast ' + kind; el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), kind === 'bad' ? 6000 : 3600);
+}
+let MODAL = null;
+function modal({ title, body, actions = [], wide = false, onClose }) {
+  $('#modal-root').innerHTML = `<div class="scrim" data-act="mbg"><div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <header><h3>${esc(title)}</h3><button class="x" data-act="mclose" aria-label="Cerrar">×</button></header>
+    <div class="mbody">${body}</div>
+    <footer>${actions.map((a, i) => `<button class="btn ${a.kind || ''}" id="mact-${i}" data-act="mact" data-i="${i}" ${a.disabled ? 'disabled' : ''}>${esc(a.label)}</button>`).join('')}</footer></div></div>`;
+  MODAL = { actions, onClose };
+  const f = $('#modal-root').querySelector('input:not([type=hidden]),select,textarea');
+  if (f && !f.readOnly) f.focus();
+}
+function closeModal(silent) {
+  $('#modal-root').innerHTML = '';
+  const m = MODAL; MODAL = null;
+  if (!silent && m && m.onClose) m.onClose();
+}
+function ask(title, msg, okLabel, cb, danger) {
+  modal({ title, body: `<p>${msg}</p>`, actions: [{ label: 'Cancelar' }, { label: okLabel, kind: danger ? 'danger' : 'primary', onClick: () => { cb(); } }] });
+}
+function requirePin(cb) {
+  if (Date.now() < UI.adminUntil) { UI.adminUntil = Date.now() + 300000; return cb(); }
+  modal({
+    title: 'Código de administración',
+    body: `<p class="muted">Esta zona está protegida para que no se cambien productos, mesas o tickets por error. (En el prototipo el código es <b>1234</b>.)</p>
+           <input id="pin" class="in" type="password" inputmode="numeric" autocomplete="off" placeholder="Código">
+           <p class="err" id="pinerr" hidden>Código incorrecto</p>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Entrar', kind: 'primary', onClick: () => {
+      if ($('#pin').value === DB.pin) { UI.adminUntil = Date.now() + 300000; cb(); return; }
+      $('#pinerr').hidden = false; return false;
+    } }],
+  });
+}
+function copiar(txt) {
+  const ok = () => toast('Copiado');
+  const fallback = () => {
+    const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); ok(); } catch (e) { toast('No se pudo copiar, seleccioná el texto a mano', 'warn'); }
+    t.remove();
+  };
+  try { navigator.clipboard.writeText(txt).then(ok, fallback); } catch (e) { fallback(); }
+}
+function descargar(nombre, txt, mime) {
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], { type: mime || 'text/csv;charset=utf-8' }));
+    a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    toast('Descarga pedida: ' + nombre);
+  } catch (e) { toast('Tu navegador bloqueó la descarga. Usá "Copiar texto".', 'warn'); }
+}
+function csv(rows) {
+  return '﻿' + rows.map(r => r.map(c => { c = String(c ?? ''); return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';')).join('\r\n');
+}
+function exportar(nombre, rows) {
+  const txt = csv(rows);
+  modal({
+    title: 'Exportar ' + nombre, wide: true,
+    body: `<p class="muted">Archivo CSV separado por punto y coma, listo para abrir con Excel. Si la descarga no arranca en tu navegador, copiá el texto y pegalo en una planilla.</p>
+           <textarea class="in mono" id="exp-txt" rows="10" readonly>${esc(txt.slice(1))}</textarea>`,
+    actions: [{ label: 'Cerrar' },
+      { label: 'Copiar texto', onClick: () => { copiar(txt.slice(1)); return false; } },
+      { label: 'Descargar ' + nombre + '.csv', kind: 'primary', onClick: () => { descargar(nombre + '.csv', txt); return false; } }],
+  });
+}
+
+/* ---------- caja: comandas ---------- */
+const getCom = key => key === 'M' ? (DB.comandas.M || (DB.comandas.M = { items: [] })) : (DB.comandas[key] || { items: [] });
+const totalItems = items => sum(items, it => { const p = prod(it.prodId); return p ? p.precio * it.cant : 0; });
+function setItems(key, items) {
+  items = items.filter(i => i.cant > 0 && prod(i.prodId));
+  if (key !== 'M' && !items.length) { delete DB.comandas[key]; return; }
+  const prev = DB.comandas[key] || {};
+  DB.comandas[key] = { ...prev, items, ts: prev.ts || Date.now() };
+}
+function aplicarItems(key, items) {
+  const r = tx(() => setItems(key, items));
+  if (!r.ok) return;
+  avisoBajo(items);
+  if (UI.view === 'venta') { renderGrid(); renderCart(); }
+  renderSide();
+}
+function avisoBajo(items) {
+  const need = consumoItems(items), res = reservadoOtros('__nada__');
+  const bajos = Object.keys(need).map(id => prod(id)).filter(p => p && p.stock - (res[p.id] || 0) <= p.minimo);
+  if (!bajos.length) return;
+  toast(bajos.map(p => { const r = Math.max(0, p.stock - (res[p.id] || 0)); return r === 0 ? `No queda ${p.nombre} (según el sistema)` : `Quedan ${r} de ${p.nombre}`; }).join(' · '), 'warn', 'stock');
+}
+function cambiarCantidad(items, idx, delta) {
+  const nuevo = items.map(i => ({ ...i }));
+  nuevo[idx].cant += delta;
+  return nuevo;
+}
+/* Si lo que se pide supera el stock del sistema, pide confirmación humana con conteo real */
+function chequearStock(nuevo, key, conReservas, cuando, onOk) {
+  const f = faltantes(nuevo, key, conReservas);
+  if (!f.length) return onOk();
+  modalFaltante(f, nuevo, key, conReservas, cuando, onOk);
+}
+function modalFaltante(f, items, key, conReservas, cuando, onOk, errorMsg) {
+  const filas = f.map(x => `
+    <div class="card" style="padding:12px">
+      <b>${esc(x.nombre)}</b>
+      <p class="muted">El sistema dice que hay <b>${x.sistema}</b>${x.reservado ? ` (${x.reservado} ya reservadas en otras mesas)` : ''}. Estás ${cuando === 'cobrar' ? 'cobrando' : 'pidiendo'} <b>${x.need}</b>.</p>
+      <label class="fld" style="margin-top:8px">¿Cuántas hay realmente ahora? (contalas)
+        <input class="in" id="real-${x.id}" inputmode="numeric" value="${x.sistema}"></label>
+    </div>`).join('');
+  modal({
+    title: 'El stock no alcanza: confirmá en persona',
+    body: `<div class="note warn">Contá lo que hay físicamente. Si realmente hay, se corrige el stock del sistema (queda registrado como ajuste) y se sigue con la venta. Si no hay, cancelá.</div>${filas}${errorMsg ? `<p class="err">${esc(errorMsg)}</p>` : ''}`,
+    actions: [{ label: 'Cancelar, no hay' }, { label: 'Confirmar conteo y seguir', kind: 'primary', onClick: () => {
+      const reales = f.map(x => ({ x, real: num($('#real-' + x.id).value) }));
+      const r = tx(() => reales.forEach(({ x, real }) => { const d = real - stk(x.id); if (d !== 0) moverStock(x.id, d, 'ajuste', { motivo: 'Conteo real confirmado al ' + (cuando === 'cobrar' ? 'cobrar' : 'vender') }); }));
+      if (!r.ok) return false;
+      renderSide();
+      const f2 = faltantes(items, key, conReservas);
+      if (f2.length) { modalFaltante(f2, items, key, conReservas, cuando, onOk, 'Con ese conteo igual no alcanza para lo que se pide. Sacá unidades de la comanda o cargá mercadería.'); return false; }
+      onOk();
+    } }],
+  });
+}
+function agregar(prodId) {
+  const key = UI.com, items = getCom(key).items;
+  const idx = items.findIndex(i => i.prodId === prodId && !i.nota);
+  const nuevo = items.map(i => ({ ...i }));
+  if (idx >= 0) nuevo[idx].cant++; else nuevo.push({ prodId, cant: 1, nota: '' });
+  chequearStock(nuevo, key, true, 'vender', () => aplicarItems(key, nuevo));
+}
+
+/* ---------- cobro ---------- */
+function abrirCobro() {
+  const key = UI.com, c = getCom(key);
+  if (!c.items.length) return toast('Primero agregá productos', 'warn');
+  chequearStock(c.items, key, false, 'cobrar', () => {
+    const total = totalItems(c.items);
+    const efe = DB.metodos.find(m => m.efectivo && m.activo) || DB.metodos.find(m => m.activo);
+    UI.pago = { total, key, rows: [{ metodoId: efe.id, monto: total }], cliente: '', alq: c.items.filter(i => prod(i.prodId).tipo === 'alquiler') };
+    renderCobro();
+  });
+}
+function renderCobro(focusIdx) {
+  const P = UI.pago;
+  const chips = DB.metodos.filter(m => m.activo).map(m => `<button class="chip" data-act="pg-add" data-id="${m.id}">+ ${esc(m.nombre)}</button>`).join('');
+  const rows = P.rows.map((r, i) => {
+    const m = metodo(r.metodoId);
+    const quick = m.efectivo ? [5000, 10000, 20000, 50000].map(v => `<button class="chip sm" data-act="pg-set" data-i="${i}" data-v="${v}">${money(v)}</button>`).join('') : '';
+    return `<div class="prow"><span class="pm">${esc(m.nombre)}</span>
+      <div class="money-in"><span>$</span><input class="in num" id="pg-${i}" data-in="pg" data-i="${i}" inputmode="numeric" value="${r.monto || ''}" placeholder="0"></div>
+      <button class="btn sm" data-act="pg-set" data-i="${i}" data-v="resto" title="Completar con lo que falta">Resto</button>
+      <button class="icon" data-act="pg-del" data-i="${i}" aria-label="Quitar">×</button></div>
+      ${quick ? `<div class="quick">${quick}</div>` : ''}`;
+  }).join('');
+  const alqTxt = P.alq.length ? `<label class="fld">Para quién es el alquiler (nombre o cancha)<small>Sirve para saber quién tiene la paleta cuando la devuelvan.</small>
+      <input class="in" id="pg-cliente" data-in="pg-cliente" value="${esc(P.cliente)}" placeholder="Ej: Cancha 3 · Juan"></label>` : '';
+  modal({
+    title: 'Cobrar · ' + (P.key === 'M' ? 'Mostrador' : DB.mesas.find(m => m.id === P.key).nombre),
+    body: `<div class="big-total"><span>Total a cobrar</span><b>${money(P.total)}</b></div>
+      ${alqTxt}
+      <div><div class="muted" style="margin-bottom:6px;font-weight:600">Medios de pago (se pueden combinar)</div><div class="chips">${chips}</div></div>
+      <div class="stack" id="pg-rows">${rows}</div>
+      <div class="pg-sum" id="pg-sum"></div>`,
+    actions: [{ label: 'Volver' }, { label: 'Confirmar cobro', kind: 'primary', disabled: true, onClick: confirmarCobro }],
+  });
+  updateCobro();
+  if (focusIdx != null) { const el = $('#pg-' + focusIdx); if (el) el.select(); }
+}
+function updateCobro() {
+  const P = UI.pago, ev = evalPago(P.total, P.rows);
+  const faltaCliente = P.alq.length && !P.cliente.trim();
+  let html = `<div class="l"><span>Cobrado</span><span class="num">${money(ev.pagado)}</span></div>`;
+  if (ev.error) html += `<div class="err">${esc(ev.error)}</div>`;
+  else if (ev.falta > 0) html += `<div class="l falta"><span>Falta</span><b class="num">${money(ev.falta)}</b></div>`;
+  else if (ev.vuelto > 0) html += `<div class="l vuelto"><span>Vuelto a entregar</span><b class="num">${money(ev.vuelto)}</b></div>`;
+  else html += `<div class="l"><span>Pago completo</span><span class="pill good">OK</span></div>`;
+  if (faltaCliente) html += `<div class="err">Falta el nombre o cancha de quien alquila.</div>`;
+  $('#pg-sum').innerHTML = html;
+  const b = $('#mact-1'); if (b) b.disabled = !(ev.ok && !faltaCliente);
+}
+function confirmarCobro() {
+  const P = UI.pago, key = P.key, c = getCom(key);
+  const mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
+  const r = tx(() => {
+    const id = commitVenta({ items: c.items, pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, cliente: P.cliente.trim() });
+    if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
+    return id;
+  });
+  if (!r.ok) return false;
+  render();
+  verTicket(r.value, true);
+}
+
+/* ---------- ticket ---------- */
+function ticketTexto(v) {
+  const W = 36, line = '-'.repeat(W);
+  const ctr = s => ' '.repeat(Math.max(0, Math.floor((W - s.length) / 2))) + s;
+  const lr = (a, b) => a.slice(0, Math.max(1, W - b.length - 1)).padEnd(W - b.length) + b;
+  const L = [ctr(DB.negocio.toUpperCase()), ctr('Ticket no fiscal'), line,
+    lr('Ticket Nº ' + String(v.nro).padStart(5, '0'), fechaHora(v.ts)), 'Destino: ' + v.destino];
+  if (v.cliente) L.push('Cliente: ' + v.cliente);
+  if (v.estado !== 'ok') L.push('*** ANULADO ***');
+  L.push(line);
+  v.items.forEach(l => {
+    L.push(lr(`${l.cant} x ${l.nombre}`, money(l.cant * l.precio).replace(' ', '')));
+    if (l.nota) L.push('   (' + l.nota + ')');
+  });
+  L.push(line, lr('TOTAL', money(v.total).replace(' ', '')));
+  v.pagos.forEach(p => L.push(lr('  ' + p.nombre, money(p.monto).replace(' ', ''))));
+  if (v.vuelto > 0) L.push(lr('  Vuelto', money(v.vuelto).replace(' ', '')));
+  L.push(line, ctr('¡Gracias por venir!'));
+  return L.join('\n');
+}
+function verTicket(id, nuevo) {
+  const v = DB.ventas.find(x => x.id === id); if (!v) return;
+  const txt = ticketTexto(v);
+  const acciones = [{ label: 'Cerrar', kind: nuevo ? 'primary' : '' }];
+  if (!nuevo && v.estado === 'ok') acciones.unshift({ label: 'Anular ticket', kind: 'danger', onClick: () => { anularTicket(id); return false; } });
+  acciones.splice(acciones.length - 1, 0, { label: 'Copiar texto', onClick: () => { copiar(txt); return false; } }, { label: 'Reimprimir / PDF', onClick: () => { imprimir(); return false; } });
+  modal({ title: nuevo ? `Venta registrada · Ticket #${v.nro}` : `Ticket #${v.nro}`, body: `<pre class="paper" id="ticket-paper">${esc(txt)}</pre>
+    <p class="muted" style="font-size:12px">Todos los datos del ticket quedan guardados: se puede reimprimir o volver a generar el PDF cuando haga falta.</p>`, actions: acciones });
+}
+function imprimir() {
+  try { window.print(); } catch (e) { /* sin impresión en este entorno */ }
+  toast('En la versión real el PDF se guarda solo en la carpeta oculta. Acá se usa la impresión del navegador (puede no abrirse en la vista previa).', 'warn');
+}
+function anularTicket(id) {
+  requirePin(() => {
+    const v = DB.ventas.find(x => x.id === id);
+    ask(`Anular ticket #${v.nro}`, `Se anula la venta de ${money(v.total)} y <b>se devuelve el stock</b> de los productos vendidos. El ticket queda en el historial marcado como anulado.`, 'Anular ticket', () => {
+      const r = tx(() => anularVenta(id));
+      if (r.ok) { toast('Ticket anulado y stock devuelto'); render(); }
+    }, true);
+  });
+}
+
+/* ---------- vistas ---------- */
+const views = {};
+function render() {
+  if (UI.com !== 'M' && !DB.comandas[UI.com] && !DB.mesas.find(m => m.id === UI.com)) UI.com = 'M';
+  renderSide();
+  $('#main').scrollTop = 0;
+  views[UI.view]();
+}
+function renderSide() {
+  $('#brand-name').textContent = DB.negocio;
+  const ocup = Object.keys(DB.comandas).filter(k => k !== 'M' && DB.comandas[k].items.length).length;
+  const alq = DB.alquileres.filter(a => a.estado === 'prestado').length;
+  const bajo = DB.productos.filter(p => p.activo && ['directo', 'insumo', 'alquiler'].includes(p.tipo) && p.stock <= p.minimo).length;
+  const items = [['venta', 'Caja', 'venta', 0], ['mesas', 'Mesas', 'mesas', ocup], ['alquileres', 'Alquileres', 'alq', alq], ['stock', 'Stock', 'stock', bajo, 1], ['tickets', 'Tickets', 'tickets', 0], ['reportes', 'Reportes', 'rep', 0], ['admin', 'Admin', 'admin', 0]];
+  $('#nav').innerHTML = items.map(([v, n, i, b, w]) => `<button data-act="nav" data-v="${v}" ${UI.view === v ? 'aria-current="page"' : ''}>${ic(i)}<span>${n}</span>${b ? `<span class="badge ${w ? 'warn' : ''}">${b}</span>` : ''}</button>`).join('');
+  $('#side-foot').innerHTML = `<div class="demo-tag">Prototipo con datos de ejemplo. Se guarda sólo en este navegador.</div>
+    ${STORAGE_OK ? '' : '<div class="demo-tag" style="background:var(--bad-soft);color:var(--bad)">Este navegador no deja guardar: al recargar se pierde todo.</div>'}
+    <button data-act="tema" aria-label="Cambiar entre modo claro y oscuro">${ic('tema')}<b>Claro / Oscuro</b></button>`;
+}
+
+/* --- CAJA --- */
+views.venta = () => {
+  $('#main').innerHTML = `<div class="pos">
+    <section class="pos-l">
+      <div class="pos-top"><div class="chips" id="cats"></div><input id="q" data-in="q" class="in search" placeholder="Buscar producto… (Enter agrega)" autocomplete="off" value="${esc(UI.q)}"></div>
+      <div class="grid" id="grid"></div>
+    </section>
+    <aside class="pos-r" id="cart" aria-label="Comanda"></aside></div>`;
+  renderCats(); renderGrid(); renderCart();
+};
+function renderCats() {
+  $('#cats').innerHTML = `<button class="chip" data-act="cat" data-id="all" aria-pressed="${UI.cat === 'all'}">Todo</button>` +
+    DB.categorias.map(c => `<button class="chip" style="--h:${CAT_HUES[c.color] ?? 160}" data-act="cat" data-id="${c.id}" aria-pressed="${UI.cat === c.id}"><span class="dot"></span>${esc(c.nombre)}</button>`).join('');
+}
+function listaVisible() {
+  const q = norm(UI.q);
+  return DB.productos.filter(p => p.activo && p.tipo !== 'insumo' && (UI.cat === 'all' || p.catId === UI.cat) && (!q || norm(p.nombre).includes(q)));
+}
+function renderGrid() {
+  const res = reservadoOtros('__nada__');
+  const html = listaVisible().map(p => {
+    const r = restante(p, res);
+    let st, cls = '';
+    if (r === Infinity) st = 'Sin control de stock';
+    else if (r <= 0) { st = 'Sin stock'; cls = 'bad'; }
+    else { st = (p.tipo === 'receta' ? 'Salen ' : p.tipo === 'alquiler' ? 'Libres ' : 'Stock ') + r; if (r <= p.minimo) cls = 'warn'; }
+    return `<button class="tile" style="--h:${hueDe(p.catId)}" data-act="add" data-id="${p.id}"><b>${esc(p.nombre)}</b><span class="st ${cls}">${st}</span><span class="pr">${money(p.precio)}</span></button>`;
+  }).join('');
+  $('#grid').innerHTML = html || '<p class="muted">No hay productos con ese filtro.</p>';
+}
+function renderCart() {
+  const key = UI.com, c = getCom(key), items = c.items.filter(i => prod(i.prodId)), total = totalItems(items);
+  const opts = `<option value="M" ${key === 'M' ? 'selected' : ''}>Mostrador (venta rápida)</option>` + DB.mesas.map(m => {
+    const oc = DB.comandas[m.id];
+    return `<option value="${m.id}" ${key === m.id ? 'selected' : ''}>${esc(m.nombre)} · ${oc ? 'ocupada ' + money(totalItems(oc.items)) : 'libre'}</option>`;
+  }).join('');
+  const lines = items.map((it, i) => {
+    const p = prod(it.prodId);
+    return `<div class="line"><div class="nm"><b>${esc(p.nombre)}</b><small>${money(p.precio)} c/u${it.nota ? ' · ' + esc(it.nota) : ''}</small></div>
+      <div class="qty"><button class="icon" data-act="dec" data-i="${i}" aria-label="Menos">−</button><span>${it.cant}</span><button class="icon" data-act="inc" data-i="${i}" aria-label="Más">+</button></div>
+      <div class="ln-sub">${money(p.precio * it.cant)}</div>
+      <div class="ln-tools"><button data-act="nota" data-i="${i}">${it.nota ? 'editar nota' : 'agregar nota'}</button><button data-act="del" data-i="${i}">quitar</button></div></div>`;
+  }).join('');
+  $('#cart').innerHTML = `
+    <div class="cart-h"><label for="sel-dest">Cuenta</label><select id="sel-dest" data-in="dest" class="in">${opts}</select>
+      ${key !== 'M' && c.ts ? `<span class="muted">Abierta hace ${hace(c.ts)}</span>` : ''}</div>
+    <div class="lines">${lines || `<div class="empty"><b>Comanda vacía</b><span>Tocá un producto para agregarlo.</span></div>`}</div>
+    <div class="cart-f">
+      <div class="total-row"><span>Total</span><b>${money(total)}</b></div>
+      <button class="btn primary lg" data-act="cobrar" ${items.length ? '' : 'disabled'}>Cobrar</button>
+      <div class="row">
+        <button class="btn sm" data-act="mover" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Pasar a una mesa' : 'Cambiar de mesa'}</button>
+        <button class="btn sm ghost" data-act="vaciar" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Vaciar' : 'Cancelar comanda'}</button>
+      </div>
+    </div>`;
+}
+function moverComanda() {
+  const key = UI.com;
+  const libres = DB.mesas.filter(m => !DB.comandas[m.id] && m.id !== key);
+  if (!libres.length) return toast('No hay mesas libres', 'warn');
+  modal({ title: key === 'M' ? 'Pasar la cuenta a una mesa' : 'Cambiar la cuenta de mesa', body: `<p class="muted">Elegí una mesa libre.</p><div class="chips">${libres.map(m => `<button class="chip" data-act="mover-a" data-id="${m.id}">${esc(m.nombre)}</button>`).join('')}</div>`, actions: [{ label: 'Cancelar' }] });
+}
+
+/* --- MESAS --- */
+function mesaHTML(m) {
+  const c = DB.comandas[m.id], ocup = !!c;
+  return `<button class="mesa ${ocup ? 'busy' : ''} ${UI.editSalon && UI.mesaEdit === m.id ? 'sel' : ''}" style="left:${m.x}%;top:${m.y}%" data-act="mesa" data-id="${m.id}">
+    <b>${esc(m.nombre)}</b><span>${ocup ? money(totalItems(c.items)) : 'libre'}</span><small>${ocup && c.ts ? 'hace ' + hace(c.ts) : ''}</small></button>`;
+}
+views.mesas = () => {
+  const ed = UI.editSalon, ocup = Object.keys(DB.comandas).filter(k => k !== 'M').length;
+  const sel = ed && UI.mesaEdit ? DB.mesas.find(m => m.id === UI.mesaEdit) : null;
+  $('#main').innerHTML = `<header class="ph"><div><h1>Mesas</h1><p class="muted">${ocup} ocupadas de ${DB.mesas.length}. Tocá una mesa para abrir o seguir su cuenta.</p></div>
+    <div class="row">${ed ? `<button class="btn" data-act="mesa-add">+ Agregar mesa</button><button class="btn primary" data-act="salon-fin">Listo</button>` : `<button class="btn ghost" data-act="salon-edit">${ic('admin')} Editar salón</button>`}</div></header>
+    ${ed ? `<div class="card" style="margin-bottom:12px"><div class="row">${sel ? `<label class="fld" style="flex:1;min-width:180px">Nombre de la mesa seleccionada<input class="in" id="mesa-name" data-in="mesa-name" value="${esc(sel.nombre)}"></label><button class="btn danger" data-act="mesa-del" style="align-self:flex-end">Eliminar mesa</button>` : '<span class="muted">Arrastrá las mesas para acomodarlas. Tocá una para renombrarla o eliminarla.</span>'}</div></div>` : ''}
+    <div class="salon ${ed ? 'editing' : ''}" id="salon">${DB.mesas.map(mesaHTML).join('')}</div>
+    <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado</span></div>`;
+};
+
+/* --- ALQUILERES --- */
+views.alquileres = () => {
+  const pend = DB.alquileres.filter(a => a.estado === 'prestado').sort((a, b) => a.ts - b.ts);
+  const hist = DB.alquileres.filter(a => a.estado !== 'prestado').sort((a, b) => b.ts - a.ts).slice(0, 30);
+  const fila = a => `<tr><td><b>${esc(a.nombre)}</b></td><td>${esc(a.cliente || '—')}</td><td class="num">${fechaHora(a.ts)}</td><td class="num">${hace(a.ts)}</td>
+    <td class="r"><div class="actions"><button class="btn sm primary" data-act="alq-dev" data-id="${a.id}">Devolvió</button><button class="btn sm" data-act="alq-perd" data-id="${a.id}">No volvió</button></div></td></tr>`;
+  $('#main').innerHTML = `<header class="ph"><div><h1>Alquileres</h1><p class="muted">Lo que está prestado ahora. El stock vuelve recién cuando lo devuelven.</p></div></header>
+    <div class="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Quién lo tiene</th><th>Desde</th><th>Hace</th><th></th></tr></thead>
+      <tbody>${pend.map(fila).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:28px">No hay nada prestado.</td></tr>'}</tbody></table></div>
+    <h2 style="margin:22px 0 10px">Últimos cerrados</h2>
+    <div class="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Quién</th><th>Salió</th><th>Estado</th></tr></thead><tbody>
+      ${hist.map(a => `<tr><td>${esc(a.nombre)}</td><td>${esc(a.cliente || '—')}</td><td class="num">${fechaHora(a.ts)}</td><td>${a.estado === 'devuelto' ? `<span class="pill good">devuelto ${a.tsDev ? hhmm(a.tsDev) : ''}</span>` : a.estado === 'perdido' ? '<span class="pill bad">no volvió</span>' : '<span class="pill">anulado</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted" style="text-align:center;padding:20px">Sin movimientos.</td></tr>'}
+    </tbody></table></div>`;
+};
+
+/* --- STOCK --- */
+function stockEstado(p) {
+  if (p.tipo === 'receta') { const r = restante(p, {}); return r <= 0 ? ['bad', 'No se puede armar'] : ['good', 'Se pueden armar ' + r]; }
+  if (p.stock <= 0) return ['bad', 'Sin stock'];
+  if (p.stock <= p.minimo) return ['warn', 'Bajo'];
+  return ['good', 'OK'];
+}
+views.stock = () => {
+  const tab = UI.stockTab;
+  const tabs = `<div class="chips" style="margin-bottom:12px"><button class="chip" data-act="stk-tab" data-v="inv" aria-pressed="${tab === 'inv'}">Inventario</button><button class="chip" data-act="stk-tab" data-v="hist" aria-pressed="${tab === 'hist'}">Historial de movimientos</button></div>`;
+  let body;
+  if (tab === 'inv') {
+    const q = norm(UI.stockQ);
+    const list = DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && (!q || norm(p.nombre).includes(q)) && (UI.stockF === 'all' || (UI.stockF === 'bajo' && stockEstado(p)[0] !== 'good')));
+    body = `<div class="toolbar"><input class="in" data-in="stockq" id="stockq" placeholder="Buscar…" value="${esc(UI.stockQ)}">
+      <div class="chips"><button class="chip" data-act="stk-f" data-v="all" aria-pressed="${UI.stockF === 'all'}">Todo</button><button class="chip" data-act="stk-f" data-v="bajo" aria-pressed="${UI.stockF === 'bajo'}">Bajo o sin stock</button></div>
+      <button class="btn sm" style="margin-left:auto" data-act="exp-stock">Exportar CSV</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Tipo</th><th class="r">Stock</th><th class="r">Mínimo</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${list.map(p => { const [k, t] = stockEstado(p), rec = p.tipo === 'receta';
+        return `<tr><td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:8px"></span><b>${esc(p.nombre)}</b></td><td class="muted">${TIPOS[p.tipo].n}</td>
+        <td class="r num"><b>${rec ? '—' : p.stock}</b></td><td class="r num">${rec ? '—' : p.minimo}</td><td><span class="pill ${k}">${t}</span></td>
+        <td class="r">${rec ? '<span class="muted">usa insumos</span>' : `<div class="actions"><button class="btn sm primary" data-act="stk-ing" data-id="${p.id}">Ingreso</button><button class="btn sm" data-act="stk-aj" data-id="${p.id}">Contar</button></div>`}</td></tr>`; }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Nada para mostrar.</td></tr>'}
+      </tbody></table></div>
+      <p class="muted" style="margin-top:10px">Los productos de servicio (turnos, café, minutas) no llevan stock y no aparecen acá.</p>`;
+  } else {
+    let movs = DB.movimientos.slice().reverse();
+    if (UI.stockMov !== 'all') movs = movs.filter(m => m.prodId === UI.stockMov);
+    body = `<div class="toolbar"><select class="in" data-in="stockmov" id="stockmov"><option value="all">Todos los productos</option>${DB.productos.filter(p => p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => `<option value="${p.id}" ${UI.stockMov === p.id ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <button class="btn sm" style="margin-left:auto" data-act="exp-mov">Exportar CSV</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="r">Cant.</th><th class="r">Antes → Después</th><th>Detalle</th></tr></thead><tbody>
+      ${movs.slice(0, 200).map(m => `<tr><td class="num">${fechaHora(m.ts)}</td><td>${esc(m.nombre)}</td><td><span class="pill ${MOV[m.tipo][1]}">${MOV[m.tipo][0]}</span></td>
+        <td class="r num"><b style="color:${m.cant > 0 ? 'var(--good)' : m.cant < 0 ? 'var(--bad)' : 'var(--muted)'}">${m.cant > 0 ? '+' : ''}${m.cant}</b></td><td class="r num">${m.antes} → ${m.despues}</td><td class="muted">${esc(m.motivo)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Sin movimientos.</td></tr>'}
+      </tbody></table></div><p class="muted" style="margin-top:10px">Cada cambio de stock queda registrado acá y no se puede borrar.</p>`;
+  }
+  $('#main').innerHTML = `<header class="ph"><div><h1>Stock</h1><p class="muted">Control estricto: el stock sólo cambia por ventas, ingresos o ajustes, y todo queda en el historial.</p></div></header>${tabs}${body}`;
+};
+function modalIngreso(id) {
+  const p = prod(id), tienePaq = p.paqueteUnidades > 1;
+  UI.ing = { id, modo: tienePaq ? 'paq' : 'uni', cant: 0 };
+  modal({
+    title: 'Ingreso de mercadería · ' + p.nombre,
+    body: `<p class="muted">Stock actual: <b>${p.stock}</b> unidades</p>
+      <div class="grid2"><label class="fld">Cómo lo cargás<select class="in" id="ing-modo" data-in="ing">${tienePaq ? `<option value="paq">Por ${esc(p.paqueteNombre || 'paquete')} (${p.paqueteUnidades} u.)</option>` : ''}<option value="uni">Unidades sueltas</option></select></label>
+      <label class="fld">Cantidad<input class="in" id="ing-cant" data-in="ing" inputmode="numeric" placeholder="0"></label></div>
+      <label class="fld">Proveedor / nota (opcional)<input class="in" id="ing-nota" placeholder="Ej: Distribuidora Sur, remito 1234"></label>
+      <div class="note" id="ing-prev">Se suman 0 unidades.</div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Cargar al stock', kind: 'primary', onClick: () => {
+      const I = UI.ing, u = unidadesIngreso();
+      if (u <= 0) { toast('Poné una cantidad mayor a cero', 'warn'); return false; }
+      const r = tx(() => moverStock(id, u, 'ingreso', { motivo: $('#ing-nota').value.trim() || 'Ingreso de mercadería' }));
+      if (r.ok) { toast(`+${u} unidades de ${p.nombre}`); render(); }
+    } }],
+  });
+}
+function unidadesIngreso() {
+  const p = prod(UI.ing.id), c = num($('#ing-cant').value);
+  return $('#ing-modo').value === 'paq' ? c * p.paqueteUnidades : c;
+}
+function modalAjuste(id) {
+  const p = prod(id);
+  modal({
+    title: 'Contar stock · ' + p.nombre,
+    body: `<p class="muted">El sistema dice que hay <b>${p.stock}</b>. Contá lo que hay físicamente y poné el número real: se corrige y queda registrado.</p>
+      <div class="grid2"><label class="fld">Cantidad real<input class="in" id="aj-real" inputmode="numeric" value="${p.stock}"></label>
+      <label class="fld">Motivo<select class="in" id="aj-motivo"><option>Conteo físico</option><option>Rotura o vencimiento</option><option>Consumo propio</option><option>Pérdida</option><option>Otro</option></select></label></div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Guardar conteo', kind: 'primary', onClick: () => {
+      const real = num($('#aj-real').value), d = real - p.stock;
+      if (d === 0) { toast('El conteo coincide, no hay cambios'); return; }
+      const r = tx(() => moverStock(id, d, 'ajuste', { motivo: $('#aj-motivo').value }));
+      if (r.ok) { toast(`Stock de ${p.nombre} corregido a ${real}`); render(); }
+    } }],
+  });
+}
+
+/* --- TICKETS --- */
+views.tickets = () => {
+  const q = norm(UI.tkQ);
+  const vs = DB.ventas.filter(v => dayKey(v.ts) >= UI.tkDesde && dayKey(v.ts) <= UI.tkHasta && (!q || String(v.nro).includes(q) || norm(v.destino).includes(q) || norm(v.cliente).includes(q) || v.items.some(l => norm(l.nombre).includes(q)))).sort((a, b) => b.ts - a.ts);
+  $('#main').innerHTML = `<header class="ph"><div><h1>Tickets</h1><p class="muted">Historial de ventas. Se pueden reimprimir o anular (con código).</p></div></header>
+    <div class="toolbar"><label class="fld" style="flex-direction:row;align-items:center;gap:8px">Desde<input class="in" type="date" data-in="tkd" value="${UI.tkDesde}"></label>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:8px">Hasta<input class="in" type="date" data-in="tkh" value="${UI.tkHasta}"></label>
+      <input class="in" id="tkq" data-in="tkq" placeholder="Buscar nº, mesa o producto" value="${esc(UI.tkQ)}"></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Nº</th><th>Fecha</th><th>Destino</th><th>Pagos</th><th class="r">Total</th><th></th></tr></thead><tbody>
+    ${vs.map(v => `<tr><td class="num"><b>#${v.nro}</b></td><td class="num">${fechaHora(v.ts)}</td><td>${esc(v.destino)}${v.cliente ? ` <span class="muted">· ${esc(v.cliente)}</span>` : ''}</td>
+      <td>${v.pagos.map(p => `<span class="pill">${esc(p.nombre)} ${money(p.monto)}</span>`).join(' ')}</td>
+      <td class="r num"><b>${money(v.total)}</b> ${v.estado !== 'ok' ? '<span class="pill bad">anulado</span>' : ''}</td>
+      <td class="r"><button class="btn sm" data-act="tk-ver" data-id="${v.id}">Ver / reimprimir</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No hay tickets en ese período.</td></tr>'}
+    </tbody></table></div>`;
+};
+
+/* --- REPORTES --- */
+function ventasRango(d, h) { return DB.ventas.filter(v => v.estado === 'ok' && dayKey(v.ts) >= d && dayKey(v.ts) <= h); }
+function resumen(d, h) {
+  const vs = ventasRango(d, h), total = sum(vs, v => v.total);
+  const met = {}; DB.metodos.forEach(m => { met[m.id] = { nombre: m.nombre, n: 0, monto: 0 }; });
+  vs.forEach(v => v.pagos.forEach(p => { const o = met[p.metodoId] || (met[p.metodoId] = { nombre: p.nombre, n: 0, monto: 0 }); o.n++; o.monto += p.monto; }));
+  const cats = {}, prods = {};
+  vs.forEach(v => v.items.forEach(l => {
+    const cn = catDe(l.catId) ? catDe(l.catId).nombre : 'Sin categoría';
+    cats[cn] = (cats[cn] || 0) + l.cant * l.precio;
+    const o = prods[l.nombre] || (prods[l.nombre] = { cant: 0, monto: 0 }); o.cant += l.cant; o.monto += l.cant * l.precio;
+  }));
+  return { vs, total, met: Object.values(met), cats: Object.entries(cats).sort((a, b) => b[1] - a[1]), prods: Object.entries(prods).sort((a, b) => b[1].cant - a[1].cant) };
+}
+function barras(rows, fmt) {
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  return rows.map(([n, v]) => `<div class="bar"><span class="lbl" title="${esc(n)}">${esc(n)}</span><div class="track"><div class="fill" style="width:${Math.max(2, v / max * 100)}%"></div></div><span class="val">${fmt(v)}</span></div>`).join('') || '<p class="muted">Sin ventas en el período.</p>';
+}
+views.reportes = () => {
+  const R = resumen(UI.repDesde, UI.repHasta), anul = DB.ventas.filter(v => v.estado !== 'ok' && dayKey(v.ts) >= UI.repDesde && dayKey(v.ts) <= UI.repHasta).length;
+  const efe = R.met.filter(m => { const mm = DB.metodos.find(x => x.nombre === m.nombre); return mm && mm.efectivo; });
+  $('#main').innerHTML = `<header class="ph"><div><h1>Reportes</h1><p class="muted">Resumen del período por medio de pago, categoría y producto.</p></div>
+    <div class="row"><label class="fld" style="flex-direction:row;align-items:center;gap:8px">Desde<input class="in" type="date" data-in="repd" value="${UI.repDesde}"></label>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:8px">Hasta<input class="in" type="date" data-in="reph" value="${UI.repHasta}"></label>
+      <button class="btn sm ghost" data-act="rep-hoy">Hoy</button></div></header>
+    <div class="kpis"><div class="kpi"><span>Total vendido</span><b>${money(R.total)}</b></div><div class="kpi"><span>Tickets</span><b>${R.vs.length}</b></div>
+      <div class="kpi"><span>Ticket promedio</span><b>${money(R.vs.length ? R.total / R.vs.length : 0)}</b></div>
+      <div class="kpi"><span>Efectivo en caja</span><b>${money(sum(efe, m => m.monto))}</b></div>
+      <div class="kpi"><span>Anulados</span><b>${anul}</b></div></div>
+    <div class="cols">
+      <div class="card"><h2>Por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}</div>
+      <div class="card"><h2>Por categoría</h2>${barras(R.cats, money)}</div>
+      <div class="card"><h2>Más vendidos</h2>${barras(R.prods.slice(0, 8).map(([n, o]) => [n, o.cant]), v => v + ' u.')}</div></div>
+    <div class="card" style="margin-top:16px"><h2>Exportar a Excel / CSV</h2><div class="row">
+      <button class="btn" data-act="exp-pagos">Resumen por medio de pago</button><button class="btn" data-act="exp-ventas">Detalle de ventas</button>
+      <button class="btn" data-act="exp-stock">Stock actual</button><button class="btn" data-act="exp-mov">Movimientos de stock</button></div></div>`;
+};
+function rowsPagos() {
+  const R = resumen(UI.repDesde, UI.repHasta);
+  return [['Desde', 'Hasta', 'Medio de pago', 'Cantidad de pagos', 'Monto'], ...R.met.map(m => [UI.repDesde, UI.repHasta, m.nombre, m.n, m.monto]), ['', '', 'TOTAL', R.vs.length + ' tickets', R.total]];
+}
+function rowsVentas() {
+  const rows = [['Ticket', 'Fecha', 'Hora', 'Destino', 'Cliente', 'Producto', 'Categoría', 'Cantidad', 'Precio', 'Subtotal', 'Medios de pago', 'Estado']];
+  DB.ventas.filter(v => dayKey(v.ts) >= UI.repDesde && dayKey(v.ts) <= UI.repHasta).forEach(v => v.items.forEach(l => rows.push([v.nro, dayKey(v.ts), hhmm(v.ts), v.destino, v.cliente, l.nombre, catDe(l.catId) ? catDe(l.catId).nombre : '', l.cant, l.precio, l.cant * l.precio, v.pagos.map(p => p.nombre + ' ' + p.monto).join(' + '), v.estado])));
+  return rows;
+}
+function rowsStock() { return [['Producto', 'Tipo', 'Stock', 'Mínimo'], ...DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => [p.nombre, TIPOS[p.tipo].n, p.stock, p.minimo])]; }
+function rowsMov() { return [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Antes', 'Después', 'Detalle'], ...DB.movimientos.map(m => [dayKey(m.ts) + ' ' + hhmm(m.ts), m.nombre, MOV[m.tipo][0], m.cant, m.antes, m.despues, m.motivo])]; }
+
+/* --- ADMIN (con código) --- */
+views.admin = () => {
+  if (Date.now() >= UI.adminUntil) {
+    $('#main').innerHTML = `<header class="ph"><div><h1>Administración</h1><p class="muted">Productos, categorías, medios de pago y datos del sistema.</p></div></header>
+      <div class="card" style="max-width:460px"><h2>Zona protegida</h2><p class="muted" style="margin-bottom:14px">Para evitar cambios por error, hace falta el código de administración.</p><button class="btn primary" data-act="adm-entrar">Ingresar código</button></div>`;
+    return;
+  }
+  const t = UI.admTab;
+  const tabs = [['productos', 'Productos'], ['categorias', 'Categorías'], ['pagos', 'Medios de pago'], ['datos', 'Datos y seguridad']].map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
+  $('#main').innerHTML = `<header class="ph"><div><h1>Administración</h1><p class="muted">Sesión desbloqueada por 5 minutos desde la última acción.</p></div><button class="btn sm ghost" data-act="adm-lock">Bloquear ahora</button></header>
+    <div class="chips" style="margin-bottom:14px">${tabs}</div><div id="adm-body"></div>`;
+  admBody[t]();
+};
+const admBody = {};
+admBody.productos = () => {
+  const q = norm(UI.admQ);
+  const list = DB.productos.filter(p => !q || norm(p.nombre).includes(q));
+  $('#adm-body').innerHTML = `<div class="toolbar"><input class="in" id="admq" data-in="admq" placeholder="Buscar producto…" value="${esc(UI.admQ)}"><button class="btn primary" style="margin-left:auto" data-act="prod-new">+ Nuevo producto</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th class="r">Precio</th><th>Empaque</th><th></th></tr></thead><tbody>
+    ${list.map(p => `<tr style="${p.activo ? '' : 'opacity:.55'}"><td><b>${esc(p.nombre)}</b> ${p.activo ? '' : '<span class="pill">oculto</span>'}${p.tipo === 'receta' ? `<br><small class="muted">${p.receta.map(r => r.cant + ' × ' + (prod(r.id) ? esc(prod(r.id).nombre) : '?')).join(' + ')}</small>` : ''}</td>
+      <td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:6px"></span>${catDe(p.catId) ? esc(catDe(p.catId).nombre) : '—'}</td><td class="muted">${TIPOS[p.tipo].n}</td>
+      <td class="r num">${p.tipo === 'insumo' ? '—' : money(p.precio)}</td><td class="muted">${p.paqueteUnidades > 1 ? esc(p.paqueteNombre || 'Paquete') + ' = ' + p.paqueteUnidades + ' u.' : '—'}</td>
+      <td class="r"><div class="actions"><button class="btn sm" data-act="prod-edit" data-id="${p.id}">Editar</button><button class="btn sm ghost" data-act="prod-tog" data-id="${p.id}">${p.activo ? 'Ocultar' : 'Mostrar'}</button><button class="btn sm ghost" data-act="prod-del" data-id="${p.id}">Eliminar</button></div></td></tr>`).join('')}
+    </tbody></table></div>`;
+};
+admBody.categorias = () => {
+  $('#adm-body').innerHTML = `<div class="card" style="max-width:640px"><h2>Categorías</h2><div class="stack">
+    ${DB.categorias.map(c => `<div class="row"><span class="dot" style="--h:${CAT_HUES[c.color] ?? 160}"></span><input class="in" style="flex:1;min-width:140px" data-in="cat-name" data-id="${c.id}" value="${esc(c.nombre)}">
+      <select class="in" style="width:auto" data-in="cat-color" data-id="${c.id}">${Object.keys(CAT_HUES).map(k => `<option ${c.color === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
+      <button class="btn sm ghost" data-act="cat-del" data-id="${c.id}">Eliminar</button></div>`).join('')}
+    <button class="btn" data-act="cat-add" style="align-self:flex-start">+ Nueva categoría</button></div></div>`;
+};
+admBody.pagos = () => {
+  $('#adm-body').innerHTML = `<div class="card" style="max-width:640px"><h2>Medios de pago</h2><p class="muted" style="margin-bottom:10px">Se pueden combinar en un mismo cobro. El efectivo es el único que admite vuelto.</p><div class="stack">
+    ${DB.metodos.map(m => `<div class="row"><input class="in" style="flex:1;min-width:140px" data-in="met-name" data-id="${m.id}" value="${esc(m.nombre)}">
+      <label class="row" style="gap:6px"><input type="checkbox" data-in="met-act" data-id="${m.id}" ${m.activo ? 'checked' : ''}> activo</label>
+      ${m.efectivo ? '<span class="pill">efectivo</span>' : `<button class="btn sm ghost" data-act="met-del" data-id="${m.id}">Eliminar</button>`}</div>`).join('')}
+    <button class="btn" data-act="met-add" style="align-self:flex-start">+ Nuevo medio de pago</button></div></div>`;
+};
+admBody.datos = () => {
+  $('#adm-body').innerHTML = `<div class="cols">
+    <div class="card"><h2>Datos del negocio</h2><div class="stack">
+      <label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>
+      <label class="fld">Código de administración<input class="in" id="newpin" type="password" inputmode="numeric" placeholder="Nuevo código"><small>Dejalo vacío para no cambiarlo.</small></label>
+      <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button></div></div>
+    <div class="card"><h2>Copia de seguridad</h2><div class="stack"><p class="muted">En la versión real es un archivo de la base de datos que se copia solo todos los días. Acá podés ver y restaurar el contenido.</p>
+      <div class="row"><button class="btn" data-act="bk-ver">Ver copia (JSON)</button><button class="btn" data-act="bk-rest">Restaurar copia</button></div></div></div>
+    <div class="card"><h2>Probar la seguridad de los datos</h2><div class="stack"><p class="muted">Simula una falla en medio de una venta (se descuenta stock y justo después "se corta"). El sistema tiene que volver todo atrás.</p>
+      <button class="btn" data-act="sim-falla" style="align-self:flex-start">Simular falla</button></div></div>
+    <div class="card"><h2>Restablecer</h2><div class="stack"><p class="muted">Empezar de nuevo. Esto no se puede deshacer.</p>
+      <div class="row"><button class="btn" data-act="reset-hist">Borrar ventas e historial</button><button class="btn danger" data-act="reset-demo">Volver a datos de ejemplo</button></div></div></div></div>`;
+};
+
+/* formulario de producto */
+function formProducto(id) {
+  const p = id ? prod(id) : null;
+  UI.pf = p ? JSON.parse(JSON.stringify(p)) : { nombre: '', catId: DB.categorias[0] ? DB.categorias[0].id : '', tipo: 'directo', precio: 0, stock: 0, minimo: 0, paqueteNombre: '', paqueteUnidades: 1, receta: [], activo: true };
+  UI.pfId = id || null;
+  mostrarFormProducto();
+}
+function leerPF() {
+  const f = UI.pf; if (!$('#pf-nombre')) return;
+  f.nombre = $('#pf-nombre').value.trim(); f.catId = $('#pf-cat').value;
+  if ($('#pf-precio')) f.precio = num($('#pf-precio').value);
+  if ($('#pf-min')) f.minimo = num($('#pf-min').value);
+  if ($('#pf-stock')) f.stock = num($('#pf-stock').value);
+  if ($('#pf-paqn')) { f.paqueteNombre = $('#pf-paqn').value.trim(); f.paqueteUnidades = Math.max(1, num($('#pf-paqu').value)); }
+  if (f.tipo === 'receta') f.receta = f.receta.map((r, i) => ({ id: $('#pf-ri-' + i).value, cant: Math.max(1, num($('#pf-rc-' + i).value)) }));
+}
+function mostrarFormProducto() {
+  const f = UI.pf, editando = !!UI.pfId, conStock = ['directo', 'insumo', 'alquiler'].includes(f.tipo);
+  const insumos = DB.productos.filter(p => (p.tipo === 'insumo' || p.tipo === 'directo') && p.id !== UI.pfId);
+  const receta = f.tipo === 'receta' ? `<div class="stack"><b>Ingredientes (se descuentan al vender)</b>
+    ${f.receta.map((r, i) => `<div class="rrow"><select class="in" id="pf-ri-${i}">${insumos.map(x => `<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select><input class="in" id="pf-rc-${i}" inputmode="numeric" value="${r.cant}" aria-label="Cantidad"><button class="icon" data-act="pf-rdel" data-i="${i}" aria-label="Quitar">×</button></div>`).join('')}
+    <button class="btn sm" data-act="pf-radd" style="align-self:flex-start">+ Ingrediente</button></div>` : '';
+  const stockCampos = conStock ? `<div class="grid2">
+      ${editando ? '' : `<label class="fld">Stock inicial (unidades)<input class="in" id="pf-stock" inputmode="numeric" value="${f.stock}"></label>`}
+      <label class="fld">Avisar cuando queden (mínimo)<input class="in" id="pf-min" inputmode="numeric" value="${f.minimo}"></label></div>
+    <div class="grid2"><label class="fld">Cómo viene de fábrica (opcional)<input class="in" id="pf-paqn" placeholder="Ej: Bulto 6 × 12, Pack × 6" value="${esc(f.paqueteNombre)}"></label>
+      <label class="fld">Unidades por paquete<input class="in" id="pf-paqu" inputmode="numeric" value="${f.paqueteUnidades}"><small>Así al cargar "4 paquetes" suma las unidades solo.</small></label></div>` : '';
+  modal({
+    title: editando ? 'Editar producto' : 'Nuevo producto', wide: true,
+    body: `<div class="grid2"><label class="fld">Nombre<input class="in" id="pf-nombre" value="${esc(f.nombre)}" placeholder="Ej: Sprite 500 ml"></label>
+      <label class="fld">Categoría<select class="in" id="pf-cat">${DB.categorias.map(c => `<option value="${c.id}" ${c.id === f.catId ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></label></div>
+      <div class="grid2"><label class="fld">Tipo de producto<select class="in" id="pf-tipo" data-in="pf-tipo">${Object.entries(TIPOS).map(([k, t]) => `<option value="${k}" ${k === f.tipo ? 'selected' : ''}>${t.n}</option>`).join('')}</select><small>${TIPOS[f.tipo].d}</small></label>
+      ${f.tipo === 'insumo' ? '<div></div>' : `<label class="fld">Precio de venta<input class="in" id="pf-precio" inputmode="numeric" value="${f.precio}"></label>`}</div>
+      ${receta}${stockCampos}${editando && conStock ? '<div class="note">El stock actual no se cambia desde acá: usá "Ingreso" o "Contar" en la sección Stock para que quede registrado.</div>' : ''}`,
+    actions: [{ label: 'Cancelar' }, { label: 'Guardar producto', kind: 'primary', onClick: guardarProducto }],
+  });
+}
+function guardarProducto() {
+  leerPF();
+  const f = UI.pf;
+  if (!f.nombre) { toast('Falta el nombre', 'warn'); return false; }
+  if (f.tipo === 'receta' && !f.receta.length) { toast('Agregá al menos un ingrediente', 'warn'); return false; }
+  if (f.tipo === 'receta' && new Set(f.receta.map(r => r.id)).size !== f.receta.length) { toast('Un ingrediente está repetido', 'warn'); return false; }
+  if (DB.productos.some(p => p.id !== UI.pfId && norm(p.nombre) === norm(f.nombre))) { toast('Ya existe un producto con ese nombre', 'warn'); return false; }
+  const r = tx(() => {
+    const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo', 'alquiler'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, receta: f.tipo === 'receta' ? f.receta : [] };
+    if (UI.pfId) Object.assign(prod(UI.pfId), campos);
+    else {
+      const p = { id: uid('p'), activo: true, stock: 0, ...campos }; DB.productos.push(p);
+      if (['directo', 'insumo', 'alquiler'].includes(p.tipo) && f.stock > 0) moverStock(p.id, f.stock, 'ingreso', { motivo: 'Stock inicial' });
+    }
+  });
+  if (r.ok) { toast('Producto guardado'); render(); }
+}
+function eliminarProducto(id) {
+  const p = prod(id);
+  const usado = DB.productos.find(x => x.receta && x.receta.some(r => r.id === id));
+  if (usado) return toast(`No se puede: "${usado.nombre}" lo usa en su receta`, 'warn');
+  if (Object.values(DB.comandas).some(c => c.items.some(i => i.prodId === id))) return toast('No se puede: está en una cuenta abierta', 'warn');
+  if (DB.alquileres.some(a => a.prodId === id && a.estado === 'prestado')) return toast('No se puede: hay unidades prestadas', 'warn');
+  ask('Eliminar producto', `¿Eliminar <b>${esc(p.nombre)}</b>? Los tickets viejos mantienen su nombre. Si sólo querés que no aparezca en la caja, usá "Ocultar".`, 'Eliminar', () => {
+    const r = tx(() => { DB.productos = DB.productos.filter(x => x.id !== id); });
+    if (r.ok) { toast('Producto eliminado'); render(); }
+  }, true);
+}
+
+/* ---------- acciones de los botones ---------- */
+const A = {
+  nav: d => { UI.view = d.v; UI.editSalon = false; render(); },
+  tema: () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const nx = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = nx;
+    try { localStorage.setItem('predio_pos_theme', nx); } catch (e) { /* sin memoria */ }
+  },
+  mbg: (d, el, e) => { if (e.target === el) closeModal(); },
+  mclose: () => closeModal(),
+  mact: d => {
+    const cur = MODAL, a = cur.actions[+d.i];
+    const r = a.onClick ? a.onClick() : undefined;
+    if (r !== false && MODAL === cur) closeModal(true);
+  },
+  // caja
+  cat: d => { UI.cat = d.id; renderCats(); renderGrid(); },
+  add: d => agregar(d.id),
+  inc: d => { const key = UI.com, items = getCom(key).items, n = cambiarCantidad(items, +d.i, 1); chequearStock(n, key, true, 'vender', () => aplicarItems(key, n)); },
+  dec: d => { const key = UI.com; aplicarItems(key, cambiarCantidad(getCom(key).items, +d.i, -1)); },
+  del: d => { const key = UI.com; aplicarItems(key, getCom(key).items.filter((_, i) => i !== +d.i)); },
+  nota: d => {
+    const key = UI.com, it = getCom(key).items[+d.i];
+    modal({ title: 'Nota para ' + prod(it.prodId).nombre, body: `<input class="in" id="nota-txt" maxlength="60" placeholder="Ej: sin cebolla, bien cocida" value="${esc(it.nota)}">`, actions: [{ label: 'Cancelar' }, { label: 'Guardar nota', kind: 'primary', onClick: () => {
+      const items = getCom(key).items.map(x => ({ ...x })); items[+d.i].nota = $('#nota-txt').value.trim();
+      aplicarItems(key, items);
+    } }] });
+  },
+  cobrar: () => abrirCobro(),
+  mover: () => moverComanda(),
+  'mover-a': d => {
+    const from = UI.com, to = d.id;
+    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
+    if (r.ok) { UI.com = to; toast('Cuenta pasada a ' + DB.mesas.find(m => m.id === to).nombre); closeModal(); render(); }
+  },
+  vaciar: () => ask(UI.com === 'M' ? 'Vaciar la venta' : 'Cancelar la comanda', 'Se quitan todos los productos de esta cuenta. No se descuenta stock porque no se cobró.', 'Sí, quitar todo', () => aplicarItems(UI.com, []), true),
+  // cobro
+  'pg-add': d => {
+    const P = UI.pago, ex = P.rows.findIndex(r => r.metodoId === d.id);
+    if (ex >= 0) return renderCobro(ex);
+    const resto = P.total - sum(P.rows, r => r.monto);
+    let monto = Math.max(0, resto);
+    if (resto <= 0) { const k = P.rows.length - 1; monto = P.rows[k] ? P.rows[k].monto : P.total; if (P.rows[k]) P.rows[k].monto = 0; }
+    P.rows.push({ metodoId: d.id, monto }); renderCobro(P.rows.length - 1);
+  },
+  'pg-del': d => { UI.pago.rows.splice(+d.i, 1); renderCobro(); },
+  'pg-set': d => {
+    const P = UI.pago, i = +d.i;
+    P.rows[i].monto = d.v === 'resto' ? Math.max(0, P.total - sum(P.rows.filter((_, k) => k !== i), r => r.monto)) : +d.v;
+    renderCobro(i);
+  },
+  // mesas
+  mesa: d => {
+    if (UI.editSalon) { UI.mesaEdit = d.id; return views.mesas(); }
+    UI.com = d.id; UI.view = 'venta'; render();
+  },
+  'salon-edit': () => requirePin(() => { UI.editSalon = true; UI.mesaEdit = null; render(); }),
+  'salon-fin': () => { UI.editSalon = false; UI.mesaEdit = null; render(); },
+  'mesa-add': () => {
+    const r = tx(() => { const n = DB.mesas.length + 1; const m = { id: uid('m'), nombre: 'Mesa ' + n, x: 5 + (n * 7) % 70, y: 6 + (n * 11) % 60 }; DB.mesas.push(m); UI.mesaEdit = m.id; });
+    if (r.ok) views.mesas();
+  },
+  'mesa-del': () => {
+    const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (!m) return;
+    if (DB.comandas[m.id]) return toast('Esa mesa tiene una cuenta abierta. Cobrala o cancelala primero.', 'warn');
+    ask('Eliminar mesa', `¿Eliminar <b>${esc(m.nombre)}</b> del salón?`, 'Eliminar', () => { const r = tx(() => { DB.mesas = DB.mesas.filter(x => x.id !== m.id); }); if (r.ok) { UI.mesaEdit = null; views.mesas(); } }, true);
+  },
+  // alquileres
+  'alq-dev': d => { const r = tx(() => devolverAlquiler(d.id, false)); if (r.ok) { toast('Devuelto: el stock volvió'); render(); } },
+  'alq-perd': d => ask('El artículo no volvió', 'Se cierra el alquiler y <b>el stock no vuelve</b> (queda como baja en el historial).', 'Marcar como no devuelto', () => { const r = tx(() => devolverAlquiler(d.id, true)); if (r.ok) { toast('Registrado como baja', 'warn'); render(); } }, true),
+  // stock
+  'stk-tab': d => { UI.stockTab = d.v; views.stock(); },
+  'stk-f': d => { UI.stockF = d.v; views.stock(); },
+  'stk-ing': d => modalIngreso(d.id),
+  'stk-aj': d => modalAjuste(d.id),
+  // tickets
+  'tk-ver': d => verTicket(d.id, false),
+  // reportes
+  'rep-hoy': () => { UI.repDesde = UI.repHasta = dayKey(Date.now()); views.reportes(); },
+  'exp-pagos': () => exportar(`pagos_${UI.repDesde}_a_${UI.repHasta}`, rowsPagos()),
+  'exp-ventas': () => exportar(`ventas_${UI.repDesde}_a_${UI.repHasta}`, rowsVentas()),
+  'exp-stock': () => exportar('stock_actual', rowsStock()),
+  'exp-mov': () => exportar('movimientos_stock', rowsMov()),
+  // admin
+  'adm-entrar': () => requirePin(() => render()),
+  'adm-lock': () => { UI.adminUntil = 0; render(); },
+  'adm-tab': d => { UI.admTab = d.v; views.admin(); },
+  'prod-new': () => formProducto(null),
+  'prod-edit': d => formProducto(d.id),
+  'prod-tog': d => { const r = tx(() => { const p = prod(d.id); p.activo = !p.activo; }); if (r.ok) views.admin(); },
+  'prod-del': d => eliminarProducto(d.id),
+  'pf-radd': () => { leerPF(); const ins = DB.productos.find(p => (p.tipo === 'insumo' || p.tipo === 'directo') && p.id !== UI.pfId && !UI.pf.receta.some(r => r.id === p.id)); if (!ins) return toast('No quedan insumos para agregar. Creá primero el insumo.', 'warn'); UI.pf.receta.push({ id: ins.id, cant: 1 }); mostrarFormProducto(); },
+  'pf-rdel': d => { leerPF(); UI.pf.receta.splice(+d.i, 1); mostrarFormProducto(); },
+  'cat-add': () => { const r = tx(() => { DB.categorias.push({ id: uid('c'), nombre: 'Nueva categoría', color: 'verde' }); }); if (r.ok) views.admin(); },
+  'cat-del': d => {
+    if (DB.productos.some(p => p.catId === d.id)) return toast('Esa categoría tiene productos. Movelos antes de eliminarla.', 'warn');
+    if (DB.categorias.length <= 1) return toast('Tiene que quedar al menos una categoría', 'warn');
+    const r = tx(() => { DB.categorias = DB.categorias.filter(c => c.id !== d.id); }); if (r.ok) views.admin();
+  },
+  'met-add': () => { const r = tx(() => { DB.metodos.push({ id: uid('mp'), nombre: 'Nuevo medio', activo: true, efectivo: false }); }); if (r.ok) views.admin(); },
+  'met-del': d => {
+    if (DB.ventas.some(v => v.pagos.some(p => p.metodoId === d.id))) return toast('Ya se usó en ventas. Desactivalo en vez de eliminarlo.', 'warn');
+    const r = tx(() => { DB.metodos = DB.metodos.filter(m => m.id !== d.id); }); if (r.ok) views.admin();
+  },
+  'pin-save': () => {
+    const v = $('#newpin').value.trim();
+    if (!v) return toast('No se cambió el código');
+    if (!/^\d{4,8}$/.test(v)) return toast('El código tiene que ser de 4 a 8 números', 'warn');
+    const r = tx(() => { DB.pin = v; }); if (r.ok) { toast('Código cambiado'); $('#newpin').value = ''; }
+  },
+  'bk-ver': () => modal({ title: 'Copia de seguridad', wide: true, body: `<textarea class="in mono" rows="12" readonly>${esc(JSON.stringify(DB))}</textarea>`, actions: [{ label: 'Cerrar' }, { label: 'Copiar', kind: 'primary', onClick: () => { copiar(JSON.stringify(DB)); return false; } }] }),
+  'bk-rest': () => modal({ title: 'Restaurar copia', wide: true, body: `<p class="muted">Pegá acá el contenido de una copia. Reemplaza todos los datos actuales.</p><textarea class="in mono" id="bk-txt" rows="10"></textarea>`, actions: [{ label: 'Cancelar' }, { label: 'Restaurar', kind: 'danger', onClick: () => {
+    let d; try { d = JSON.parse($('#bk-txt').value); } catch (e) { toast('El texto no es una copia válida', 'bad'); return false; }
+    if (!d || !Array.isArray(d.productos) || !Array.isArray(d.ventas) || !Array.isArray(d.metodos)) { toast('Falta información: no parece una copia de este sistema', 'bad'); return false; }
+    const r = tx(() => { DB = d; normalizar(); }); if (r.ok) { toast('Copia restaurada'); render(); }
+  } }] }),
+  'sim-falla': () => {
+    const p = DB.productos.find(x => x.tipo === 'directo' && x.stock > 0), antes = p.stock, nv = DB.contadores.venta;
+    tx(() => { moverStock(p.id, -1, 'venta', { motivo: 'PRUEBA' }); DB.contadores.venta++; throw new Error('falla simulada a mitad de la venta (se cortó la luz)'); });
+    const q = prod(p.id);
+    modal({ title: 'Resultado de la prueba', body: `<p>Se descontó 1 unidad de <b>${esc(p.nombre)}</b>, se numeró un ticket y recién ahí "se cortó la luz".</p>
+      <div class="card"><p>Stock antes: <b>${antes}</b> · Stock después de la falla: <b>${q.stock}</b></p><p>Nº de ticket antes: <b>${nv}</b> · después: <b>${DB.contadores.venta}</b></p></div>
+      <div class="note">${q.stock === antes && DB.contadores.venta === nv ? 'Todo quedó igual que antes: no se perdió ni se inventó nada (rollback).' : 'Algo quedó a medias.'}</div>`, actions: [{ label: 'Entendido', kind: 'primary' }] });
+  },
+  'reset-hist': () => ask('Borrar ventas e historial', 'Se borran tickets, movimientos de stock y alquileres. Los productos y su stock actual se mantienen.', 'Borrar', () => {
+    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.alquileres = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
+    if (r.ok) { toast('Historial borrado'); render(); }
+  }, true),
+  'reset-demo': () => ask('Volver a datos de ejemplo', 'Se pierde todo lo que cargaste y se vuelven a cargar los datos de ejemplo.', 'Restablecer', () => { seed(); normalizar(); persist(); UI.com = 'M'; toast('Datos de ejemplo cargados'); render(); }, true),
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || !A[el.dataset.act]) return;
+  A[el.dataset.act](el.dataset, el, e);
+});
+
+/* campos de texto, selectores y fechas (evento "input") */
+const I = {
+  q: el => { UI.q = el.value; renderGrid(); },
+  dest: el => { UI.com = el.value; renderCart(); },
+  pg: el => { UI.pago.rows[+el.dataset.i].monto = num(el.value); updateCobro(); },
+  'pg-cliente': el => { UI.pago.cliente = el.value; updateCobro(); },
+  'mesa-name': el => { const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (m && el.value.trim()) { m.nombre = el.value.trim(); persist(); const b = $(`.mesa[data-id="${m.id}"] b`); if (b) b.textContent = m.nombre; } },
+  stockq: el => { UI.stockQ = el.value; views.stock(); const n = $('#stockq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
+  stockmov: el => { UI.stockMov = el.value; views.stock(); },
+  ing: () => { const u = unidadesIngreso(), p = prod(UI.ing.id); $('#ing-prev').textContent = `Se suman ${u} unidades. El stock pasa de ${p.stock} a ${p.stock + u}.`; },
+  tkd: el => { UI.tkDesde = el.value; views.tickets(); },
+  tkh: el => { UI.tkHasta = el.value; views.tickets(); },
+  tkq: el => { UI.tkQ = el.value; views.tickets(); const n = $('#tkq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
+  repd: el => { if (el.value) { UI.repDesde = el.value; views.reportes(); } },
+  reph: el => { if (el.value) { UI.repHasta = el.value; views.reportes(); } },
+  admq: el => { UI.admQ = el.value; admBody.productos(); const n = $('#admq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
+  'pf-tipo': el => { leerPF(); UI.pf.tipo = el.value; if (el.value === 'receta' && !UI.pf.receta.length) { const ins = DB.productos.find(p => p.tipo === 'insumo'); if (ins) UI.pf.receta.push({ id: ins.id, cant: 1 }); } mostrarFormProducto(); },
+  'cat-name': el => { const c = catDe(el.dataset.id); if (c && el.value.trim()) { c.nombre = el.value.trim(); persist(); } },
+  'cat-color': el => { const r = tx(() => { catDe(el.dataset.id).color = el.value; }); if (r.ok) views.admin(); },
+  'met-name': el => { const m = metodo(el.dataset.id); if (m && el.value.trim()) { m.nombre = el.value.trim(); persist(); } },
+  'met-act': el => { const r = tx(() => { const m = metodo(el.dataset.id); if (m.efectivo && !el.checked) throw new Error('El efectivo tiene que estar siempre activo'); m.activo = el.checked; }); if (!r.ok) views.admin(); },
+  negocio: el => { DB.negocio = el.value.trim() || 'Predio Deportivo'; persist(); renderSide(); },
+};
+document.addEventListener('input', e => {
+  const el = e.target.closest('[data-in]');
+  if (el && I[el.dataset.in]) { if (UI.view === 'admin') UI.adminUntil = Date.now() + 300000; I[el.dataset.in](el); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && MODAL) closeModal();
+  if (e.key === 'Enter' && e.target.id === 'q') { const l = listaVisible(); if (l.length === 1) { agregar(l[0].id); e.target.select(); } }
+  if (e.key === 'Enter' && MODAL && e.target.matches('#modal-root input')) {
+    const b = $('#modal-root .btn.primary:not(:disabled), #modal-root .btn.danger:not(:disabled)'); if (b) b.click();
+  }
+});
+
+/* arrastrar mesas en modo edición */
+let drag = null;
+document.addEventListener('pointerdown', e => {
+  const t = e.target.closest('.salon.editing .mesa'); if (!t) return;
+  const r = $('#salon').getBoundingClientRect(), tr = t.getBoundingClientRect();
+  drag = { t, id: t.dataset.id, dx: e.clientX - tr.left, dy: e.clientY - tr.top, r, w: tr.width, h: tr.height, moved: false, sx: e.clientX, sy: e.clientY };
+  try { t.setPointerCapture(e.pointerId); } catch (x) { /* ok */ }
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
+  if (!drag.moved) return;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  drag.x = clamp((e.clientX - drag.dx - drag.r.left) / drag.r.width * 100, 0, (drag.r.width - drag.w) / drag.r.width * 100);
+  drag.y = clamp((e.clientY - drag.dy - drag.r.top) / drag.r.height * 100, 0, (drag.r.height - drag.h) / drag.r.height * 100);
+  drag.t.style.left = drag.x + '%'; drag.t.style.top = drag.y + '%';
+});
+document.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved) { const m = DB.mesas.find(x => x.id === d.id); if (m) { m.x = Math.round(d.x * 10) / 10; m.y = Math.round(d.y * 10) / 10; persist(); } UI.mesaEdit = d.id; setTimeout(() => views.mesas(), 0); }
+});
+
+/* ---------- arranque ---------- */
+try { const t = localStorage.getItem('predio_pos_theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* sin memoria */ }
+DB = cargar();
+if (!DB) { seed(); persist(); }
+normalizar();
+render();
+window.__pos = { get DB() { return DB; }, UI, tx };
+</script>
+</body>
+</html>
