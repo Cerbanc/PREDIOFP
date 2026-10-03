@@ -48,6 +48,7 @@
   color-scheme:dark}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -232,7 +233,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .note{background:var(--accent-soft);color:var(--fg);border-radius:10px;padding:10px 12px;font-size:13px}
 .note.warn{background:var(--warn-soft)}
 
-#toasts{position:fixed;left:50%;transform:translateX(-50%);top:16px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;width:min(420px,calc(100% - 32px))}
+#toasts{position:fixed;right:16px;top:16px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;width:min(340px,calc(100% - 32px))}
 .toast{background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);animation:in .18s ease-out}
 .toast.warn{background:var(--warn);color:#fff}
 .toast.bad{background:var(--bad);color:#fff}
@@ -257,7 +258,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
   .side-foot button{border:0;padding:6px}
   .side-foot button b{display:none}
   main{padding:14px 16px 20px}
-  #toasts{top:10px}
+  #toasts{top:10px;right:16px}
   .grid2{grid-template-columns:1fr}
   .frow{grid-template-columns:1fr 1fr}
   .prow{grid-template-columns:minmax(0,1fr) 120px auto}
@@ -282,6 +283,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .slot.res.t-padel{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 50%,var(--line))}
 .slot.res.t-otro{background:var(--warn-soft)}
 .slot.res.done{opacity:.7}
+.slot.res.fijo{border-left:5px solid var(--accent)}
 .slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface) 6px,var(--surface) 12px)}
 .slot.past{opacity:.55}
 .l2{display:flex;justify-content:space-between;padding:3px 0}
@@ -351,11 +353,11 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ---------- base de datos (en memoria + localStorage) ---------- */
-const LS_KEY = 'predio_pos_proto_v3';
+const LS_KEY = 'predio_pos_proto_v4';
 let DB = null;
 let STORAGE_OK = true;
 const UI = {
-  view: 'venta', cat: 'all', q: '', com: 'M', turFecha: dayKey(Date.now()), turSel: null,
+  view: 'venta', cat: 'all', q: '', com: 'M', turFecha: dayKey(Date.now()), turSel: null, lgTipo: 'all',
   stockTab: 'inv', stockQ: '', stockF: 'all', stockMov: 'all',
   repDesde: dayKey(Date.now()), repHasta: dayKey(Date.now()),
   tkDesde: dayKey(Date.now() - 6 * 864e5), tkHasta: dayKey(Date.now()), tkQ: '',
@@ -378,7 +380,8 @@ function normalizar() {
   DB.comandas = DB.comandas || {};
   if (!DB.comandas.M) DB.comandas.M = { items: [] };
   DB.negocio = DB.negocio || 'Predio Deportivo';
-  DB.caja = DB.caja || []; DB.canchas = DB.canchas || []; DB.turnos = DB.turnos || [];
+  DB.caja = DB.caja || []; DB.canchas = DB.canchas || []; DB.turnos = DB.turnos || []; DB.fijos = DB.fijos || []; DB.log = DB.log || [];
+  DB.config = DB.config || { pedirPinAjuste: true };
   DB.mesas.forEach(m => { m.tipo = m.tipo || 'mesa'; m.w = m.w || 14; m.h = m.h || 17; });
 }
 
@@ -458,29 +461,67 @@ function evalPago(total, rows) {
   out.applied = Math.min(cashIn, total - noCash);
   out.vuelto = cashIn - out.applied;
   out.falta = total - noCash - out.applied;
-  out.ok = out.falta === 0 && total > 0;
+  out.ok = out.falta === 0 && total >= 0;
   return out;
 }
 const cancha = id => DB.canchas.find(c => c.id === id);
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const dowDe = f => new Date(f + 'T12:00:00').getDay();
+const sumarDias = (f, n) => dayKey(new Date(f + 'T12:00:00').getTime() + n * 864e5);
 
-/* Libro de caja: cada cobro (parcial o total) y cada devolución, con el medio de pago real. De acá salen los reportes. */
+/* Registro de cambios: todo ajuste de precio, anulación, corrección o devolución deja una línea acá y no se puede borrar */
+const USUARIO = () => Date.now() < UI.adminUntil ? 'Administración' : 'Caja';
+function logPush(tipo, ref, detalle, datos) {
+  DB.log.push({ id: uid('lg'), ts: Date.now(), usuario: USUARIO(), tipo, ref: ref || '', detalle, datos: datos || null });
+}
+/* Libro de caja: cada cobro (parcial o total), devolución y corrección, con el medio de pago real. De acá salen los reportes. */
 function cajaPush(metodoId, monto, tipo, motivo, ts) {
   const m = metodo(metodoId);
   if (!m) throw new Error('Medio de pago inexistente');
   DB.caja.push({ id: uid('cj'), ts: ts || Date.now(), metodoId, nombre: m.nombre, monto, tipo, motivo });
 }
 
-/* Registrar una venta completa (stock + ticket + pagos + caja), todo dentro de una transacción.
+/* Costos (sólo se cargan y se ven en Administración). Una receta cuesta lo que cuestan sus ingredientes. */
+function costoReceta(receta) {
+  let t = 0;
+  for (const r of receta || []) { const i = prod(r.id); if (!i || !(i.costo > 0)) return 0; t += i.costo * r.cant; }
+  return t;
+}
+const costoUnit = p => p.tipo === 'receta' ? costoReceta(p.receta) : (p.costo > 0 ? p.costo : 0);
+function lineasDeItems(items) {
+  return items.map(it => {
+    const p = prod(it.prodId);
+    if (!p) throw new Error('Un producto de la comanda ya no existe');
+    return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, costo: costoUnit(p), nota: it.nota || '' };
+  });
+}
+/* Descuento que corresponde a un ajuste: % , monto, total final o "al costo" */
+function calcDescuento(subtotal, lineas, aj) {
+  if (!aj) return 0;
+  if (aj.tipo === 'pct') return Math.round(subtotal * Math.min(100, aj.valor || 0) / 100);
+  if (aj.tipo === 'monto') return Math.min(subtotal, aj.valor || 0);
+  if (aj.tipo === 'final') return Math.max(0, subtotal - Math.min(subtotal, aj.valor || 0));
+  if (aj.tipo === 'costo') {
+    const faltan = lineas.filter(l => !(l.costo > 0));
+    if (faltan.length) throw new Error('Falta cargar el costo de: ' + faltan.map(l => l.nombre).join(', ') + ' (Admin → Productos)');
+    return Math.max(0, subtotal - sum(lineas, l => l.costo * l.cant));
+  }
+  throw new Error('Tipo de ajuste desconocido');
+}
+
+/* Registrar una venta completa (stock + ticket + pagos + caja + registro), todo dentro de una transacción.
    `items` son productos de la comanda; `lineas` permite ventas sin producto (por ejemplo un turno de cancha). */
 function commitVenta(o) {
   const ts = o.ts || Date.now();
-  const lineas = o.lineas || o.items.map(it => {
-    const p = prod(it.prodId);
-    if (!p) throw new Error('Un producto de la comanda ya no existe');
-    return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, nota: it.nota || '' };
-  });
+  const lineas = o.lineas || lineasDeItems(o.items);
   if (!lineas.length) throw new Error('La comanda está vacía');
-  const total = sum(lineas, l => l.cant * l.precio);
+  const subtotal = sum(lineas, l => l.cant * l.precio);
+  if (o.ajuste) {
+    if (!o.ajuste.motivo) throw new Error('Falta el motivo del descuento');
+    if (o.ajuste.tipo === 'costo' && !String(o.ajuste.nota || '').trim()) throw new Error('Poné el nombre del empleado en la nota');
+  }
+  const descuento = Math.min(subtotal, calcDescuento(subtotal, lineas, o.ajuste));
+  const total = subtotal - descuento;
   const abonos = o.abonos || [], yaPagado = sum(abonos, a => a.monto);
   if (yaPagado > total) throw new Error('Lo ya pagado supera el total de la cuenta');
   const ev = evalPago(total - yaPagado, o.pagos);
@@ -499,7 +540,12 @@ function commitVenta(o) {
   o.pagos.filter(r => r.monto > 0 && !metodo(r.metodoId).efectivo).forEach(r => pagos.push({ metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto, ts }));
   if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied, ts });
   pagos.forEach(p => cajaPush(p.metodoId, p.monto, 'cobro', 'Ticket #' + nro, ts));
-  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '', turnoId: o.turnoId || null });
+  const ajuste = o.ajuste ? { tipo: o.ajuste.tipo, valor: o.ajuste.valor || 0, motivo: o.ajuste.motivo, nota: String(o.ajuste.nota || '').trim(), descuento } : null;
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, subtotal, descuento, ajuste, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '', turnoId: o.turnoId || null });
+  if (ajuste) {
+    const nombres = { pct: 'descuento del ' + ajuste.valor + '%', monto: 'descuento de ' + money(ajuste.valor), final: 'total final fijado en ' + money(ajuste.valor), costo: 'vendido al costo' };
+    logPush('descuento', '#' + nro, `Ticket #${nro}: ${nombres[ajuste.tipo]}. Subtotal ${money(subtotal)}, descuento ${money(descuento)}, total ${money(total)}. Motivo: ${ajuste.motivo}${ajuste.nota ? ' (' + ajuste.nota + ')' : ''}`, ajuste);
+  }
   return ventaId;
 }
 
@@ -523,27 +569,71 @@ function registrarAbono(key, rows) {
   cu.obj.pagos = pagosDe(cu.obj).concat(nuevos);
   nuevos.forEach(p => cajaPush(p.metodoId, p.monto, 'cobro', 'Pago parcial · ' + cu.titulo));
 }
-/* La devolución puede hacerse en un medio distinto al que se pagó (pagó con Mercado Pago, se devuelve en efectivo) */
+/* La devolución puede hacerse en un medio distinto al que se pagó (pagó con QR, se devuelve en efectivo) */
 function devolverPago(key, pagoId, metodoId) {
   const cu = cuentaGuardada(key), p = pagosDe(cu.obj).find(x => x.id === pagoId);
   if (!p) throw new Error('Ese pago ya no está en la cuenta');
   cu.obj.pagos = cu.obj.pagos.filter(x => x.id !== pagoId);
   cajaPush(metodoId, -p.monto, 'devolucion', `Devolución (${cu.titulo}) · había pagado con ${p.nombre}`);
+  logPush('devolucion', cu.titulo, `Se devolvieron ${money(p.monto)} en ${metodo(metodoId).nombre} (había pagado con ${p.nombre}) · ${cu.titulo}`);
+}
+/* Corregir un ticket ya cobrado: sólo el medio de pago real y la nota. Cambiar productos o importes se hace anulando. */
+function corregirVenta(id, o) {
+  const v = DB.ventas.find(x => x.id === id);
+  if (!v || v.estado !== 'ok') throw new Error('Ese ticket no se puede corregir');
+  if (!o.motivo) throw new Error('Poné el motivo de la corrección');
+  const cambios = [];
+  v.pagos.forEach((p, i) => {
+    const nuevo = o.medios[i];
+    if (!nuevo || nuevo === p.metodoId) return;
+    const m = metodo(nuevo);
+    cajaPush(p.metodoId, -p.monto, 'correccion', `Ticket #${v.nro} corregido (sale de ${p.nombre})`, p.ts || v.ts);
+    cajaPush(nuevo, p.monto, 'correccion', `Ticket #${v.nro} corregido (pasa a ${m.nombre})`, p.ts || v.ts);
+    cambios.push(`${money(p.monto)}: ${p.nombre} → ${m.nombre}`);
+    p.metodoId = nuevo; p.nombre = m.nombre;
+  });
+  if ((o.nota || '') !== (v.nota || '')) { cambios.push(`nota: "${v.nota || ''}" → "${o.nota || ''}"`); v.nota = o.nota || ''; }
+  if (!cambios.length) throw new Error('No hay cambios para guardar');
+  v.corregido = true;
+  logPush('correccion', '#' + v.nro, `Ticket #${v.nro} corregido. ${cambios.join('; ')}. Motivo: ${o.motivo}`, { cambios, motivo: o.motivo });
 }
 function anularVenta(id, map) {
   const v = DB.ventas.find(x => x.id === id);
   if (!v || v.estado !== 'ok') throw new Error('Ese ticket ya está anulado');
   DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta').forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, permitirNegativo: true, motivo: `Anulación ticket #${v.nro}` }));
-  v.pagos.forEach((p, i) => cajaPush((map && map[i]) || p.metodoId, -p.monto, 'devolucion', `Ticket #${v.nro} anulado · había pagado con ${p.nombre}`));
+  const devs = v.pagos.map((p, i) => {
+    const mid = (map && map[i]) || p.metodoId;
+    cajaPush(mid, -p.monto, 'devolucion', `Ticket #${v.nro} anulado · había pagado con ${p.nombre}`);
+    return `${money(p.monto)} (pagó ${p.nombre}) devuelto en ${metodo(mid).nombre}`;
+  });
   if (v.turnoId) { const t = DB.turnos.find(x => x.id === v.turnoId); if (t) t.estado = 'cancelado'; }
   v.estado = 'anulada'; v.tsAnul = Date.now();
+  logPush('anulacion', '#' + v.nro, `Ticket #${v.nro} anulado (${money(v.total)}, ${v.destino}). ${devs.join('; ') || 'No había pagos que devolver'}`);
 }
 
-/* Turnos de cancha. Una cancha puede "bloquear" a otras (Fútbol 7 usa las dos de Fútbol 5). */
-const relacionadas = (a, b) => a.id === b.id || a.bloquea.includes(b.id) || b.bloquea.includes(a.id);
-function ocupante(canchaId, fecha, ini, fin) {
+/* Turnos de cancha. Regla fija del sistema: Fútbol 7 usa las dos canchas de Fútbol 5, así que si hay un F5 (cualquiera de los dos) no hay F7, y si hay F7 no hay F5.
+   Las dos de pádel son independientes. */
+const CLAVES_F5 = ['f5a', 'f5b'];
+const relacionadas = (a, b) => a.id === b.id || (a.clave === 'f7' && CLAVES_F5.includes(b.clave)) || (b.clave === 'f7' && CLAVES_F5.includes(a.clave));
+
+/* Turnos FIJOS: se repiten todas las semanas (mismo día y hora, precio de fijo, sin seña). Cada fecha aparece como una
+   "ocurrencia"; sólo se guarda un turno real cuando pasa algo ese día (se cobra, se suspende o se pospone). */
+function ocurrenciasFijas(fecha) {
+  const dow = dowDe(fecha);
+  return DB.fijos.filter(f => f.dow === dow && f.desde <= fecha && (!f.hasta || fecha <= f.hasta) && !DB.turnos.some(t => t.fijoId === f.id && t.ocurrencia === fecha)).map(f => {
+    const c = cancha(f.canchaId);
+    return { virtual: true, id: 'F:' + f.id + ':' + fecha, fijoId: f.id, canchaId: f.canchaId, fecha, ini: f.ini, fin: f.ini + c.dur, cliente: f.cliente, tel: f.tel, nota: f.nota, precio: c.precioFijo, estado: 'reservado', pagos: [], esFijo: true, ocurrencia: fecha };
+  });
+}
+const turnosDelDia = fecha => DB.turnos.filter(t => t.fecha === fecha && t.estado !== 'cancelado').concat(ocurrenciasFijas(fecha));
+function turnoPorId(id) {
+  if (id.startsWith('F:')) { const [, fid, fecha] = id.split(':'); return ocurrenciasFijas(fecha).find(t => t.fijoId === fid) || null; }
+  return DB.turnos.find(t => t.id === id) || null;
+}
+function ocupante(canchaId, fecha, ini, fin, ignorar) {
   const c = cancha(canchaId);
-  return DB.turnos.find(t => t.fecha === fecha && t.estado !== 'cancelado' && t.ini < fin && ini < t.fin && relacionadas(c, cancha(t.canchaId)));
+  return turnosDelDia(fecha).find(t => t.ini < fin && ini < t.fin && relacionadas(c, cancha(t.canchaId)) &&
+    !(ignorar && (t.id === ignorar.id || (t.fijoId && t.fijoId === ignorar.fijoId && t.ocurrencia && t.ocurrencia === ignorar.ocurrencia))));
 }
 function slotsDe(c) { const out = []; for (let s = c.ap; s + c.dur <= c.ci; s += c.dur) out.push(s); return out; }
 function crearTurno(o) {
@@ -551,10 +641,12 @@ function crearTurno(o) {
   if (!c) throw new Error('La cancha no existe');
   const fin = o.ini + c.dur, oc = ocupante(c.id, o.fecha, o.ini, fin);
   if (oc) throw new Error('Ese horario ya está ocupado por ' + cancha(oc.canchaId).nombre + ' (' + (oc.cliente || 'sin nombre') + ')');
-  if (!(o.precio > 0)) throw new Error('Poné el precio del turno');
+  const precio = o.fijo ? c.precioFijo : c.precio;
+  if (!(precio > 0)) throw new Error('La cancha no tiene precio cargado (Admin → Canchas y turnos)');
   const filas = (o.pagos || []).filter(r => r.monto > 0), sena = sum(filas, r => r.monto);
-  if (sena >= o.precio) throw new Error('La seña tiene que ser menor al precio. Para pagar todo, reservá y cobrá el turno.');
-  const t = { id: uid('t'), canchaId: c.id, fecha: o.fecha, ini: o.ini, fin, cliente: o.cliente || '', tel: o.tel || '', nota: o.nota || '', precio: o.precio, estado: 'reservado', pagos: [], ventaId: null };
+  if (o.fijo && sena > 0) throw new Error('Los turnos fijos no llevan seña');
+  if (sena >= precio) throw new Error('La seña tiene que ser menor al precio. Para pagar todo, reservá y cobrá el turno.');
+  const t = { id: uid('t'), canchaId: c.id, fecha: o.fecha, ini: o.ini, fin, cliente: o.cliente || '', tel: o.tel || '', nota: o.nota || '', precio, estado: 'reservado', pagos: [], ventaId: null, esFijo: !!o.fijo, fijoId: o.fijoId || null };
   DB.turnos.push(t);
   filas.forEach(r => {
     t.pagos.push({ id: uid('pg'), ts: o.ts || Date.now(), metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto });
@@ -562,22 +654,68 @@ function crearTurno(o) {
   });
   return t.id;
 }
+function crearFijo(o) {
+  const c = cancha(o.canchaId);
+  const choques = [];
+  for (let i = 0; i < 12; i++) { const f = sumarDias(o.fecha, 7 * i); if (ocupante(c.id, f, o.ini, o.ini + c.dur)) choques.push(f.slice(8) + '/' + f.slice(5, 7)); }
+  if (choques.length) throw new Error('Choca con otros turnos el ' + choques.join(', ') + '. Liberá esos horarios antes de crear el fijo.');
+  const f = { id: uid('fx'), canchaId: c.id, dow: dowDe(o.fecha), ini: o.ini, cliente: o.cliente || '', tel: o.tel || '', nota: o.nota || '', desde: o.fecha, hasta: null };
+  DB.fijos.push(f);
+  logPush('turno', c.nombre, `Turno FIJO creado: ${f.cliente || 'sin nombre'}, ${c.nombre}, todos los ${DIAS[f.dow]} a las ${hm(f.ini)} (desde el ${o.fecha})`);
+  return f.id;
+}
+function materializarFijo(fijoId, fecha) {
+  const existente = DB.turnos.find(t => t.fijoId === fijoId && t.ocurrencia === fecha);
+  if (existente) return existente;
+  const f = DB.fijos.find(x => x.id === fijoId), c = cancha(f.canchaId);
+  const t = { id: uid('t'), canchaId: f.canchaId, fecha, ini: f.ini, fin: f.ini + c.dur, cliente: f.cliente, tel: f.tel, nota: f.nota, precio: c.precioFijo, estado: 'reservado', pagos: [], ventaId: null, esFijo: true, fijoId, ocurrencia: fecha };
+  DB.turnos.push(t);
+  return t;
+}
+/* Dentro de una transacción: devuelve el turno real, creándolo si era una ocurrencia de un fijo */
+function turnoReal(id) {
+  if (id.startsWith('F:')) { const [, fid, fecha] = id.split(':'); return materializarFijo(fid, fecha); }
+  const t = DB.turnos.find(x => x.id === id);
+  if (!t) throw new Error('El turno ya no existe');
+  return t;
+}
+function suspenderOcurrencia(id) {
+  const t = turnoReal(id);
+  if (t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+  t.estado = 'cancelado';
+  logPush('turno', cancha(t.canchaId).nombre, `Turno fijo de ${t.cliente || 'sin nombre'} suspendido el ${t.fecha} (${cancha(t.canchaId).nombre}, ${hm(t.ini)}). El horario quedó libre ese día.`);
+}
+function posponerOcurrencia(id, fecha, ini) {
+  const t = turnoReal(id), c = cancha(t.canchaId);
+  if (t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+  t.estado = 'cancelado';
+  const nid = crearTurno({ canchaId: t.canchaId, fecha, ini, cliente: t.cliente, tel: t.tel, nota: t.nota, fijo: true, fijoId: t.fijoId });
+  logPush('turno', c.nombre, `Turno de ${t.cliente || 'sin nombre'} pospuesto: del ${t.fecha} ${hm(t.ini)} al ${fecha} ${hm(ini)} (${c.nombre}).`);
+  return nid;
+}
+function terminarFijo(fijoId, desdeFecha) {
+  const f = DB.fijos.find(x => x.id === fijoId);
+  if (!f) throw new Error('El turno fijo no existe');
+  f.hasta = sumarDias(desdeFecha, -1);
+  logPush('turno', cancha(f.canchaId).nombre, `Turno FIJO terminado: ${f.cliente || 'sin nombre'}, ${cancha(f.canchaId).nombre}, ${DIAS[f.dow]} ${hm(f.ini)}. Libre desde el ${desdeFecha}.`);
+}
 function cancelarTurno(id, map) {
   const t = DB.turnos.find(x => x.id === id);
   if (!t || t.estado !== 'reservado') throw new Error('Ese turno no se puede cancelar');
   pagosDe(t).slice().forEach((p, i) => devolverPago('T:' + id, p.id, (map && map[i]) || p.metodoId));
   t.estado = 'cancelado';
+  logPush('turno', cancha(t.canchaId).nombre, `Turno cancelado: ${t.cliente || 'sin nombre'}, ${cancha(t.canchaId).nombre}, ${t.fecha} ${hm(t.ini)}.`);
 }
 
 /* ---------- datos de ejemplo ---------- */
 function seed() {
-  const d = { v: 3, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], contadores: { venta: 0 } };
+  const d = { v: 4, seq: 1, pin: '1234', negocio: 'Predio Deportivo', config: { pedirPinAjuste: true }, categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], fijos: [], log: [], contadores: { venta: 0 } };
   DB = d;
   const t0 = Date.now() - 9 * 3600e3, hoy = dayKey(Date.now()), manana = dayKey(Date.now() + 864e5);
   const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
   const met = (nombre, efectivo) => { const m = { id: uid('mp'), nombre, activo: true, efectivo: !!efectivo }; d.metodos.push(m); return m.id; };
   const add = o => {
-    const p = { id: uid('p'), activo: true, precio: 0, stock: 0, minimo: 0, paqueteNombre: '', paqueteUnidades: 1, receta: [], tipo: 'directo', ...o };
+    const p = { id: uid('p'), activo: true, precio: 0, costo: 0, stock: 0, minimo: 0, paqueteNombre: '', paqueteUnidades: 1, receta: [], tipo: 'directo', ...o };
     const st = p.stock; p.stock = 0; d.productos.push(p);
     if (st > 0) moverStock(p.id, st, 'ingreso', { ts: t0, motivo: 'Stock inicial' });
     return p.id;
@@ -587,28 +725,29 @@ function seed() {
     return { id: uid('pg'), ts, metodoId, nombre: metodo(metodoId).nombre, monto };
   };
   const kiosco = cat('Kiosco', 'ambar'), padel = cat('Pádel', 'azul'), buffet = cat('Buffet', 'rojo'), futbol = cat('Fútbol', 'verde');
-  const efe = met('Efectivo', true), mp = met('Mercado Pago'), tr = met('Transferencia'), tj = met('Tarjeta');
+  // Hoy se acepta: efectivo, Mercado Pago por QR y Mercado Pago por transferencia
+  const efe = met('Efectivo', true), qr = met('MP · QR'), tr = met('MP · Transferencia');
 
-  const coca = add({ nombre: 'Coca-Cola 500 ml', catId: kiosco, precio: 2200, stock: 8, minimo: 6, paqueteNombre: 'Bulto 6 × 12', paqueteUnidades: 72 });
-  const agua = add({ nombre: 'Agua mineral 500 ml', catId: kiosco, precio: 1500, stock: 24, minimo: 6, paqueteNombre: 'Pack × 6', paqueteUnidades: 6 });
-  const gato = add({ nombre: 'Gatorade 500 ml', catId: kiosco, precio: 2600, stock: 18, minimo: 6, paqueteNombre: 'Pack × 12', paqueteUnidades: 12 });
-  const alfa = add({ nombre: 'Alfajor', catId: kiosco, precio: 1200, stock: 40, minimo: 10, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
-  add({ nombre: 'Papas fritas', catId: kiosco, precio: 2000, stock: 15, minimo: 5, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
-  add({ nombre: 'Chicles', catId: kiosco, precio: 500, stock: 60, minimo: 10, paqueteNombre: 'Caja × 20', paqueteUnidades: 20 });
-  const pelotas = add({ nombre: 'Pelotas de pádel (tubo × 3)', catId: padel, precio: 9000, stock: 10, minimo: 3, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
-  const grip = add({ nombre: 'Grip', catId: padel, precio: 3500, stock: 14, minimo: 4, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
+  const coca = add({ nombre: 'Coca-Cola 500 ml', catId: kiosco, precio: 2200, costo: 1400, stock: 8, minimo: 6, paqueteNombre: 'Bulto 6 × 12', paqueteUnidades: 72 });
+  const agua = add({ nombre: 'Agua mineral 500 ml', catId: kiosco, precio: 1500, costo: 800, stock: 24, minimo: 6, paqueteNombre: 'Pack × 6', paqueteUnidades: 6 });
+  const gato = add({ nombre: 'Gatorade 500 ml', catId: kiosco, precio: 2600, costo: 1700, stock: 18, minimo: 6, paqueteNombre: 'Pack × 12', paqueteUnidades: 12 });
+  const alfa = add({ nombre: 'Alfajor', catId: kiosco, precio: 1200, costo: 650, stock: 40, minimo: 10, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
+  add({ nombre: 'Papas fritas', catId: kiosco, precio: 2000, costo: 1200, stock: 15, minimo: 5, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
+  add({ nombre: 'Chicles', catId: kiosco, precio: 500, costo: 250, stock: 60, minimo: 10, paqueteNombre: 'Caja × 20', paqueteUnidades: 20 });
+  const pelotas = add({ nombre: 'Pelotas de pádel (tubo × 3)', catId: padel, precio: 9000, costo: 6000, stock: 10, minimo: 3, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
+  const grip = add({ nombre: 'Grip', catId: padel, precio: 3500, costo: 2000, stock: 14, minimo: 4, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
   add({ nombre: 'Alquiler de paleta', catId: padel, precio: 3000, tipo: 'servicio' });
-  const salch = add({ nombre: 'Salchicha', catId: buffet, tipo: 'insumo', stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
-  const pan = add({ nombre: 'Pan de pancho', catId: buffet, tipo: 'insumo', stock: 30, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
-  const medal = add({ nombre: 'Medallón de carne', catId: buffet, tipo: 'insumo', stock: 20, minimo: 5, paqueteNombre: 'Caja × 10', paqueteUnidades: 10 });
-  const panH = add({ nombre: 'Pan de hamburguesa', catId: buffet, tipo: 'insumo', stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
-  const queso = add({ nombre: 'Feta de queso', catId: buffet, tipo: 'insumo', stock: 60, minimo: 10, paqueteNombre: 'Paquete × 20', paqueteUnidades: 20 });
+  const salch = add({ nombre: 'Salchicha', catId: buffet, tipo: 'insumo', costo: 350, stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const pan = add({ nombre: 'Pan de pancho', catId: buffet, tipo: 'insumo', costo: 250, stock: 30, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const medal = add({ nombre: 'Medallón de carne', catId: buffet, tipo: 'insumo', costo: 1100, stock: 20, minimo: 5, paqueteNombre: 'Caja × 10', paqueteUnidades: 10 });
+  const panH = add({ nombre: 'Pan de hamburguesa', catId: buffet, tipo: 'insumo', costo: 400, stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
+  const queso = add({ nombre: 'Feta de queso', catId: buffet, tipo: 'insumo', costo: 200, stock: 60, minimo: 10, paqueteNombre: 'Paquete × 20', paqueteUnidades: 20 });
   const pancho = add({ nombre: 'Pancho', catId: buffet, precio: 3500, tipo: 'receta', receta: [{ id: salch, cant: 1 }, { id: pan, cant: 1 }] });
   const hamb = add({ nombre: 'Hamburguesa completa', catId: buffet, precio: 8500, tipo: 'receta', receta: [{ id: medal, cant: 1 }, { id: panH, cant: 1 }, { id: queso, cant: 2 }] });
-  add({ nombre: 'Porción de muzzarella', catId: buffet, precio: 2800, stock: 16, minimo: 4, paqueteNombre: 'Pizza × 8 porciones', paqueteUnidades: 8 });
-  add({ nombre: 'Milanesa con papas', catId: buffet, precio: 9500, tipo: 'servicio' });
-  const cerv = add({ nombre: 'Cerveza 1 L', catId: buffet, precio: 4200, stock: 18, minimo: 6, paqueteNombre: 'Cajón × 12', paqueteUnidades: 12 });
-  add({ nombre: 'Café', catId: buffet, precio: 1800, tipo: 'servicio' });
+  add({ nombre: 'Porción de muzzarella', catId: buffet, precio: 2800, costo: 1500, stock: 16, minimo: 4, paqueteNombre: 'Pizza × 8 porciones', paqueteUnidades: 8 });
+  add({ nombre: 'Milanesa con papas', catId: buffet, precio: 9500, costo: 5200, tipo: 'servicio' });
+  const cerv = add({ nombre: 'Cerveza 1 L', catId: buffet, precio: 4200, costo: 2600, stock: 18, minimo: 6, paqueteNombre: 'Cajón × 12', paqueteUnidades: 12 });
+  add({ nombre: 'Café', catId: buffet, precio: 1800, costo: 500, tipo: 'servicio' });
 
   // mapa del salón (lugares donde se abren cuentas)
   const L = (nombre, tipo, x, y, w, h, rapido) => { const m = { id: uid('m'), nombre, tipo, x, y, w, h, rapido: !!rapido }; d.mesas.push(m); return m; };
@@ -619,40 +758,45 @@ function seed() {
   [2, 22, 42].forEach((x, i) => mesas.push(L('Mesa ' + (i + 6), 'mesa', x, 58, 14, 17)));
   const barra = L('Barra', 'barra', 62, 60, 34, 14, true);
 
-  // canchas del calendario de turnos
-  const cn = (nombre, deporte, dur, ap, precio, catId, bloquea) => { const c = { id: uid('cn'), nombre, deporte, dur, ap, ci: 1440, precio, catId, bloquea: bloquea || [] }; d.canchas.push(c); return c.id; };
-  const f5a = cn('Fútbol 5 · Cancha 1', 'futbol', 60, 600, 28000, futbol), f5b = cn('Fútbol 5 · Cancha 2', 'futbol', 60, 600, 28000, futbol);
-  const f7 = cn('Fútbol 7 · Cancha completa', 'futbol', 60, 600, 48000, futbol, [f5a, f5b]);
-  const pT = cn('Pádel · Techada', 'padel', 90, 480, 26000, padel), pA = cn('Pádel · Abierta', 'padel', 90, 480, 22000, padel);
+  // canchas del calendario: precio común y precio de fijo
+  const cn = (clave, nombre, deporte, dur, ap, precio, precioFijo, catId) => { const c = { id: uid('cn'), clave, nombre, deporte, dur, ap, ci: 1440, precio, precioFijo, catId }; d.canchas.push(c); return c.id; };
+  const f5a = cn('f5a', 'Fútbol 5 · Cancha 1', 'futbol', 60, 600, 28000, 24000, futbol), f5b = cn('f5b', 'Fútbol 5 · Cancha 2', 'futbol', 60, 600, 28000, 24000, futbol);
+  const f7 = cn('f7', 'Fútbol 7 · Cancha completa', 'futbol', 60, 600, 48000, 42000, futbol);
+  const pT = cn('padelT', 'Pádel · Techada', 'padel', 90, 480, 26000, 22000, padel), pA = cn('padelA', 'Pádel · Abierta', 'padel', 90, 480, 22000, 19000, padel);
 
   // ventas de ejemplo de hoy (pasan por la misma función que las ventas reales)
   const demo = [
     { items: [[pancho, 2], [coca, 1]], pagos: [[efe, 10000]], mesa: 'Mesa 2' },
-    { items: [[hamb, 1], [cerv, 1]], pagos: [[mp, 12700]], mesa: 'Mesa 4' },
+    { items: [[hamb, 1], [cerv, 1]], pagos: [[qr, 12700]], mesa: 'Mesa 4' },
     { items: [[grip, 1], [pelotas, 1]], pagos: [[efe, 5000], [tr, 7500]] },
-    { items: [[alfa, 2], [agua, 1]], pagos: [[efe, 5000]] },
-    { items: [[pelotas, 1]], pagos: [[mp, 9000]] },
-    { items: [[coca, 2]], pagos: [[tj, 4400]] },
+    { items: [[alfa, 2], [agua, 1]], pagos: [[efe, 4000]], ajuste: { tipo: 'pct', valor: 10, motivo: 'Promo', nota: '' } },
+    { items: [[pelotas, 1]], pagos: [[qr, 9000]] },
+    { items: [[coca, 2]], pagos: [[tr, 4400]] },
+    { items: [[hamb, 1]], pagos: [[efe, 1900]], ajuste: { tipo: 'costo', valor: 0, motivo: 'Empleado (al costo)', nota: 'Juan (cocina)' } },
   ];
   demo.forEach((x, i) => commitVenta({
     ts: Date.now() - (demo.length + 1 - i) * 17 * 60000,
     items: x.items.map(([prodId, cant]) => ({ prodId, cant })),
     pagos: x.pagos.map(([metodoId, monto]) => ({ metodoId, monto })),
-    mesaNombre: x.mesa,
+    mesaNombre: x.mesa, ajuste: x.ajuste,
   }));
   // un turno ya cobrado (seña en efectivo y el resto por transferencia)
-  const tc = crearTurno({ canchaId: f5b, fecha: hoy, ini: 600, cliente: 'Café Central', precio: 28000, ts: Date.now() - 200 * 60000, pagos: [{ metodoId: efe, monto: 8000 }] });
+  const tc = crearTurno({ canchaId: f5b, fecha: hoy, ini: 600, cliente: 'Café Central', ts: Date.now() - 200 * 60000, pagos: [{ metodoId: efe, monto: 8000 }] });
   const tt = d.turnos.find(x => x.id === tc), cc = cancha(f5b);
   tt.ventaId = commitVenta({ ts: Date.now() - 100 * 60000, abonos: tt.pagos, pagos: [{ metodoId: tr, monto: 20000 }], mesaNombre: 'Turno · ' + cc.nombre, cliente: 'Café Central', turnoId: tc,
-    lineas: [{ prodId: null, nombre: 'Turno ' + cc.nombre + ' · 10:00-11:00', catId: futbol, tipo: 'servicio', cant: 1, precio: 28000, nota: 'Café Central' }] });
+    lineas: [{ prodId: null, nombre: 'Turno ' + cc.nombre + ' · 10:00-11:00', catId: futbol, tipo: 'servicio', cant: 1, precio: 28000, costo: 0, nota: 'Café Central' }] });
   tt.estado = 'cobrado';
-  // turnos abiertos
-  crearTurno({ canchaId: f5a, fecha: hoy, ini: 1200, cliente: 'Los Pibes', tel: '11 5555-0101', precio: 28000, ts: Date.now() - 300 * 60000, pagos: [{ metodoId: efe, monto: 5000 }] });
-  crearTurno({ canchaId: f5b, fecha: hoy, ini: 1140, cliente: 'Oficina Sur', precio: 28000 });
-  crearTurno({ canchaId: f7, fecha: hoy, ini: 1260, cliente: 'Cumple de Tomi', tel: '11 5555-0202', precio: 48000, ts: Date.now() - 150 * 60000, pagos: [{ metodoId: mp, monto: 15000 }] });
-  crearTurno({ canchaId: pT, fecha: hoy, ini: 1200, cliente: 'Martín y Ana', precio: 26000, ts: Date.now() - 120 * 60000, pagos: [{ metodoId: tr, monto: 8000 }] });
-  crearTurno({ canchaId: pA, fecha: hoy, ini: 1110, cliente: 'Sofi', precio: 22000 });
-  crearTurno({ canchaId: f5a, fecha: manana, ini: 1140, cliente: 'Torneo del viernes', precio: 28000 });
+  // turnos comunes abiertos
+  crearTurno({ canchaId: f5a, fecha: hoy, ini: 1200, cliente: 'Los Pibes', tel: '11 5555-0101', ts: Date.now() - 300 * 60000, pagos: [{ metodoId: efe, monto: 5000 }] });
+  crearTurno({ canchaId: f5b, fecha: hoy, ini: 1140, cliente: 'Oficina Sur' });
+  crearTurno({ canchaId: f7, fecha: hoy, ini: 1260, cliente: 'Cumple de Tomi', tel: '11 5555-0202', ts: Date.now() - 150 * 60000, pagos: [{ metodoId: qr, monto: 15000 }] });
+  crearTurno({ canchaId: pT, fecha: hoy, ini: 1200, cliente: 'Martín y Ana', ts: Date.now() - 120 * 60000, pagos: [{ metodoId: tr, monto: 8000 }] });
+  crearTurno({ canchaId: pA, fecha: hoy, ini: 1110, cliente: 'Sofi' });
+  crearTurno({ canchaId: f5a, fecha: manana, ini: 1140, cliente: 'Torneo del viernes' });
+  // turnos FIJOS (se repiten todas las semanas, precio de fijo, sin seña)
+  crearFijo({ canchaId: f5b, fecha: hoy, ini: 1320, cliente: 'Los de siempre', tel: '11 5555-0303' });
+  crearFijo({ canchaId: pT, fecha: hoy, ini: 1110, cliente: 'Daniela (fija)', tel: '11 5555-0404' });
+  crearFijo({ canchaId: f5a, fecha: manana, ini: 1260, cliente: 'Los del viernes' });
   // cuentas abiertas de ejemplo (con pagos parciales ya hechos)
   d.comandas[mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }], pagos: [ab(efe, 5000, 10, 'Pago parcial · Mesa 3')] };
   d.comandas[mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
@@ -689,14 +833,15 @@ function closeModal(silent) {
 function ask(title, msg, okLabel, cb, danger) {
   modal({ title, body: `<p>${msg}</p>`, actions: [{ label: 'Cancelar' }, { label: okLabel, kind: danger ? 'danger' : 'primary', onClick: () => { cb(); } }] });
 }
-function requirePin(cb) {
+function requirePin(cb, onCancel) {
   if (Date.now() < UI.adminUntil) { UI.adminUntil = Date.now() + 300000; return cb(); }
   modal({
     title: 'Código de administración',
+    onClose: onCancel,
     body: `<p class="muted">Esta zona está protegida para que no se cambien productos, mesas o tickets por error. (En el prototipo el código es <b>1234</b>.)</p>
            <input id="pin" class="in" type="password" inputmode="numeric" autocomplete="off" placeholder="Código">
            <p class="err" id="pinerr" hidden>Código incorrecto</p>`,
-    actions: [{ label: 'Cancelar' }, { label: 'Entrar', kind: 'primary', onClick: () => {
+    actions: [{ label: 'Cancelar', onClick: () => { if (onCancel) onCancel(); } }, { label: 'Entrar', kind: 'primary', onClick: () => {
       if ($('#pin').value === DB.pin) { UI.adminUntil = Date.now() + 300000; cb(); return; }
       $('#pinerr').hidden = false; return false;
     } }],
@@ -811,26 +956,47 @@ function tituloCuenta(key) {
   if (key.startsWith('T:')) { const t = DB.turnos.find(x => x.id === key.slice(2)); return t ? 'Turno ' + cancha(t.canchaId).nombre + ' · ' + hm(t.ini) : 'Turno'; }
   return lugarNombre(key);
 }
-function iniciarCobro(key, total, saldo, parcial, negativo) {
-  UI.pago = { key, total, saldo, parcial: !!parcial, negativo: !!negativo, rows: [{ metodoId: efectivoId(), monto: parcial ? 0 : saldo }] };
+/* subtotal = lo que suman los productos; ya = lo pagado antes; el ajuste (descuento, al costo) sólo se aplica en el pago final */
+function iniciarCobro(key, subtotal, ya, lineas, parcial, negativo) {
+  UI.pago = { key, subtotal, ya, lineas, ajuste: null, ajusteAbierto: false, descuento: 0, ajusteErr: '', total: subtotal, saldo: subtotal - ya, parcial: !!parcial, negativo: !!negativo, rows: [] };
+  UI.pago.rows = [{ metodoId: efectivoId(), monto: parcial ? 0 : UI.pago.saldo }];
   renderCobro(parcial ? 0 : undefined);
 }
 function abrirCobro(parcial) {
   const key = UI.com, c = getCom(key);
   if (!c.items.length) return toast('Primero agregá productos', 'warn');
-  const total = totalItems(c.items), saldo = total - pagadoDe(c);
-  if (saldo <= 0) return toast('Esta cuenta ya está paga. Devolvé un pago o agregá productos.', 'warn');
-  if (parcial) return iniciarCobro(key, total, saldo, true);
-  if (c.negOk) return iniciarCobro(key, total, saldo, false, true);
-  chequearStock(c.items, key, false, 'cobrar', neg => iniciarCobro(key, total, saldo, false, neg));
+  const total = totalItems(c.items), ya = pagadoDe(c);
+  if (total - ya <= 0) return toast('Esta cuenta ya está paga. Devolvé un pago o agregá productos.', 'warn');
+  const lineas = lineasDeItems(c.items);
+  if (parcial) return iniciarCobro(key, total, ya, lineas, true);
+  if (c.negOk) return iniciarCobro(key, total, ya, lineas, false, true);
+  chequearStock(c.items, key, false, 'cobrar', neg => iniciarCobro(key, total, ya, lineas, false, neg));
 }
 function abrirCobroTurno(id, parcial) {
-  const t = DB.turnos.find(x => x.id === id), saldo = t.precio - pagadoDe(t);
-  if (saldo <= 0) return toast('Este turno ya está pago', 'warn');
-  iniciarCobro('T:' + id, t.precio, saldo, parcial);
+  const t = DB.turnos.find(x => x.id === id), ya = pagadoDe(t);
+  if (t.precio - ya <= 0) return toast('Este turno ya está pago', 'warn');
+  iniciarCobro('T:' + id, t.precio, ya, [{ prodId: null, nombre: nombreTurno(t), costo: 0, cant: 1, precio: t.precio }], parcial);
+}
+function cobrarTurnoUI(id, parcial) {
+  const r = tx(() => turnoReal(id).id);
+  if (r.ok) abrirCobroTurno(r.value, parcial);
+}
+const AJ_MOTIVOS = ['Empleado (al costo)', 'Cortesía', 'Promo', 'Error de precio', 'Cliente frecuente', 'Otro'];
+function ajusteHTML(P) {
+  if (P.parcial) return '';
+  if (!P.ajusteAbierto) return `<button class="btn sm ghost" style="align-self:flex-start" data-act="aj-abrir">Descuento, al costo u otro ajuste…</button>`;
+  const aj = P.ajuste, esTurno = P.key.startsWith('T:');
+  const tipos = [['pct', 'Descuento en %'], ['monto', 'Descuento en $'], ['final', 'Poner un total final']].concat(esTurno ? [] : [['costo', 'Al costo (empleados)']]);
+  return `<div class="card" style="padding:12px"><div class="stack">
+    <div class="grid2"><label class="fld">Tipo de ajuste<select class="in" id="aj-tipo" data-in="aj">${tipos.map(([k, n]) => `<option value="${k}" ${aj.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="fld" id="aj-valor-wrap" ${aj.tipo === 'costo' ? 'hidden' : ''}><span id="aj-valor-lbl">${aj.tipo === 'pct' ? 'Porcentaje de descuento' : aj.tipo === 'monto' ? 'Descuento en pesos' : 'Total final a cobrar'}</span><input class="in" id="aj-valor" data-in="aj" inputmode="numeric" value="${aj.valor || ''}" placeholder="0"></label></div>
+    <div class="grid2"><label class="fld">Motivo (obligatorio)<select class="in" id="aj-motivo" data-in="aj"><option value="">Elegí un motivo…</option>${AJ_MOTIVOS.map(m => `<option ${aj.motivo === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label class="fld">Nota (nombre del empleado, quién autorizó)<input class="in" id="aj-nota" data-in="aj" value="${esc(aj.nota)}"></label></div>
+    <div class="muted" style="font-size:12px">El ajuste queda anotado en el registro de cambios, con fecha, hora y motivo.</div>
+    <button class="btn sm ghost" style="align-self:flex-start" data-act="aj-quitar">Quitar el ajuste</button></div></div>`;
 }
 function renderCobro(focusIdx) {
-  const P = UI.pago, ya = P.total - P.saldo;
+  const P = UI.pago;
   const chips = DB.metodos.filter(m => m.activo).map(m => `<button class="chip" data-act="pg-add" data-id="${m.id}">+ ${esc(m.nombre)}</button>`).join('');
   const rows = P.rows.map((r, i) => {
     const m = metodo(r.metodoId);
@@ -843,29 +1009,54 @@ function renderCobro(focusIdx) {
   }).join('');
   modal({
     title: (P.parcial ? 'Pago parcial · ' : 'Cobrar · ') + tituloCuenta(P.key),
-    body: `<div class="big-total"><span>${ya > 0 ? 'Saldo a cobrar' : 'Total a cobrar'}</span><b>${money(P.saldo)}</b></div>
-      ${ya > 0 ? `<p class="muted">Total ${money(P.total)} · ya pagado ${money(ya)}</p>` : ''}
+    body: `<div class="big-total"><span id="cb-lbl"></span><b id="cb-total"></b></div><p class="muted" id="cb-sub"></p>
+      ${ajusteHTML(P)}
       <div><div class="muted" style="margin-bottom:6px;font-weight:600">Medios de pago (se pueden combinar)</div><div class="chips">${chips}</div></div>
       <div class="stack" id="pg-rows">${rows}</div>
       <div class="pg-sum" id="pg-sum"></div>`,
     actions: [{ label: 'Volver' }, { label: 'Guardar pago parcial', disabled: true, onClick: guardarParcial }, { label: 'Confirmar cobro', kind: 'primary', disabled: true, onClick: confirmarCobro }],
   });
+  pintarTotalesCobro();
   updateCobro();
   if (focusIdx != null) { const el = $('#pg-' + focusIdx); if (el) el.select(); }
 }
+function pintarTotalesCobro() {
+  const P = UI.pago; if (!$('#cb-total')) return;
+  $('#cb-lbl').textContent = P.ya > 0 ? 'Saldo a cobrar' : 'Total a cobrar';
+  $('#cb-total').textContent = money(Math.max(0, P.saldo));
+  const partes = [];
+  if (P.descuento > 0) partes.push(`Subtotal ${money(P.subtotal)} − descuento ${money(P.descuento)} = ${money(P.total)}`);
+  if (P.ya > 0) partes.push(`ya pagado ${money(P.ya)}`);
+  $('#cb-sub').textContent = partes.join(' · ');
+}
+function recalcCobro() {
+  const P = UI.pago;
+  let desc = 0, err = '';
+  if (P.ajuste) { try { desc = Math.min(P.subtotal, calcDescuento(P.subtotal, P.lineas, P.ajuste)); } catch (e) { err = e.message; } }
+  P.descuento = desc; P.total = P.subtotal - desc; P.saldo = P.total - P.ya; P.ajusteErr = err;
+  if (!err && P.saldo < 0) P.ajusteErr = `El total no puede quedar por debajo de lo ya pagado (${money(P.ya)}).`;
+  if (P.rows.length === 1) { P.rows[0].monto = Math.max(0, P.saldo); const inp = $('#pg-0'); if (inp) inp.value = P.rows[0].monto || ''; }
+  pintarTotalesCobro();
+  updateCobro();
+}
 function updateCobro() {
-  const P = UI.pago, ev = evalPago(P.saldo, P.rows);
+  const P = UI.pago, ev = evalPago(Math.max(0, P.saldo), P.rows);
+  const aj = P.ajuste;
+  const ajMal = !!aj && (!aj.motivo || (aj.tipo === 'costo' && !aj.nota) || !!P.ajusteErr);
   let html = `<div class="l"><span>Se está cobrando ahora</span><span class="num">${money(ev.pagado)}</span></div>`;
+  if (P.ajusteErr) html += `<div class="err">${esc(P.ajusteErr)}</div>`;
+  if (aj && !aj.motivo) html += `<div class="err">Elegí el motivo del ajuste.</div>`;
+  if (aj && aj.tipo === 'costo' && !aj.nota) html += `<div class="err">Poné el nombre del empleado en la nota.</div>`;
   if (ev.error) html += `<div class="err">${esc(ev.error)}</div>`;
   else if (ev.falta > 0) {
     html += `<div class="l falta"><span>Falta</span><b class="num">${money(ev.falta)}</b></div>`;
-    if (ev.pagado > 0) html += `<div class="muted" style="font-weight:400;font-size:12px">Si el cliente paga una parte ahora, tocá "Guardar pago parcial": queda abierto y el resto se cobra después.</div>`;
+    if (ev.pagado > 0 && !aj) html += `<div class="muted" style="font-weight:400;font-size:12px">Si el cliente paga una parte ahora, tocá "Guardar pago parcial": queda abierto y el resto se cobra después.</div>`;
   } else if (ev.vuelto > 0) html += `<div class="l vuelto"><span>Vuelto a entregar</span><b class="num">${money(ev.vuelto)}</b></div>`;
   else html += `<div class="l"><span>Pago completo</span><span class="pill good">OK</span></div>`;
   $('#pg-sum').innerHTML = html;
   const bp = $('#mact-1'), bc = $('#mact-2');
-  if (bp) bp.disabled = !(!ev.error && ev.pagado > 0 && ev.falta > 0);
-  if (bc) bc.disabled = !ev.ok;
+  if (bp) bp.disabled = !!aj || !(!ev.error && ev.pagado > 0 && ev.falta > 0);
+  if (bc) bc.disabled = !(ev.ok && !ajMal && P.saldo >= 0);
 }
 function guardarParcial() {
   const P = UI.pago;
@@ -886,13 +1077,13 @@ function confirmarCobro() {
       const t = DB.turnos.find(x => x.id === key.slice(2));
       if (!t || t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
       const c = cancha(t.canchaId);
-      const id = commitVenta({ abonos: pagosDe(t), pagos: P.rows, mesaNombre: 'Turno · ' + c.nombre, cliente: t.cliente, turnoId: t.id,
-        lineas: [{ prodId: null, nombre: nombreTurno(t), catId: c.catId, tipo: 'servicio', cant: 1, precio: t.precio, nota: t.cliente }] });
+      const id = commitVenta({ abonos: pagosDe(t), pagos: P.rows, ajuste: P.ajuste, mesaNombre: 'Turno · ' + c.nombre, cliente: t.cliente, turnoId: t.id,
+        lineas: [{ prodId: null, nombre: nombreTurno(t), catId: c.catId, tipo: 'servicio', cant: 1, precio: t.precio, costo: 0, nota: t.cliente }] });
       t.estado = 'cobrado'; t.ventaId = id;
       return id;
     }
     const c = getCom(key), mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
-    const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, negativo: P.negativo });
+    const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, ajuste: P.ajuste, mesaNombre: mesa ? mesa.nombre : null, negativo: P.negativo });
     if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
     return id;
   });
@@ -909,7 +1100,7 @@ function modalDevolucion({ titulo, intro, confirmLabel, pagos, onConfirm }) {
     <label class="fld">Devolver en<select class="in" id="dv-${i}">${opts(metodo(p.metodoId) && metodo(p.metodoId).activo ? p.metodoId : efectivoId())}</select></label></div>`).join('');
   modal({
     title: titulo,
-    body: `<p>${intro}</p><div class="stack">${filas}</div><p class="muted" style="font-size:12px">Podés devolver en un medio distinto al que pagaron (por ejemplo, pagaron con Mercado Pago y devolvés en efectivo). La caja lo registra así.</p>`,
+    body: `<p>${intro}</p><div class="stack">${filas}</div><p class="muted" style="font-size:12px">Podés devolver en un medio distinto al que pagaron (por ejemplo, pagaron con QR y devolvés en efectivo). La caja y el registro de cambios lo anotan así.</p>`,
     actions: [{ label: 'Cancelar' }, { label: confirmLabel, kind: 'danger', onClick: () => { onConfirm(pagos.map((_, i) => $('#dv-' + i).value)); } }],
   });
 }
@@ -918,6 +1109,7 @@ function modalDevolucion({ titulo, intro, confirmLabel, pagos, onConfirm }) {
 function ticketTexto(v) {
   const W = 36, line = '-'.repeat(W);
   const ctr = s => ' '.repeat(Math.max(0, Math.floor((W - s.length) / 2))) + s;
+  const m = n => money(n).replace(/\s/g, '');
   const lr = (a, b) => a.slice(0, Math.max(1, W - b.length - 1)).padEnd(W - b.length) + b;
   const L = [ctr(DB.negocio.toUpperCase()), ctr('Ticket no fiscal'), line,
     lr('Ticket Nº ' + String(v.nro).padStart(5, '0'), fechaHora(v.ts)), 'Destino: ' + v.destino];
@@ -925,12 +1117,14 @@ function ticketTexto(v) {
   if (v.estado !== 'ok') L.push('*** ANULADO ***');
   L.push(line);
   v.items.forEach(l => {
-    L.push(lr(`${l.cant} x ${l.nombre}`, money(l.cant * l.precio).replace(' ', '')));
+    L.push(lr(`${l.cant} x ${l.nombre}`, m(l.cant * l.precio)));
     if (l.nota) L.push('   (' + l.nota + ')');
   });
-  L.push(line, lr('TOTAL', money(v.total).replace(' ', '')));
-  v.pagos.forEach(p => L.push(lr('  ' + p.nombre + (p.ts && Math.abs(p.ts - v.ts) > 60000 ? ' (' + hhmm(p.ts) + ')' : ''), money(p.monto).replace(' ', ''))));
-  if (v.vuelto > 0) L.push(lr('  Vuelto', money(v.vuelto).replace(' ', '')));
+  L.push(line);
+  if (v.descuento > 0) { L.push(lr('Subtotal', m(v.subtotal))); L.push(lr('Descuento', '-' + m(v.descuento))); L.push('  (' + v.ajuste.motivo + ')'); }
+  L.push(lr('TOTAL', m(v.total)));
+  v.pagos.forEach(p => L.push(lr('  ' + p.nombre + (p.ts && Math.abs(p.ts - v.ts) > 60000 ? ' (' + hhmm(p.ts) + ')' : ''), m(p.monto))));
+  if (v.vuelto > 0) L.push(lr('  Vuelto', m(v.vuelto)));
   L.push(line, ctr('¡Gracias por venir!'));
   return L.join('\n');
 }
@@ -938,9 +1132,10 @@ function verTicket(id, nuevo) {
   const v = DB.ventas.find(x => x.id === id); if (!v) return;
   const txt = ticketTexto(v);
   const acciones = [{ label: 'Cerrar', kind: nuevo ? 'primary' : '' }];
-  if (!nuevo && v.estado === 'ok') acciones.unshift({ label: 'Anular ticket', kind: 'danger', onClick: () => { anularTicket(id); return false; } });
-  acciones.splice(acciones.length - 1, 0, { label: 'Copiar texto', onClick: () => { copiar(txt); return false; } }, { label: 'Reimprimir / PDF', onClick: () => { imprimir(); return false; } });
-  modal({ title: nuevo ? `Venta registrada · Ticket #${v.nro}` : `Ticket #${v.nro}`, body: `<pre class="paper" id="ticket-paper">${esc(txt)}</pre>
+  acciones.unshift({ label: 'Copiar texto', onClick: () => { copiar(txt); return false; } }, { label: 'Reimprimir / PDF', onClick: () => { imprimir(); return false; } });
+  if (!nuevo && v.estado === 'ok') acciones.unshift({ label: 'Anular ticket', kind: 'danger', onClick: () => { anularTicket(id); return false; } }, { label: 'Corregir ticket', onClick: () => { corregirTicket(id); return false; } });
+  const aviso = (v.ajuste ? `<div class="note warn">Ticket con ajuste: <b>${esc(v.ajuste.motivo)}</b>${v.ajuste.nota ? ' · ' + esc(v.ajuste.nota) : ''} (descuento ${money(v.descuento)}).</div>` : '') + (v.corregido ? '<div class="note">Este ticket fue corregido. Los cambios están en el registro de cambios (Admin).</div>' : '');
+  modal({ title: nuevo ? `Venta registrada · Ticket #${v.nro}` : `Ticket #${v.nro}`, body: `${aviso}<pre class="paper" id="ticket-paper">${esc(txt)}</pre>
     <p class="muted" style="font-size:12px">Todos los datos del ticket quedan guardados: se puede reimprimir o volver a generar el PDF cuando haga falta.</p>`, actions: acciones });
 }
 function imprimir() {
@@ -952,9 +1147,27 @@ function anularTicket(id) {
     const v = DB.ventas.find(x => x.id === id);
     modalDevolucion({
       titulo: `Anular ticket #${v.nro}`,
-      intro: `Se anula la venta de <b>${money(v.total)}</b> y <b>se devuelve el stock</b> de los productos. Elegí en qué medio devolvés cada pago.`,
+      intro: `Se anula la venta de <b>${money(v.total)}</b> y <b>se devuelve el stock</b> de los productos. Elegí en qué medio devolvés cada pago. Queda en el registro de cambios.`,
       confirmLabel: 'Anular ticket', pagos: v.pagos,
       onConfirm: map => { const r = tx(() => anularVenta(id, map)); if (r.ok) { toast('Ticket anulado, stock devuelto y devolución registrada'); render(); } },
+    });
+  });
+}
+function corregirTicket(id) {
+  requirePin(() => {
+    const v = DB.ventas.find(x => x.id === id);
+    const opts = sel => DB.metodos.filter(m => m.activo || m.id === sel).map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('');
+    modal({
+      title: `Corregir ticket #${v.nro}`,
+      body: `<p class="muted">Acá se corrige con qué se cobró y la nota del ticket. Si hay que cambiar productos o el importe, anulá el ticket y hacelo de nuevo. Todo queda en el registro de cambios.</p>
+        ${v.pagos.map((p, i) => `<div class="drow"><span><b>${money(p.monto)}</b><br><small class="muted">figura como ${esc(p.nombre)}</small></span><label class="fld">Cobrado realmente con<select class="in" id="co-${i}">${opts(p.metodoId)}</select></label></div>`).join('')}
+        <label class="fld">Nota del ticket<input class="in" id="co-nota" value="${esc(v.nota || '')}"></label>
+        <label class="fld">Motivo de la corrección (obligatorio)<input class="in" id="co-motivo" placeholder="Ej: se anotó efectivo pero pagó con QR"></label>`,
+      actions: [{ label: 'Cancelar' }, { label: 'Guardar corrección', kind: 'primary', onClick: () => {
+        const r = tx(() => corregirVenta(id, { medios: v.pagos.map((_, i) => $('#co-' + i).value), nota: $('#co-nota').value.trim(), motivo: $('#co-motivo').value.trim() }));
+        if (!r.ok) return false;
+        toast('Ticket corregido y registrado'); render(); verTicket(id, false);
+      } }],
     });
   });
 }
@@ -1088,6 +1301,7 @@ const fechaLarga = f => new Date(f + 'T12:00:00').toLocaleDateString('es-AR', { 
 function textoEstadoTurno(t) {
   const pag = pagadoDe(t);
   if (t.estado === 'cobrado') return 'cobrado ✓';
+  if (t.esFijo && !pag) return 'FIJO · ' + money(t.precio);
   return pag > 0 ? `seña ${money(pag)} · debe ${money(t.precio - pag)}` : 'sin pago · ' + money(t.precio);
 }
 function slotHTML(c, s, fecha, ap, hoy, ahora) {
@@ -1096,25 +1310,25 @@ function slotHTML(c, s, fecha, ap, hoy, ahora) {
   const pasado = fecha < hoy || (fecha === hoy && e <= ahora);
   let cls, inner, act;
   if (!oc) { cls = 'free'; inner = `<b>${hm(s)}</b><span>libre</span>`; act = `data-act="slot" data-c="${c.id}" data-s="${s}"`; }
-  else if (oc.canchaId === c.id) { cls = 'res t-' + c.deporte + (oc.estado === 'cobrado' ? ' done' : ''); inner = `<b>${hm(s)} · ${esc(oc.cliente || 'Sin nombre')}</b><span>${textoEstadoTurno(oc)}</span>`; act = `data-act="turno" data-id="${oc.id}"`; }
+  else if (oc.canchaId === c.id) { cls = 'res t-' + c.deporte + (oc.esFijo ? ' fijo' : '') + (oc.estado === 'cobrado' ? ' done' : ''); inner = `<b>${hm(s)} · ${esc(oc.cliente || 'Sin nombre')}</b><span>${textoEstadoTurno(oc)}</span>`; act = `data-act="turno" data-id="${oc.id}"`; }
   else { cls = 'blk'; inner = `<b>${hm(s)}</b><span>ocupada por ${esc(cancha(oc.canchaId).nombre)}</span>`; act = `data-act="turno" data-id="${oc.id}"`; }
   return `<button class="slot ${cls} ${pasado ? 'past' : ''}" style="top:${top}px;height:${h}px" ${act}>${inner}</button>`;
 }
 views.turnos = () => {
   const f = UI.turFecha, cs = DB.canchas, hoy = dayKey(Date.now()), now = new Date(), ahora = now.getHours() * 60 + now.getMinutes();
-  if (!cs.length) { $('#main').innerHTML = '<header class="ph"><h1>Turnos</h1></header><div class="card">No hay canchas cargadas. Agregalas en Admin → Canchas y turnos.</div>'; return; }
+  if (!cs.length) { $('#main').innerHTML = '<header class="ph"><h1>Turnos</h1></header><div class="card">No hay canchas cargadas.</div>'; return; }
   const ap = Math.min(...cs.map(c => c.ap)), ci = Math.max(...cs.map(c => c.ci)), H = (ci - ap) / 60 * HP;
   const horas = []; for (let m = ap; m < ci; m += 60) horas.push(m);
-  const dia = DB.turnos.filter(t => t.fecha === f && t.estado !== 'cancelado');
-  const heads = cs.map(c => `<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)}</small>${c.bloquea.length ? `<small>ocupa también: ${c.bloquea.map(id => esc(cancha(id).nombre)).join(' + ')}</small>` : ''}</div>`).join('');
+  const dia = turnosDelDia(f);
+  const heads = cs.map(c => `<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)} · fijo ${money(c.precioFijo)}</small>${c.clave === 'f7' ? '<small>ocupa también las dos de Fútbol 5</small>' : CLAVES_F5.includes(c.clave) ? '<small>si se usa, no hay Fútbol 7</small>' : ''}</div>`).join('');
   const cols = cs.map(c => `<div class="ccol" style="height:${H}px">${slotsDe(c).map(s => slotHTML(c, s, f, ap, hoy, ahora)).join('')}</div>`).join('');
-  $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos reservados</p></div>
+  $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos (${dia.filter(t => t.esFijo).length} fijos)</p></div>
     <div class="row"><button class="icon" data-act="tur-dia" data-d="-1" aria-label="Día anterior">‹</button><input class="in" style="width:auto" type="date" data-in="turf" value="${f}" aria-label="Fecha">
       <button class="icon" data-act="tur-dia" data-d="1" aria-label="Día siguiente">›</button><button class="btn sm ghost" data-act="tur-hoy">Hoy</button></div></header>
     <div class="cal-wrap" id="cal-wrap"><div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(150px,1fr));--hp:${HP}px">
       <div class="chead corner"></div>${heads}
       <div class="tcol" style="height:${H}px">${horas.map((m, i) => `<span style="top:${i * HP}px">${hm(m)}</span>`).join('')}</div>${cols}</div></div>
-    <div class="legend"><span><span class="pill">libre</span> tocá para reservar</span><span><span class="pill good">fútbol</span></span><span><span class="pill" style="background:var(--info-soft);color:var(--info)">pádel</span></span><span>Franja rayada: la cancha está ocupada por otra que usa el mismo espacio (Fútbol 7 usa las dos de Fútbol 5).</span></div>`;
+    <div class="legend"><span><span class="pill">libre</span> tocá para reservar</span><span><span class="pill good">fútbol</span></span><span><span class="pill" style="background:var(--info-soft);color:var(--info)">pádel</span></span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos canchas de Fútbol 5 (y al revés).</span></div>`;
   if (f === hoy) $('#cal-wrap').scrollTop = Math.max(0, ((ahora - ap) / 60 - 1) * HP);
 };
 function modalNuevoTurno(canchaId, ini) {
@@ -1125,31 +1339,41 @@ function modalNuevoTurno(canchaId, ini) {
     title: 'Reservar · ' + c.nombre,
     body: `<p><b>${esc(fechaLarga(f))}</b> · ${hm(ini)} a ${hm(ini + c.dur)} (${c.dur} min)</p>
       ${rel.length ? `<div class="note">Al reservar esta cancha, en ese horario también quedan ocupadas: <b>${rel.map(x => esc(x.nombre)).join(' y ')}</b>.</div>` : ''}
+      <label class="fld">Tipo de turno<select id="tn-tipo" class="in" data-in="tn-tipo"><option value="comun">Común · ${money(c.precio)}</option><option value="fijo">FIJO, todos los ${DIAS[dowDe(f)]} · ${money(c.precioFijo)} por turno</option></select></label>
       <div class="grid2"><label class="fld">A nombre de<input id="tn-cli" class="in" placeholder="Ej: Los Pibes"></label><label class="fld">Teléfono (opcional)<input id="tn-tel" class="in" inputmode="tel"></label></div>
-      <div class="grid2"><label class="fld">Precio del turno<input id="tn-precio" class="in" inputmode="numeric" value="${c.precio}"></label><label class="fld">Nota (opcional)<input id="tn-nota" class="in"></label></div>
-      <div class="grid2"><label class="fld">Seña ahora (opcional)<input id="tn-sena" class="in" inputmode="numeric" placeholder="0"></label><label class="fld">Medio de la seña<select id="tn-med" class="in">${metodos}</select></label></div>`,
+      <label class="fld">Nota (opcional)<input id="tn-nota" class="in"></label>
+      <div class="grid2" id="tn-sena-box"><label class="fld">Seña ahora (opcional)<input id="tn-sena" class="in" inputmode="numeric" placeholder="0"></label><label class="fld">Medio de la seña<select id="tn-med" class="in">${metodos}</select></label></div>
+      <div class="note" id="tn-fijo-note" hidden>Turno fijo: no lleva seña. Aparece todas las semanas con el precio de fijo. Si un día no juegan, lo suspendés o lo posponés desde el turno; si se terminan, terminás el fijo y el horario queda libre.</div>`,
     actions: [{ label: 'Cancelar' }, { label: 'Reservar', kind: 'primary', onClick: () => {
+      const datos = { canchaId, fecha: f, ini, cliente: $('#tn-cli').value.trim(), tel: $('#tn-tel').value.trim(), nota: $('#tn-nota').value.trim() };
+      if ($('#tn-tipo').value === 'fijo') {
+        const r = tx(() => crearFijo(datos));
+        if (!r.ok) return false;
+        toast('Turno fijo creado: todos los ' + DIAS[dowDe(f)] + ' a las ' + hm(ini)); render(); return;
+      }
       const sena = num($('#tn-sena').value);
-      const r = tx(() => crearTurno({ canchaId, fecha: f, ini, cliente: $('#tn-cli').value.trim(), tel: $('#tn-tel').value.trim(), nota: $('#tn-nota').value.trim(), precio: num($('#tn-precio').value), pagos: sena > 0 ? [{ metodoId: $('#tn-med').value, monto: sena }] : [] }));
+      const r = tx(() => crearTurno({ ...datos, pagos: sena > 0 ? [{ metodoId: $('#tn-med').value, monto: sena }] : [] }));
       if (!r.ok) return false;
       toast('Turno reservado'); render();
     } }],
   });
 }
 function verTurno(id) {
-  const t = DB.turnos.find(x => x.id === id); if (!t) return;
+  const t = turnoPorId(id); if (!t) return toast('Ese turno ya no existe', 'warn');
   UI.turSel = id;
   const c = cancha(t.canchaId), pag = pagadoDe(t), saldo = t.precio - pag, abierto = t.estado === 'reservado';
   const rel = DB.canchas.filter(x => x.id !== c.id && relacionadas(c, x));
   const pagos = pagosDe(t).map(p => `<div class="ab"><span>Pagó ${esc(p.nombre)} <small class="muted">${fechaHora(p.ts)}</small></span><b>${money(p.monto)}</b>${abierto ? `<button data-act="tpg-del" data-id="${p.id}">devolver</button>` : '<span></span>'}</div>`).join('');
-  const acciones = abierto
-    ? [{ label: 'Cerrar' }, { label: 'Cancelar turno', kind: 'danger', onClick: () => cancelarTurnoUI(id) }, { label: 'Editar datos', onClick: () => editarTurno(id) }, { label: 'Pago parcial', onClick: () => abrirCobroTurno(id, true) }, { label: 'Cobrar saldo', kind: 'primary', onClick: () => abrirCobroTurno(id, false) }]
-    : [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
+  let acciones;
+  if (!abierto) acciones = [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
+  else if (t.esFijo) acciones = [{ label: 'Cerrar' }, { label: 'Terminar el fijo', kind: 'danger', onClick: () => terminarFijoUI(id) }, { label: 'Posponer', onClick: () => modalPosponer(id) }, { label: 'Suspender este día', onClick: () => suspenderUI(id) }, { label: 'Cobrar', kind: 'primary', onClick: () => cobrarTurnoUI(id, false) }];
+  else acciones = [{ label: 'Cerrar' }, { label: 'Cancelar turno', kind: 'danger', onClick: () => cancelarTurnoUI(id) }, { label: 'Editar datos', onClick: () => editarTurno(id) }, { label: 'Pago parcial', onClick: () => abrirCobroTurno(id, true) }, { label: 'Cobrar saldo', kind: 'primary', onClick: () => abrirCobroTurno(id, false) }];
   modal({
-    title: c.nombre,
+    title: c.nombre + (t.esFijo ? ' · FIJO' : ''),
     body: `<p><b>${esc(fechaLarga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
       <div class="grid2"><div><span class="muted">A nombre de</span><br><b>${esc(t.cliente || 'Sin nombre')}</b>${t.tel ? '<br>' + esc(t.tel) : ''}</div><div><span class="muted">Nota</span><br>${esc(t.nota || '—')}</div></div>
-      <div class="card" style="padding:12px"><div class="l2"><span>Precio</span><b>${money(t.precio)}</b></div>${pagos}<div class="l2"><span>${abierto ? 'Saldo a cobrar' : 'Estado'}</span><b>${abierto ? money(saldo) : 'Cobrado ✓'}</b></div></div>
+      <div class="card" style="padding:12px"><div class="l2"><span>Precio ${t.esFijo ? 'de fijo' : ''}</span><b>${money(t.precio)}</b></div>${pagos}<div class="l2"><span>${abierto ? 'Saldo a cobrar' : 'Estado'}</span><b>${abierto ? money(saldo) : 'Cobrado ✓'}</b></div></div>
+      ${t.esFijo && abierto ? '<div class="note">Turno fijo: se juega todas las semanas y no lleva seña. Si hoy no juegan, usá "Suspender este día" o "Posponer"; si se terminan del todo, "Terminar el fijo".</div>' : ''}
       ${rel.length && abierto ? `<div class="note">En este horario también están ocupadas: ${rel.map(x => esc(x.nombre)).join(' y ')}.</div>` : ''}`,
     actions: acciones,
   });
@@ -1160,16 +1384,51 @@ function cancelarTurnoUI(id) {
   if (ps.length) modalDevolucion({ titulo: 'Cancelar turno', intro: `${esc(t.cliente || 'Este turno')} había pagado <b>${money(sum(ps, p => p.monto))}</b>. Elegí cómo devolvés el dinero.`, confirmLabel: 'Devolver y cancelar turno', pagos: ps, onConfirm: hacer });
   else ask('Cancelar turno', `¿Cancelar el turno de ${esc(t.cliente || 'sin nombre')} (${hm(t.ini)}, ${esc(c.nombre)})? El horario queda libre.`, 'Cancelar turno', () => hacer(null), true);
 }
+function suspenderUI(id) {
+  const t = turnoPorId(id), c = cancha(t.canchaId);
+  ask('Suspender sólo este día', `${esc(t.cliente || 'El turno')} no juega el ${esc(fechaLarga(t.fecha))} (${hm(t.ini)}, ${esc(c.nombre)}). El horario queda libre sólo ese día; el fijo sigue las otras semanas.`, 'Suspender este día', () => {
+    const r = tx(() => suspenderOcurrencia(id)); if (r.ok) { toast('Horario liberado por hoy'); render(); }
+  }, true);
+}
+function terminarFijoUI(id) {
+  const t = turnoPorId(id), c = cancha(t.canchaId);
+  ask('Terminar el turno fijo', `Se termina el fijo de ${esc(t.cliente || 'sin nombre')} (${esc(c.nombre)}, ${DIAS[dowDe(t.fecha)]} ${hm(t.ini)}) desde el ${esc(fechaLarga(t.fecha))}. Ese horario queda libre todas las semanas siguientes. Lo ya cobrado no se toca.`, 'Terminar fijo', () => {
+    const r = tx(() => terminarFijo(t.fijoId, t.fecha)); if (r.ok) { toast('Fijo terminado, el horario quedó libre'); render(); }
+  }, true);
+}
+function modalPosponer(id) {
+  const t = turnoPorId(id), c = cancha(t.canchaId);
+  UI.posId = id;
+  modal({
+    title: 'Posponer turno fijo',
+    body: `<p><b>${esc(t.cliente || 'Sin nombre')}</b> · ${esc(c.nombre)} · ${esc(fechaLarga(t.fecha))} ${hm(t.ini)}</p>
+      <p class="muted">Se libera este horario y el turno pasa al día y hora que elijas, con el mismo precio de fijo. Las otras semanas no cambian.</p>
+      <div class="grid2"><label class="fld">Nueva fecha<input class="in" type="date" id="po-fecha" data-in="po" value="${sumarDias(t.fecha, 1)}"></label><label class="fld">Nuevo horario<select class="in" id="po-hora"></select></label></div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Posponer', kind: 'primary', onClick: () => {
+      const fecha = $('#po-fecha').value, ini = parseInt($('#po-hora').value, 10);
+      if (!fecha || isNaN(ini)) { toast('Elegí fecha y horario', 'warn'); return false; }
+      const r = tx(() => posponerOcurrencia(id, fecha, ini));
+      if (!r.ok) return false;
+      toast('Turno pospuesto'); render();
+    } }],
+  });
+  llenarHorasPosponer();
+}
+function llenarHorasPosponer() {
+  const t = turnoPorId(UI.posId); if (!t) return;
+  const c = cancha(t.canchaId), f = $('#po-fecha').value;
+  const libres = f ? slotsDe(c).filter(s => !ocupante(c.id, f, s, s + c.dur, t)) : [];
+  $('#po-hora').innerHTML = libres.map(s => `<option value="${s}">${hm(s)} a ${hm(s + c.dur)}</option>`).join('') || '<option value="">No hay horarios libres ese día</option>';
+}
 function editarTurno(id) {
   const t = DB.turnos.find(x => x.id === id);
   modal({
     title: 'Editar turno',
-    body: `<div class="grid2"><label class="fld">A nombre de<input id="et-cli" class="in" value="${esc(t.cliente)}"></label><label class="fld">Teléfono<input id="et-tel" class="in" value="${esc(t.tel)}"></label></div>
-      <div class="grid2"><label class="fld">Precio<input id="et-precio" class="in" inputmode="numeric" value="${t.precio}"></label><label class="fld">Nota<input id="et-nota" class="in" value="${esc(t.nota)}"></label></div>`,
+    body: `<p class="muted">El precio del turno lo define la cancha (Admin → Canchas y turnos). Cualquier descuento se pone al cobrar y queda en el registro de cambios.</p>
+      <div class="grid2"><label class="fld">A nombre de<input id="et-cli" class="in" value="${esc(t.cliente)}"></label><label class="fld">Teléfono<input id="et-tel" class="in" value="${esc(t.tel)}"></label></div>
+      <label class="fld">Nota<input id="et-nota" class="in" value="${esc(t.nota)}"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Guardar', kind: 'primary', onClick: () => {
-      const precio = num($('#et-precio').value);
-      if (precio <= pagadoDe(t)) { toast('El precio tiene que ser mayor a lo ya pagado (' + money(pagadoDe(t)) + ')', 'warn'); return false; }
-      const r = tx(() => { Object.assign(DB.turnos.find(x => x.id === id), { cliente: $('#et-cli').value.trim(), tel: $('#et-tel').value.trim(), nota: $('#et-nota').value.trim(), precio }); });
+      const r = tx(() => { Object.assign(DB.turnos.find(x => x.id === id), { cliente: $('#et-cli').value.trim(), tel: $('#et-tel').value.trim(), nota: $('#et-nota').value.trim() }); });
       if (!r.ok) return false;
       render(); verTurno(id);
     } }],
@@ -1317,7 +1576,7 @@ views.tickets = () => {
     <div class="tbl-wrap"><table><thead><tr><th>Nº</th><th>Fecha</th><th>Destino</th><th>Pagos</th><th class="r">Total</th><th></th></tr></thead><tbody>
     ${vs.map(v => `<tr><td class="num"><b>#${v.nro}</b></td><td class="num">${fechaHora(v.ts)}</td><td>${esc(v.destino)}${v.cliente ? ` <span class="muted">· ${esc(v.cliente)}</span>` : ''}</td>
       <td>${v.pagos.map(p => `<span class="pill">${esc(p.nombre)} ${money(p.monto)}</span>`).join(' ')}</td>
-      <td class="r num"><b>${money(v.total)}</b> ${v.estado !== 'ok' ? '<span class="pill bad">anulado</span>' : ''}</td>
+      <td class="r num"><b>${money(v.total)}</b> ${v.estado !== 'ok' ? '<span class="pill bad">anulado</span>' : ''}${v.descuento > 0 ? ' <span class="pill warn">descuento</span>' : ''}${v.corregido ? ' <span class="pill">corregido</span>' : ''}</td>
       <td class="r"><button class="btn sm" data-act="tk-ver" data-id="${v.id}">Ver / reimprimir</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No hay tickets en ese período.</td></tr>'}
     </tbody></table></div>`;
 };
@@ -1359,6 +1618,7 @@ views.reportes = () => {
       <button class="btn sm ghost" data-act="rep-hoy">Hoy</button></div></header>
     <div class="kpis"><div class="kpi"><span>Total vendido</span><b>${money(R.total)}</b></div><div class="kpi"><span>Tickets</span><b>${R.vs.length}</b></div>
       <div class="kpi"><span>Ticket promedio</span><b>${money(R.vs.length ? R.total / R.vs.length : 0)}</b></div>
+      <div class="kpi"><span>Descuentos otorgados</span><b>${money(sum(R.vs, v => v.descuento || 0))}</b></div>
       <div class="kpi"><span>Cobrado en el período</span><b>${money(R.cobrado)}</b></div>
       <div class="kpi"><span>Efectivo en caja</span><b>${money(sum(efe, m => m.monto))}</b></div>
       <div class="kpi"><span>Por cobrar (cuentas y turnos abiertos)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0) + sum(DB.turnos.filter(t => t.estado === 'reservado' && t.fecha <= dayKey(Date.now())), t => t.precio - pagadoDe(t)))}</b></div>
@@ -1380,7 +1640,8 @@ function rowsVentas() {
   DB.ventas.filter(v => dayKey(v.ts) >= UI.repDesde && dayKey(v.ts) <= UI.repHasta).forEach(v => v.items.forEach(l => rows.push([v.nro, dayKey(v.ts), hhmm(v.ts), v.destino, v.cliente, l.nombre, catDe(l.catId) ? catDe(l.catId).nombre : '', l.cant, l.precio, l.cant * l.precio, v.pagos.map(p => p.nombre + ' ' + p.monto).join(' + '), v.estado])));
   return rows;
 }
-function rowsCaja() { return [['Fecha', 'Hora', 'Tipo', 'Medio de pago', 'Monto', 'Detalle'], ...DB.caja.filter(e => dayKey(e.ts) >= UI.repDesde && dayKey(e.ts) <= UI.repHasta).map(e => [dayKey(e.ts), hhmm(e.ts), e.tipo === 'cobro' ? 'Cobro' : 'Devolución', e.nombre, e.monto, e.motivo])]; }
+function rowsCaja() { return [['Fecha', 'Hora', 'Tipo', 'Medio de pago', 'Monto', 'Detalle'], ...DB.caja.filter(e => dayKey(e.ts) >= UI.repDesde && dayKey(e.ts) <= UI.repHasta).map(e => [dayKey(e.ts), hhmm(e.ts), ({ cobro: 'Cobro', devolucion: 'Devolución', correccion: 'Corrección' })[e.tipo], e.nombre, e.monto, e.motivo])]; }
+function rowsLog() { return [['Fecha', 'Hora', 'Quién', 'Tipo', 'Referencia', 'Detalle'], ...DB.log.map(l => [dayKey(l.ts), hhmm(l.ts), l.usuario, l.tipo, l.ref, l.detalle])]; }
 function rowsStock() { return [['Producto', 'Tipo', 'Stock', 'Mínimo'], ...DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => [p.nombre, TIPOS[p.tipo].n, p.stock, p.minimo])]; }
 function rowsMov() { return [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Antes', 'Después', 'Detalle'], ...DB.movimientos.map(m => [dayKey(m.ts) + ' ' + hhmm(m.ts), m.nombre, MOV[m.tipo][0], m.cant, m.antes, m.despues, m.motivo])]; }
 
@@ -1392,7 +1653,7 @@ views.admin = () => {
     return;
   }
   const t = UI.admTab;
-  const tabs = [['productos', 'Productos'], ['categorias', 'Categorías'], ['canchas', 'Canchas y turnos'], ['pagos', 'Medios de pago'], ['datos', 'Datos y seguridad']].map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
+  const tabs = [['productos', 'Productos'], ['categorias', 'Categorías'], ['canchas', 'Canchas y precios'], ['fijos', 'Turnos fijos'], ['pagos', 'Medios de pago'], ['registro', 'Registro de cambios'], ['datos', 'Datos y seguridad']].map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
   $('#main').innerHTML = `<header class="ph"><div><h1>Administración</h1><p class="muted">Sesión desbloqueada por 5 minutos desde la última acción.</p></div><button class="btn sm ghost" data-act="adm-lock">Bloquear ahora</button></header>
     <div class="chips" style="margin-bottom:14px">${tabs}</div><div id="adm-body"></div>`;
   admBody[t]();
@@ -1402,10 +1663,10 @@ admBody.productos = () => {
   const q = norm(UI.admQ);
   const list = DB.productos.filter(p => !q || norm(p.nombre).includes(q));
   $('#adm-body').innerHTML = `<div class="toolbar"><input class="in" id="admq" data-in="admq" placeholder="Buscar producto…" value="${esc(UI.admQ)}"><button class="btn primary" style="margin-left:auto" data-act="prod-new">+ Nuevo producto</button></div>
-    <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th class="r">Precio</th><th>Empaque</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th class="r">Precio</th><th class="r">Costo</th><th class="r">Margen</th><th>Empaque</th><th></th></tr></thead><tbody>
     ${list.map(p => `<tr style="${p.activo ? '' : 'opacity:.55'}"><td><b>${esc(p.nombre)}</b> ${p.activo ? '' : '<span class="pill">oculto</span>'}${p.tipo === 'receta' ? `<br><small class="muted">${p.receta.map(r => r.cant + ' × ' + (prod(r.id) ? esc(prod(r.id).nombre) : '?')).join(' + ')}</small>` : ''}</td>
       <td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:6px"></span>${catDe(p.catId) ? esc(catDe(p.catId).nombre) : '—'}</td><td class="muted">${TIPOS[p.tipo].n}</td>
-      <td class="r num">${p.tipo === 'insumo' ? '—' : money(p.precio)}</td><td class="muted">${p.paqueteUnidades > 1 ? esc(p.paqueteNombre || 'Paquete') + ' = ' + p.paqueteUnidades + ' u.' : '—'}</td>
+      <td class="r num">${p.tipo === 'insumo' ? '—' : money(p.precio)}</td><td class="r num">${costoUnit(p) ? money(costoUnit(p)) : '—'}</td><td class="r num">${costoUnit(p) && p.precio > 0 ? Math.round((p.precio - costoUnit(p)) / p.precio * 100) + '%' : '—'}</td><td class="muted">${p.paqueteUnidades > 1 ? esc(p.paqueteNombre || 'Paquete') + ' = ' + p.paqueteUnidades + ' u.' : '—'}</td>
       <td class="r"><div class="actions"><button class="btn sm" data-act="prod-edit" data-id="${p.id}">Editar</button><button class="btn sm ghost" data-act="prod-tog" data-id="${p.id}">${p.activo ? 'Ocultar' : 'Mostrar'}</button><button class="btn sm ghost" data-act="prod-del" data-id="${p.id}">Eliminar</button></div></td></tr>`).join('')}
     </tbody></table></div>`;
 };
@@ -1418,18 +1679,33 @@ admBody.categorias = () => {
 };
 admBody.canchas = () => {
   const horas = (sel, desde, hasta) => Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i).map(h => `<option value="${h}" ${h === sel ? 'selected' : ''}>${h === 24 ? '24:00 (medianoche)' : pad(h) + ':00'}</option>`).join('');
-  $('#adm-body').innerHTML = `<p class="muted" style="margin-bottom:12px">Las canchas del calendario de turnos. Si una cancha "bloquea" a otra, al reservar una queda ocupada la otra en ese horario: por ejemplo, Fútbol 7 bloquea a las dos de Fútbol 5.</p>
-    <div class="stack">${DB.canchas.map(c => `<div class="card"><div class="grid2">
-      <label class="fld">Nombre<input class="in" data-in="cn-f" data-f="nombre" data-id="${c.id}" value="${esc(c.nombre)}"></label>
-      <label class="fld">Categoría para los reportes<select class="in" data-in="cn-f" data-f="catId" data-id="${c.id}">${DB.categorias.map(k => `<option value="${k.id}" ${k.id === c.catId ? 'selected' : ''}>${esc(k.nombre)}</option>`).join('')}</select></label></div>
-      <div class="grid2" style="margin-top:12px"><label class="fld">Deporte<select class="in" data-in="cn-f" data-f="deporte" data-id="${c.id}">${['futbol', 'padel', 'otro'].map(k => `<option value="${k}" ${k === c.deporte ? 'selected' : ''}>${k === 'futbol' ? 'Fútbol' : k === 'padel' ? 'Pádel' : 'Otro'}</option>`).join('')}</select></label>
-      <label class="fld">Duración del turno (minutos)<input class="in" inputmode="numeric" data-in="cn-f" data-f="dur" data-id="${c.id}" value="${c.dur}"></label></div>
+  $('#adm-body').innerHTML = `<div class="note" style="margin-bottom:12px">Reglas fijas del sistema (no se configuran): Fútbol 7 usa las dos canchas de Fútbol 5, así que si hay un Fútbol 5 no hay Fútbol 7, y si hay Fútbol 7 no hay Fútbol 5. Las dos de pádel son independientes. Cada turno se cobra al precio cargado acá: <b>precio común</b> para turnos sueltos y <b>precio fijo</b> para los que juegan todas las semanas.</div>
+    <div class="stack">${DB.canchas.map(c => `<div class="card"><div class="row" style="margin-bottom:10px"><b style="font-size:16px">${esc(c.nombre)}</b><span class="pill">${c.deporte === 'futbol' ? 'Fútbol' : 'Pádel'}</span></div>
+      <div class="grid2"><label class="fld">Precio común (turno suelto)<input class="in" inputmode="numeric" data-in="cn-f" data-f="precio" data-id="${c.id}" value="${c.precio}"></label>
+      <label class="fld">Precio FIJO (turno de todas las semanas)<input class="in" inputmode="numeric" data-in="cn-f" data-f="precioFijo" data-id="${c.id}" value="${c.precioFijo}"></label></div>
+      <div class="grid2" style="margin-top:12px"><label class="fld">Duración del turno (minutos)<input class="in" inputmode="numeric" data-in="cn-f" data-f="dur" data-id="${c.id}" value="${c.dur}"></label>
+      <label class="fld">Nombre<input class="in" data-in="cn-f" data-f="nombre" data-id="${c.id}" value="${esc(c.nombre)}"></label></div>
       <div class="grid2" style="margin-top:12px"><label class="fld">Abre<select class="in" data-in="cn-f" data-f="ap" data-id="${c.id}">${horas(c.ap / 60, 0, 23)}</select></label>
-      <label class="fld">Cierra<select class="in" data-in="cn-f" data-f="ci" data-id="${c.id}">${horas(c.ci / 60, 1, 24)}</select></label></div>
-      <div class="grid2" style="margin-top:12px"><label class="fld">Precio del turno<input class="in" inputmode="numeric" data-in="cn-f" data-f="precio" data-id="${c.id}" value="${c.precio}"></label>
-      <div class="fld">Bloquea a estas canchas<div class="chips">${DB.canchas.filter(o => o.id !== c.id).map(o => `<label class="chip"><input type="checkbox" data-in="cn-bloq" data-id="${c.id}" data-o="${o.id}" ${c.bloquea.includes(o.id) ? 'checked' : ''}> ${esc(o.nombre)}</label>`).join('') || '<span class="muted">No hay otras canchas</span>'}</div></div></div>
-      <div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="cn-del" data-id="${c.id}">Eliminar cancha</button></div></div>`).join('')}
-      <button class="btn" data-act="cn-add" style="align-self:flex-start">+ Nueva cancha</button></div>`;
+      <label class="fld">Cierra<select class="in" data-in="cn-f" data-f="ci" data-id="${c.id}">${horas(c.ci / 60, 1, 24)}</select></label></div></div>`).join('')}</div>`;
+};
+admBody.fijos = () => {
+  const hoy = dayKey(Date.now());
+  const filas = DB.fijos.slice().sort((a, b) => a.dow - b.dow || a.ini - b.ini).map(f => {
+    const c = cancha(f.canchaId), activo = !f.hasta || f.hasta >= hoy;
+    return `<tr style="${activo ? '' : 'opacity:.55'}"><td><b>${esc(f.cliente || 'Sin nombre')}</b>${f.tel ? `<br><small class="muted">${esc(f.tel)}</small>` : ''}</td><td>${esc(c.nombre)}</td><td>${DIAS[f.dow]} ${hm(f.ini)}</td><td class="r num">${money(c.precioFijo)}</td><td class="num">${f.desde.slice(8)}/${f.desde.slice(5, 7)}</td>
+      <td>${activo ? '<span class="pill good">activo</span>' : '<span class="pill">terminado ' + f.hasta.slice(8) + '/' + f.hasta.slice(5, 7) + '</span>'}</td><td class="r">${activo ? `<button class="btn sm ghost" data-act="fx-fin" data-id="${f.id}">Terminar fijo</button>` : ''}</td></tr>`;
+  }).join('');
+  $('#adm-body').innerHTML = `<p class="muted" style="margin-bottom:10px">Turnos que se juegan todas las semanas, a otro precio y sin seña. Se crean desde el calendario (tocá un horario libre y elegí "FIJO"). Si un día no juegan se suspende o se pospone desde ese turno; si se terminan, se termina el fijo y el horario queda libre.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>A nombre de</th><th>Cancha</th><th>Día y hora</th><th class="r">Precio fijo</th><th>Desde</th><th>Estado</th><th></th></tr></thead><tbody>${filas || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">Todavía no hay turnos fijos.</td></tr>'}</tbody></table></div>`;
+};
+const LOG_TIPOS = { descuento: 'Descuento / al costo', anulacion: 'Anulación de ticket', correccion: 'Corrección de ticket', devolucion: 'Devolución de dinero', cancelacion: 'Cuenta cancelada', turno: 'Turnos', precio: 'Precios y costos', config: 'Configuración', sistema: 'Sistema' };
+admBody.registro = () => {
+  const f = UI.lgTipo, filas = DB.log.slice().reverse().filter(l => f === 'all' || l.tipo === f).slice(0, 300);
+  $('#adm-body').innerHTML = `<p class="muted" style="margin-bottom:10px">Todo lo que se cambia en tickets, precios, devoluciones y turnos queda acá, con fecha, hora y quién lo hizo. No se puede borrar ni editar.</p>
+    <div class="toolbar"><select class="in" data-in="lg-f"><option value="all">Todos los cambios</option>${Object.entries(LOG_TIPOS).map(([k, n]) => `<option value="${k}" ${f === k ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn sm" style="margin-left:auto" data-act="exp-log">Exportar CSV</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Tipo</th><th>Referencia</th><th>Detalle</th></tr></thead><tbody>
+    ${filas.map(l => `<tr><td class="num" style="white-space:nowrap">${fechaHora(l.ts)}</td><td>${esc(l.usuario)}</td><td><span class="pill ${l.tipo === 'descuento' || l.tipo === 'anulacion' ? 'warn' : ''}">${LOG_TIPOS[l.tipo] || l.tipo}</span></td><td>${esc(l.ref)}</td><td>${esc(l.detalle)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:24px">No hay cambios registrados.</td></tr>'}
+    </tbody></table></div>`;
 };
 admBody.pagos = () => {
   $('#adm-body').innerHTML = `<div class="card" style="max-width:640px"><h2>Medios de pago</h2><p class="muted" style="margin-bottom:10px">Se pueden combinar en un mismo cobro. El efectivo es el único que admite vuelto.</p><div class="stack">
@@ -1443,7 +1719,8 @@ admBody.datos = () => {
     <div class="card"><h2>Datos del negocio</h2><div class="stack">
       <label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>
       <label class="fld">Código de administración<input class="in" id="newpin" type="password" inputmode="numeric" placeholder="Nuevo código"><small>Dejalo vacío para no cambiarlo.</small></label>
-      <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button></div></div>
+      <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button>
+      <label class="row" style="gap:8px;margin-top:6px"><input type="checkbox" data-in="cfg-pin" ${DB.config.pedirPinAjuste ? 'checked' : ''}> Pedir el código para dar descuentos o vender al costo</label></div></div>
     <div class="card"><h2>Copia de seguridad</h2><div class="stack"><p class="muted">En la versión real es un archivo de la base de datos que se copia solo todos los días. Acá podés ver y restaurar el contenido.</p>
       <div class="row"><button class="btn" data-act="bk-ver">Ver copia (JSON)</button><button class="btn" data-act="bk-rest">Restaurar copia</button></div></div></div>
     <div class="card"><h2>Probar la seguridad de los datos</h2><div class="stack"><p class="muted">Simula una falla en medio de una venta (se descuenta stock y justo después "se corta"). El sistema tiene que volver todo atrás.</p>
@@ -1463,6 +1740,7 @@ function leerPF() {
   const f = UI.pf; if (!$('#pf-nombre')) return;
   f.nombre = $('#pf-nombre').value.trim(); f.catId = $('#pf-cat').value;
   if ($('#pf-precio')) f.precio = num($('#pf-precio').value);
+  if ($('#pf-costo')) f.costo = num($('#pf-costo').value);
   if ($('#pf-min')) f.minimo = num($('#pf-min').value);
   if ($('#pf-stock')) f.stock = num($('#pf-stock').value);
   if ($('#pf-paqn')) { f.paqueteNombre = $('#pf-paqn').value.trim(); f.paqueteUnidades = Math.max(1, num($('#pf-paqu').value)); }
@@ -1474,6 +1752,7 @@ function mostrarFormProducto() {
   const receta = f.tipo === 'receta' ? `<div class="stack"><b>Ingredientes (se descuentan al vender)</b>
     ${f.receta.map((r, i) => `<div class="rrow"><select class="in" id="pf-ri-${i}">${insumos.map(x => `<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select><input class="in" id="pf-rc-${i}" inputmode="numeric" value="${r.cant}" aria-label="Cantidad"><button class="icon" data-act="pf-rdel" data-i="${i}" aria-label="Quitar">×</button></div>`).join('')}
     <button class="btn sm" data-act="pf-radd" style="align-self:flex-start">+ Ingrediente</button></div>` : '';
+  const costoCampo = f.tipo === 'receta' ? `<div class="note">Costo calculado con los ingredientes: <b>${costoReceta(f.receta) ? money(costoReceta(f.receta)) : 'faltan los costos de algún ingrediente'}</b></div>` : `<label class="fld">Costo unitario (sólo se ve en Administración)<input class="in" id="pf-costo" inputmode="numeric" value="${f.costo || 0}"><small>Sirve para vender "al costo" a empleados y para ver el margen.</small></label>`;
   const stockCampos = conStock ? `<div class="grid2">
       ${editando ? '' : `<label class="fld">Stock inicial (unidades)<input class="in" id="pf-stock" inputmode="numeric" value="${f.stock}"></label>`}
       <label class="fld">Avisar cuando queden (mínimo)<input class="in" id="pf-min" inputmode="numeric" value="${f.minimo}"></label></div>
@@ -1485,7 +1764,7 @@ function mostrarFormProducto() {
       <label class="fld">Categoría<select class="in" id="pf-cat">${DB.categorias.map(c => `<option value="${c.id}" ${c.id === f.catId ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></label></div>
       <div class="grid2"><label class="fld">Tipo de producto<select class="in" id="pf-tipo" data-in="pf-tipo">${Object.entries(TIPOS).map(([k, t]) => `<option value="${k}" ${k === f.tipo ? 'selected' : ''}>${t.n}</option>`).join('')}</select><small>${TIPOS[f.tipo].d}</small></label>
       ${f.tipo === 'insumo' ? '<div></div>' : `<label class="fld">Precio de venta<input class="in" id="pf-precio" inputmode="numeric" value="${f.precio}"></label>`}</div>
-      ${receta}${stockCampos}${editando && conStock ? '<div class="note">El stock actual no se cambia desde acá: usá "Ingreso" o "Contar" en la sección Stock para que quede registrado.</div>' : ''}`,
+      ${costoCampo}${receta}${stockCampos}${editando && conStock ? '<div class="note">El stock actual no se cambia desde acá: usá "Ingreso" o "Contar" en la sección Stock para que quede registrado.</div>' : ''}`,
     actions: [{ label: 'Cancelar' }, { label: 'Guardar producto', kind: 'primary', onClick: guardarProducto }],
   });
 }
@@ -1497,9 +1776,12 @@ function guardarProducto() {
   if (f.tipo === 'receta' && new Set(f.receta.map(r => r.id)).size !== f.receta.length) { toast('Un ingrediente está repetido', 'warn'); return false; }
   if (DB.productos.some(p => p.id !== UI.pfId && norm(p.nombre) === norm(f.nombre))) { toast('Ya existe un producto con ese nombre', 'warn'); return false; }
   const r = tx(() => {
-    const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, receta: f.tipo === 'receta' ? f.receta : [] };
-    if (UI.pfId) Object.assign(prod(UI.pfId), campos);
-    else {
+    const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, costo: f.tipo === 'receta' ? 0 : (f.costo || 0), receta: f.tipo === 'receta' ? f.receta : [] };
+    if (UI.pfId) {
+      const p = prod(UI.pfId), antes = { precio: p.precio, costo: p.costo || 0 };
+      Object.assign(p, campos);
+      if (antes.precio !== p.precio || antes.costo !== (p.costo || 0)) logPush('precio', p.nombre, `${p.nombre}: precio ${money(antes.precio)} → ${money(p.precio)}, costo ${money(antes.costo)} → ${money(p.costo || 0)}`);
+    } else {
       const p = { id: uid('p'), activo: true, stock: 0, ...campos }; DB.productos.push(p);
       if (['directo', 'insumo'].includes(p.tipo) && f.stock > 0) moverStock(p.id, f.stock, 'ingreso', { motivo: 'Stock inicial' });
     }
@@ -1565,12 +1847,14 @@ const A = {
     modalDevolucion({ titulo: 'Devolver un pago', intro: `El cliente había pagado <b>${money(p.monto)}</b>. El turno vuelve a deber ese monto.`, confirmLabel: 'Devolver', pagos: [p],
       onConfirm: map => { const r = tx(() => devolverPago('T:' + t.id, p.id, map[0])); if (r.ok) { toast('Pago devuelto'); render(); } verTurno(t.id); } });
   },
-  'exp-caja': () => exportar(`caja_${UI.repDesde}_a_${UI.repHasta}`, rowsCaja()),
-  'cn-add': () => { const r = tx(() => { DB.canchas.push({ id: uid('cn'), nombre: 'Nueva cancha', deporte: 'otro', dur: 60, ap: 600, ci: 1440, precio: 20000, catId: DB.categorias[0].id, bloquea: [] }); }); if (r.ok) views.admin(); },
-  'cn-del': d => {
-    if (DB.turnos.some(t => t.canchaId === d.id && t.estado !== 'cancelado')) return toast('Esa cancha tiene turnos reservados o cobrados. Cancelalos antes.', 'warn');
-    const r = tx(() => { DB.canchas = DB.canchas.filter(c => c.id !== d.id); DB.canchas.forEach(c => { c.bloquea = c.bloquea.filter(x => x !== d.id); }); }); if (r.ok) views.admin();
+  'exp-log': () => exportar('registro_de_cambios', rowsLog()),
+  'fx-fin': d => ask('Terminar turno fijo', 'El horario queda libre desde hoy en adelante. Lo ya cobrado no se toca.', 'Terminar fijo', () => { const r = tx(() => terminarFijo(d.id, dayKey(Date.now()))); if (r.ok) { toast('Fijo terminado'); views.admin(); } }, true),
+  'aj-abrir': () => {
+    const abrir = () => { UI.pago.ajusteAbierto = true; UI.pago.ajuste = { tipo: 'pct', valor: 0, motivo: '', nota: '' }; renderCobro(); recalcCobro(); };
+    if (DB.config.pedirPinAjuste) requirePin(abrir, () => renderCobro()); else abrir();
   },
+  'aj-quitar': () => { UI.pago.ajusteAbierto = false; UI.pago.ajuste = null; renderCobro(); recalcCobro(); },
+  'exp-caja': () => exportar(`caja_${UI.repDesde}_a_${UI.repHasta}`, rowsCaja()),
   mover: () => moverComanda(),
   'mover-a': d => {
     const from = UI.com, to = d.id;
@@ -1582,6 +1866,7 @@ const A = {
     const hacer = map => {
       const r = tx(() => {
         ps.forEach((p, i) => devolverPago(key, p.id, map ? map[i] : p.metodoId));
+        if (c.items.length) logPush('cancelacion', lugarNombre(key), `Cuenta de ${lugarNombre(key)} cancelada sin cobrar: ${c.items.map(i => i.cant + ' x ' + (prod(i.prodId) ? prod(i.prodId).nombre : '?')).join(', ')} (${money(totalItems(c.items))})${ps.length ? '. Se devolvieron ' + money(sum(ps, p => p.monto)) : ''}`);
         if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
       });
       if (r.ok) render();
@@ -1682,7 +1967,7 @@ const A = {
       <div class="note">${q.stock === antes && DB.contadores.venta === nv ? 'Todo quedó igual que antes: no se perdió ni se inventó nada (rollback).' : 'Algo quedó a medias.'}</div>`, actions: [{ label: 'Entendido', kind: 'primary' }] });
   },
   'reset-hist': () => ask('Borrar ventas e historial', 'Se borran tickets, turnos, movimientos de stock y movimientos de caja. Los productos y su stock actual se mantienen.', 'Borrar', () => {
-    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.caja = []; DB.turnos = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
+    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.caja = []; DB.turnos = []; logPush('sistema', '', 'Se borraron ventas, turnos, movimientos de stock y de caja'); DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
     if (r.ok) { toast('Historial borrado'); render(); }
   }, true),
   'reset-demo': () => ask('Volver a datos de ejemplo', 'Se pierde todo lo que cargaste y se vuelven a cargar los datos de ejemplo.', 'Restablecer', () => { seed(); normalizar(); persist(); UI.com = 'M'; toast('Datos de ejemplo cargados'); render(); }, true),
@@ -1696,6 +1981,17 @@ document.addEventListener('click', e => {
 /* campos de texto, selectores y fechas (evento "input") */
 const mesaSel = () => DB.mesas.find(x => x.id === UI.mesaEdit);
 const I = {
+  aj: () => {
+    const P = UI.pago, tipo = $('#aj-tipo').value;
+    P.ajuste = { tipo, valor: num($('#aj-valor').value), motivo: $('#aj-motivo').value, nota: $('#aj-nota').value.trim() };
+    $('#aj-valor-wrap').hidden = tipo === 'costo';
+    $('#aj-valor-lbl').textContent = tipo === 'pct' ? 'Porcentaje de descuento' : tipo === 'monto' ? 'Descuento en pesos' : 'Total final a cobrar';
+    recalcCobro();
+  },
+  po: () => llenarHorasPosponer(),
+  'tn-tipo': el => { const fijo = el.value === 'fijo'; $('#tn-sena-box').hidden = fijo; $('#tn-fijo-note').hidden = !fijo; },
+  'cfg-pin': el => { const r = tx(() => { DB.config.pedirPinAjuste = el.checked; logPush('config', '', 'Pedir el código para descuentos y ventas al costo: ' + (el.checked ? 'activado' : 'desactivado')); }); if (!r.ok) views.admin(); },
+  'lg-f': el => { UI.lgTipo = el.value; admBody.registro(); },
   turf: el => { if (el.value) { UI.turFecha = el.value; views.turnos(); } },
   'cn-f': el => {
     const c = cancha(el.dataset.id); if (!c) return;
@@ -1708,7 +2004,6 @@ const I = {
     else c[f] = num(v);
     persist();
   },
-  'cn-bloq': el => { const c = cancha(el.dataset.id), o = el.dataset.o; if (!c) return; c.bloquea = el.checked ? [...new Set([...c.bloquea, o])] : c.bloquea.filter(x => x !== o); persist(); },
   'mesa-tipo': el => { const m = mesaSel(); if (m) { m.tipo = el.value; persist(); views.mesas(); } },
   'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
   'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
