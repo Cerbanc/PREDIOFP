@@ -1,0 +1,58 @@
+name: Programa para Windows
+
+# Arma el programa para Windows, corre las pruebas en Windows y deja el instalador para descargar.
+# Se ejecuta a mano (pestaña Actions > "Programa para Windows" > Run workflow), al subir una versión (etiqueta v*)
+# y cuando cambia el código del programa en la rama de trabajo.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    branches: ['claude/pos-offline-python-sqlite-5t9te7']
+    paths: ['predio/**', 'packaging/**', 'requirements*.txt', 'predio_launcher.py', 'tests/**', '.github/workflows/windows.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Pruebas (en Windows)
+        run: python -m pytest tests -q --ignore=tests/test_e2e.py
+      - name: Icono
+        run: python packaging/hacer_icono.py
+      - name: Armar el programa
+        run: pyinstaller packaging/predio.spec --noconfirm
+      - name: Probar el programa armado
+        run: python packaging/probar_exe.py dist/Predio/Predio.exe
+      - name: Instalador
+        shell: pwsh
+        run: |
+          $v = (python -c "from predio import VERSION; print(VERSION)").Trim()
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and -not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          $iscc = if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") { "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" } else { (Get-Command iscc).Source }
+          & $iscc "/DVersion=$v" packaging\instalador.iss
+          Compress-Archive -Path dist\Predio\* -DestinationPath "dist\Caja-del-Predio-$v-portable.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Caja-del-Predio-Windows
+          path: |
+            dist/Instalar-Caja-del-Predio-*.exe
+            dist/Caja-del-Predio-*-portable.zip
+          if-no-files-found: error
+      - name: Publicar la versión
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Instalar-Caja-del-Predio-*.exe
+            dist/Caja-del-Predio-*-portable.zip
