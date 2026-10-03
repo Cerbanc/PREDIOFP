@@ -17,6 +17,7 @@
   --good:#17803f; --good-soft:#d9f0e1;
   --warn:#9a5b00; --warn-soft:#fbebc8;
   --bad:#bb3326; --bad-soft:#f9dad6;
+  --info:#25679f; --info-soft:#dbe9f7;
   --side-bg:#12261f; --side-fg:#dcebe5; --side-mute:#8fb0a4;
   --shadow:0 1px 2px rgba(10,30,22,.08),0 4px 14px rgba(10,30,22,.06);
   --font:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -30,6 +31,7 @@
   --good:#52cf86; --good-soft:#153725;
   --warn:#f0b24a; --warn-soft:#3b2d0f;
   --bad:#ff7d6e; --bad-soft:#41191a;
+  --info:#6fb2ee; --info-soft:#16304a;
   --side-bg:#09100e; --side-fg:#d5e4dd; --side-mute:#7f9a8f;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
   color-scheme:dark}}
@@ -40,6 +42,7 @@
   --good:#52cf86; --good-soft:#153725;
   --warn:#f0b24a; --warn-soft:#3b2d0f;
   --bad:#ff7d6e; --bad-soft:#41191a;
+  --info:#6fb2ee; --info-soft:#16304a;
   --side-bg:#09100e; --side-fg:#d5e4dd; --side-mute:#7f9a8f;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
   color-scheme:dark}
@@ -145,6 +148,14 @@ textarea.in{resize:vertical}
 .cart-f{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .total-row{display:flex;justify-content:space-between;align-items:baseline}
 .total-row span{font-weight:700;color:var(--muted)}
+.total-row.sm b{font-size:18px}
+.total-row.saldo b{color:var(--warn)}
+.abonos{display:flex;flex-direction:column;gap:4px;border-top:1px dashed var(--line);padding-top:8px}
+.ab{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px}
+.ab b{font-variant-numeric:tabular-nums;color:var(--good)}
+.ab button{border:0;background:transparent;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px}
+.frow{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) 70px 120px auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.frow code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
 .total-row b{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 
 /* Mesas */
@@ -153,10 +164,18 @@ textarea.in{resize:vertical}
   linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/10% 100%, var(--surface);
   background-blend-mode:normal;height:min(62vh,540px);min-height:360px;touch-action:pan-y;overflow:hidden}
 .salon.editing{outline:2px dashed var(--accent);outline-offset:-2px}
-.mesa{position:absolute;width:118px;height:88px;border-radius:14px;border:2px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;box-shadow:var(--shadow);padding:4px}
+.mesa{position:absolute;container-type:size;border-radius:14px;border:2px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;box-shadow:var(--shadow);padding:4px;overflow:hidden}
+.mesa b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (max-height:62px){.mesa small{display:none}}
+@container (max-height:40px){.mesa span{display:none}}
+.mesa .rz{display:none;position:absolute;right:2px;bottom:2px;width:22px;height:22px;border-right:4px solid var(--accent);border-bottom:4px solid var(--accent);border-radius:0 0 10px 0;cursor:nwse-resize;touch-action:none}
+.salon.editing .mesa .rz{display:block}
 .mesa b{font-size:15px} .mesa span{font-weight:700;font-variant-numeric:tabular-nums}
 .mesa small{color:var(--muted);font-size:11px;min-height:14px}
 .mesa:not(.busy) span{color:var(--good)}
+.mesa.t-futbol{background:color-mix(in srgb,var(--good-soft) 75%,var(--surface));border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.mesa.t-padel{background:color-mix(in srgb,var(--info-soft) 80%,var(--surface));border-color:color-mix(in srgb,var(--info) 50%,var(--line))}
+.mesa.t-barra{background:var(--surface2);border-color:var(--fg)}
 .mesa.busy{border-color:var(--warn);background:var(--warn-soft)}
 .mesa.busy span{color:var(--warn)}
 .salon.editing .mesa{cursor:grab;touch-action:none}
@@ -213,7 +232,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .note{background:var(--accent-soft);color:var(--fg);border-radius:10px;padding:10px 12px;font-size:13px}
 .note.warn{background:var(--warn-soft)}
 
-#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;max-width:min(380px,calc(100% - 32px))}
+#toasts{position:fixed;left:50%;transform:translateX(-50%);top:16px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;width:min(420px,calc(100% - 32px))}
 .toast{background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);animation:in .18s ease-out}
 .toast.warn{background:var(--warn);color:#fff}
 .toast.bad{background:var(--bad);color:#fff}
@@ -238,8 +257,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
   .side-foot button{border:0;padding:6px}
   .side-foot button b{display:none}
   main{padding:14px 16px 20px}
-  #toasts{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  #toasts{top:10px}
   .grid2{grid-template-columns:1fr}
+  .frow{grid-template-columns:1fr 1fr}
   .prow{grid-template-columns:minmax(0,1fr) 120px auto}
   .search{max-width:none;width:100%}
   h1{font-size:21px}
@@ -309,7 +329,7 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ---------- base de datos (en memoria + localStorage) ---------- */
-const LS_KEY = 'predio_pos_proto_v1';
+const LS_KEY = 'predio_pos_proto_v2';
 let DB = null;
 let STORAGE_OK = true;
 const UI = {
@@ -336,6 +356,8 @@ function normalizar() {
   DB.comandas = DB.comandas || {};
   if (!DB.comandas.M) DB.comandas.M = { items: [] };
   DB.negocio = DB.negocio || 'Predio Deportivo';
+  DB.devoluciones = DB.devoluciones || [];
+  DB.mesas.forEach(m => { m.tipo = m.tipo || 'mesa'; m.w = m.w || 14; m.h = m.h || 17; });
 }
 
 /* Transacción: ejecuta fn; si lanza un error, restaura el estado anterior (rollback). */
@@ -426,7 +448,9 @@ function commitVenta(o) {
   });
   if (!lineas.length) throw new Error('La comanda está vacía');
   const total = sum(lineas, l => l.cant * l.precio);
-  const ev = evalPago(total, o.pagos);
+  const abonos = o.abonos || [], yaPagado = sum(abonos, a => a.monto);
+  if (yaPagado > total) throw new Error('Lo ya pagado supera el total de la cuenta');
+  const ev = evalPago(total - yaPagado, o.pagos);
   if (ev.error) throw new Error(ev.error);
   if (ev.falta > 0) throw new Error('Falta cobrar ' + money(ev.falta));
 
@@ -442,10 +466,25 @@ function commitVenta(o) {
   // Pagos guardados por el monto realmente aplicado (el efectivo ya sin el vuelto)
   const pagos = [];
   const cashRow = o.pagos.find(r => r.monto > 0 && metodo(r.metodoId).efectivo);
-  o.pagos.filter(r => r.monto > 0 && !metodo(r.metodoId).efectivo).forEach(r => pagos.push({ metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto }));
-  if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied });
-  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos, recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '' });
+  o.pagos.filter(r => r.monto > 0 && !metodo(r.metodoId).efectivo).forEach(r => pagos.push({ metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto, ts }));
+  if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied, ts });
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '' });
   return ventaId;
+}
+/* Pago parcial: queda guardado en la cuenta abierta y el resto se cobra después */
+function registrarAbono(key, rows) {
+  const com = DB.comandas[key];
+  if (!com || !com.items.length) throw new Error('La cuenta está vacía');
+  const filas = rows.filter(r => r.monto > 0), t = sum(filas, r => r.monto), saldo = saldoDe(com);
+  if (t <= 0) throw new Error('Poné un monto mayor a cero');
+  if (t >= saldo) throw new Error('Ese monto cubre todo el saldo: usá "Confirmar cobro"');
+  com.pagos = pagosDe(com).concat(filas.map(r => ({ id: uid('pg'), ts: Date.now(), metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto })));
+}
+function devolverAbono(key, pagoId) {
+  const com = DB.comandas[key], p = com && pagosDe(com).find(x => x.id === pagoId);
+  if (!p) throw new Error('Ese pago ya no está en la cuenta');
+  com.pagos = com.pagos.filter(x => x.id !== pagoId);
+  DB.devoluciones.push({ id: uid('dv'), ts: Date.now(), metodoId: p.metodoId, nombre: p.nombre, monto: p.monto, motivo: 'Pago parcial devuelto (' + lugarNombre(key) + ')' });
 }
 function anularVenta(id) {
   const v = DB.ventas.find(x => x.id === id);
@@ -467,7 +506,7 @@ function devolverAlquiler(id, perdido) {
 
 /* ---------- datos de ejemplo ---------- */
 function seed() {
-  const d = { v: 1, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], alquileres: [], contadores: { venta: 0 } };
+  const d = { v: 1, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], alquileres: [], devoluciones: [], contadores: { venta: 0 } };
   DB = d;
   const t0 = Date.now() - 9 * 3600e3;
   const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
@@ -503,8 +542,13 @@ function seed() {
   const cerv = add({ nombre: 'Cerveza 1 L', catId: buffet, precio: 4200, stock: 18, minimo: 6, paqueteNombre: 'Cajón × 12', paqueteUnidades: 12 });
   add({ nombre: 'Café', catId: buffet, precio: 1800, tipo: 'servicio' });
 
-  const pos = [[8, 10], [27, 10], [46, 10], [65, 10], [84 - 4, 10], [8, 48], [27, 48], [46, 48], [65, 48], [80, 48]];
-  ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 4', 'Mesa 5', 'Mesa 6', 'Mesa 7', 'Mesa 8', 'Barra', 'Quincho'].forEach((n, i) => d.mesas.push({ id: uid('m'), nombre: n, x: pos[i][0], y: pos[i][1] }));
+  const L = (nombre, tipo, x, y, w, h, rapido) => { const m = { id: uid('m'), nombre, tipo, x, y, w, h, rapido: !!rapido }; d.mesas.push(m); return m; };
+  const futbol1 = L('FÚTBOL 1', 'futbol', 2, 3, 26, 20); L('FÚTBOL 2', 'futbol', 30, 3, 26, 20);
+  L('PÁDEL 1', 'padel', 59, 3, 18, 14); L('PÁDEL 2', 'padel', 79, 3, 18, 14);
+  const mesas = [];
+  [2, 22, 42, 62, 82].forEach((x, i) => mesas.push(L('Mesa ' + (i + 1), 'mesa', x, 34, 14, 17)));
+  [2, 22, 42].forEach((x, i) => mesas.push(L('Mesa ' + (i + 6), 'mesa', x, 58, 14, 17)));
+  const barra = L('Barra', 'barra', 62, 60, 34, 14, true);
 
   // ventas de ejemplo de hoy (pasan por la misma función que las ventas reales)
   const demo = [
@@ -527,8 +571,12 @@ function seed() {
   dev.estado = 'devuelto'; dev.tsDev = Date.now() - 5 * 60000;
   moverStock(paleta, 1, 'alquiler_devolucion', { motivo: 'Devolvió Alquiler de paleta (Cancha 1 · Lucía)' });
   // comandas abiertas de ejemplo
-  d.comandas[d.mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }] };
-  d.comandas[d.mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
+  d.comandas[mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }],
+    pagos: [{ id: uid('pg'), ts: Date.now() - 10 * 60000, metodoId: efe, nombre: 'Efectivo', monto: 5000 }] };
+  d.comandas[mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
+  d.comandas[futbol1.id] = { ts: Date.now() - 40 * 60000, items: [{ prodId: turno, cant: 1, nota: '' }],
+    pagos: [{ id: uid('pg'), ts: Date.now() - 40 * 60000, metodoId: tr, nombre: 'Transferencia', monto: 10000 }] };
+  d.comandas[barra.id] = { ts: Date.now() - 15 * 60000, items: [{ prodId: cerv, cant: 2, nota: '' }, { prodId: alfa, cant: 1, nota: '' }] };
   return d;
 }
 
@@ -607,6 +655,9 @@ function exportar(nombre, rows) {
 /* ---------- caja: comandas ---------- */
 const getCom = key => key === 'M' ? (DB.comandas.M || (DB.comandas.M = { items: [] })) : (DB.comandas[key] || { items: [] });
 const totalItems = items => sum(items, it => { const p = prod(it.prodId); return p ? p.precio * it.cant : 0; });
+const pagosDe = c => c.pagos || [];
+const pagadoDe = c => sum(pagosDe(c), p => p.monto);
+const saldoDe = c => totalItems(c.items) - pagadoDe(c);
 function setItems(key, items) {
   items = items.filter(i => i.cant > 0 && prod(i.prodId));
   if (key !== 'M' && !items.length) { delete DB.comandas[key]; return; }
@@ -614,6 +665,8 @@ function setItems(key, items) {
   DB.comandas[key] = { ...prev, items, ts: prev.ts || Date.now() };
 }
 function aplicarItems(key, items) {
+  const pag = pagadoDe(getCom(key));
+  if (pag > 0 && totalItems(items) < pag) return toast(`No se puede: ya pagaron ${money(pag)}. Primero devolvé un pago.`, 'warn');
   const r = tx(() => setItems(key, items));
   if (!r.ok) return;
   avisoBajo(items);
@@ -668,18 +721,21 @@ function agregar(prodId) {
 }
 
 /* ---------- cobro ---------- */
-function abrirCobro() {
+const efectivoId = () => (DB.metodos.find(m => m.efectivo && m.activo) || DB.metodos.find(m => m.activo)).id;
+const lugarNombre = key => key === 'M' ? 'Mostrador' : (DB.mesas.find(m => m.id === key) || { nombre: 'Mesa' }).nombre;
+function abrirCobro(parcial) {
   const key = UI.com, c = getCom(key);
   if (!c.items.length) return toast('Primero agregá productos', 'warn');
-  chequearStock(c.items, key, false, 'cobrar', () => {
-    const total = totalItems(c.items);
-    const efe = DB.metodos.find(m => m.efectivo && m.activo) || DB.metodos.find(m => m.activo);
-    UI.pago = { total, key, rows: [{ metodoId: efe.id, monto: total }], cliente: '', alq: c.items.filter(i => prod(i.prodId).tipo === 'alquiler') };
-    renderCobro();
-  });
+  const abrir = () => {
+    const total = totalItems(c.items), saldo = total - pagadoDe(c);
+    if (saldo <= 0) return toast('Esta cuenta ya está paga. Devolvé un pago o agregá productos.', 'warn');
+    UI.pago = { total, saldo, key, parcial: !!parcial, rows: [{ metodoId: efectivoId(), monto: parcial ? 0 : saldo }], cliente: '', alq: c.items.filter(i => prod(i.prodId).tipo === 'alquiler') };
+    renderCobro(parcial ? 0 : undefined);
+  };
+  if (parcial) abrir(); else chequearStock(c.items, key, false, 'cobrar', abrir);
 }
 function renderCobro(focusIdx) {
-  const P = UI.pago;
+  const P = UI.pago, ya = P.total - P.saldo;
   const chips = DB.metodos.filter(m => m.activo).map(m => `<button class="chip" data-act="pg-add" data-id="${m.id}">+ ${esc(m.nombre)}</button>`).join('');
   const rows = P.rows.map((r, i) => {
     const m = metodo(r.metodoId);
@@ -693,34 +749,46 @@ function renderCobro(focusIdx) {
   const alqTxt = P.alq.length ? `<label class="fld">Para quién es el alquiler (nombre o cancha)<small>Sirve para saber quién tiene la paleta cuando la devuelvan.</small>
       <input class="in" id="pg-cliente" data-in="pg-cliente" value="${esc(P.cliente)}" placeholder="Ej: Cancha 3 · Juan"></label>` : '';
   modal({
-    title: 'Cobrar · ' + (P.key === 'M' ? 'Mostrador' : DB.mesas.find(m => m.id === P.key).nombre),
-    body: `<div class="big-total"><span>Total a cobrar</span><b>${money(P.total)}</b></div>
+    title: (P.parcial ? 'Pago parcial · ' : 'Cobrar · ') + lugarNombre(P.key),
+    body: `<div class="big-total"><span>${ya > 0 ? 'Saldo a cobrar' : 'Total a cobrar'}</span><b>${money(P.saldo)}</b></div>
+      ${ya > 0 ? `<p class="muted">Total de la cuenta ${money(P.total)} · ya pagado ${money(ya)}</p>` : ''}
       ${alqTxt}
       <div><div class="muted" style="margin-bottom:6px;font-weight:600">Medios de pago (se pueden combinar)</div><div class="chips">${chips}</div></div>
       <div class="stack" id="pg-rows">${rows}</div>
       <div class="pg-sum" id="pg-sum"></div>`,
-    actions: [{ label: 'Volver' }, { label: 'Confirmar cobro', kind: 'primary', disabled: true, onClick: confirmarCobro }],
+    actions: [{ label: 'Volver' }, { label: 'Guardar pago parcial', disabled: true, onClick: guardarParcial }, { label: 'Confirmar cobro', kind: 'primary', disabled: true, onClick: confirmarCobro }],
   });
   updateCobro();
   if (focusIdx != null) { const el = $('#pg-' + focusIdx); if (el) el.select(); }
 }
 function updateCobro() {
-  const P = UI.pago, ev = evalPago(P.total, P.rows);
+  const P = UI.pago, ev = evalPago(P.saldo, P.rows);
   const faltaCliente = P.alq.length && !P.cliente.trim();
-  let html = `<div class="l"><span>Cobrado</span><span class="num">${money(ev.pagado)}</span></div>`;
+  let html = `<div class="l"><span>Se está cobrando ahora</span><span class="num">${money(ev.pagado)}</span></div>`;
   if (ev.error) html += `<div class="err">${esc(ev.error)}</div>`;
-  else if (ev.falta > 0) html += `<div class="l falta"><span>Falta</span><b class="num">${money(ev.falta)}</b></div>`;
-  else if (ev.vuelto > 0) html += `<div class="l vuelto"><span>Vuelto a entregar</span><b class="num">${money(ev.vuelto)}</b></div>`;
+  else if (ev.falta > 0) {
+    html += `<div class="l falta"><span>Falta</span><b class="num">${money(ev.falta)}</b></div>`;
+    if (ev.pagado > 0) html += `<div class="muted" style="font-weight:400;font-size:12px">Si el cliente paga una parte ahora, tocá "Guardar pago parcial": la cuenta queda abierta y el resto se cobra después.</div>`;
+  } else if (ev.vuelto > 0) html += `<div class="l vuelto"><span>Vuelto a entregar</span><b class="num">${money(ev.vuelto)}</b></div>`;
   else html += `<div class="l"><span>Pago completo</span><span class="pill good">OK</span></div>`;
   if (faltaCliente) html += `<div class="err">Falta el nombre o cancha de quien alquila.</div>`;
   $('#pg-sum').innerHTML = html;
-  const b = $('#mact-1'); if (b) b.disabled = !(ev.ok && !faltaCliente);
+  const bp = $('#mact-1'), bc = $('#mact-2');
+  if (bp) bp.disabled = !(!ev.error && ev.pagado > 0 && ev.falta > 0);
+  if (bc) bc.disabled = !(ev.ok && !faltaCliente);
+}
+function guardarParcial() {
+  const P = UI.pago;
+  const r = tx(() => registrarAbono(P.key, P.rows));
+  if (!r.ok) return false;
+  toast('Pago parcial guardado. Saldo pendiente: ' + money(saldoDe(getCom(P.key))));
+  render();
 }
 function confirmarCobro() {
   const P = UI.pago, key = P.key, c = getCom(key);
   const mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
   const r = tx(() => {
-    const id = commitVenta({ items: c.items, pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, cliente: P.cliente.trim() });
+    const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, cliente: P.cliente.trim() });
     if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
     return id;
   });
@@ -744,7 +812,7 @@ function ticketTexto(v) {
     if (l.nota) L.push('   (' + l.nota + ')');
   });
   L.push(line, lr('TOTAL', money(v.total).replace(' ', '')));
-  v.pagos.forEach(p => L.push(lr('  ' + p.nombre, money(p.monto).replace(' ', ''))));
+  v.pagos.forEach(p => L.push(lr('  ' + p.nombre + (p.ts && Math.abs(p.ts - v.ts) > 60000 ? ' (' + hhmm(p.ts) + ')' : ''), money(p.monto).replace(' ', ''))));
   if (v.vuelto > 0) L.push(lr('  Vuelto', money(v.vuelto).replace(' ', '')));
   L.push(line, ctr('¡Gracias por venir!'));
   return L.join('\n');
@@ -785,8 +853,14 @@ function renderSide() {
   const ocup = Object.keys(DB.comandas).filter(k => k !== 'M' && DB.comandas[k].items.length).length;
   const alq = DB.alquileres.filter(a => a.estado === 'prestado').length;
   const bajo = DB.productos.filter(p => p.activo && ['directo', 'insumo', 'alquiler'].includes(p.tipo) && p.stock <= p.minimo).length;
-  const items = [['venta', 'Caja', 'venta', 0], ['mesas', 'Mesas', 'mesas', ocup], ['alquileres', 'Alquileres', 'alq', alq], ['stock', 'Stock', 'stock', bajo, 1], ['tickets', 'Tickets', 'tickets', 0], ['reportes', 'Reportes', 'rep', 0], ['admin', 'Admin', 'admin', 0]];
-  $('#nav').innerHTML = items.map(([v, n, i, b, w]) => `<button data-act="nav" data-v="${v}" ${UI.view === v ? 'aria-current="page"' : ''}>${ic(i)}<span>${n}</span>${b ? `<span class="badge ${w ? 'warn' : ''}">${b}</span>` : ''}</button>`).join('');
+  const rap = DB.mesas.filter(m => m.rapido);
+  const enRap = UI.view === 'venta' && rap.some(m => m.id === UI.com);
+  const btn = (attrs, label, icon, badge, warn, cur) => `<button ${attrs} ${cur ? 'aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<span class="badge ${warn ? 'warn' : ''}">${badge}</span>` : ''}</button>`;
+  const nav = (v, n, i, b, w) => btn(`data-act="nav" data-v="${v}"`, n, i, b, w, UI.view === v);
+  $('#nav').innerHTML = btn('data-act="nav" data-v="venta"', 'Caja', 'venta', 0, 0, UI.view === 'venta' && !enRap) +
+    rap.map(m => btn(`data-act="ir-lugar" data-id="${m.id}"`, m.nombre, 'mesas', DB.comandas[m.id] && DB.comandas[m.id].items.length ? '●' : '', 0, UI.view === 'venta' && UI.com === m.id)).join('') +
+    nav('mesas', 'Mesas', 'mesas', ocup, 0) + nav('alquileres', 'Alquileres', 'alq', alq, 0) + nav('stock', 'Stock', 'stock', bajo, 1) +
+    nav('tickets', 'Tickets', 'tickets', 0, 0) + nav('reportes', 'Reportes', 'rep', 0, 0) + nav('admin', 'Admin', 'admin', 0, 0);
   $('#side-foot').innerHTML = `<div class="demo-tag">Prototipo con datos de ejemplo. Se guarda sólo en este navegador.</div>
     ${STORAGE_OK ? '' : '<div class="demo-tag" style="background:var(--bad-soft);color:var(--bad)">Este navegador no deja guardar: al recargar se pierde todo.</div>'}
     <button data-act="tema" aria-label="Cambiar entre modo claro y oscuro">${ic('tema')}<b>Claro / Oscuro</b></button>`;
@@ -824,9 +898,12 @@ function renderGrid() {
 }
 function renderCart() {
   const key = UI.com, c = getCom(key), items = c.items.filter(i => prod(i.prodId)), total = totalItems(items);
+  const pagos = pagosDe(c), pag = pagadoDe(c), saldo = total - pag;
+  const chipDest = (id, nombre, deuda) => `<button class="chip" data-act="dest" data-id="${id}" aria-pressed="${key === id}">${esc(nombre)}${deuda ? ' <span class="pill warn">' + money(deuda) + '</span>' : ''}</button>`;
+  const quick = chipDest('M', 'Mostrador', 0) + DB.mesas.filter(m => m.rapido).map(m => chipDest(m.id, m.nombre, DB.comandas[m.id] ? saldoDe(DB.comandas[m.id]) : 0)).join('');
   const opts = `<option value="M" ${key === 'M' ? 'selected' : ''}>Mostrador (venta rápida)</option>` + DB.mesas.map(m => {
     const oc = DB.comandas[m.id];
-    return `<option value="${m.id}" ${key === m.id ? 'selected' : ''}>${esc(m.nombre)} · ${oc ? 'ocupada ' + money(totalItems(oc.items)) : 'libre'}</option>`;
+    return `<option value="${m.id}" ${key === m.id ? 'selected' : ''}>${esc(m.nombre)} · ${oc ? 'ocupada, debe ' + money(saldoDe(oc)) : 'libre'}</option>`;
   }).join('');
   const lines = items.map((it, i) => {
     const p = prod(it.prodId);
@@ -835,16 +912,21 @@ function renderCart() {
       <div class="ln-sub">${money(p.precio * it.cant)}</div>
       <div class="ln-tools"><button data-act="nota" data-i="${i}">${it.nota ? 'editar nota' : 'agregar nota'}</button><button data-act="del" data-i="${i}">quitar</button></div></div>`;
   }).join('');
+  const abonos = pagos.length ? `<div class="abonos">${pagos.map(p => `<div class="ab"><span>Pagó ${esc(p.nombre)} <small class="muted">${hhmm(p.ts)}</small></span><b>− ${money(p.monto)}</b><button data-act="ab-del" data-id="${p.id}">devolver</button></div>`).join('')}
+      <div class="total-row saldo"><span>Saldo a cobrar</span><b>${money(saldo)}</b></div></div>` : '';
   $('#cart').innerHTML = `
-    <div class="cart-h"><label for="sel-dest">Cuenta</label><select id="sel-dest" data-in="dest" class="in">${opts}</select>
+    <div class="cart-h"><label>Cuenta</label><div class="chips">${quick}</div>
+      <select id="sel-dest" data-in="dest" class="in" aria-label="Otras cuentas">${opts}</select>
       ${key !== 'M' && c.ts ? `<span class="muted">Abierta hace ${hace(c.ts)}</span>` : ''}</div>
     <div class="lines">${lines || `<div class="empty"><b>Comanda vacía</b><span>Tocá un producto para agregarlo.</span></div>`}</div>
     <div class="cart-f">
-      <div class="total-row"><span>Total</span><b>${money(total)}</b></div>
-      <button class="btn primary lg" data-act="cobrar" ${items.length ? '' : 'disabled'}>Cobrar</button>
+      <div class="total-row ${pagos.length ? 'sm' : ''}"><span>Total</span><b>${money(total)}</b></div>
+      ${abonos}
+      <button class="btn primary lg" data-act="cobrar" ${items.length && saldo > 0 ? '' : 'disabled'}>${pagos.length ? 'Cobrar saldo' : 'Cobrar'}</button>
       <div class="row">
-        <button class="btn sm" data-act="mover" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Pasar a una mesa' : 'Cambiar de mesa'}</button>
-        <button class="btn sm ghost" data-act="vaciar" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Vaciar' : 'Cancelar comanda'}</button>
+        <button class="btn sm" data-act="cobrar-parcial" ${items.length && saldo > 0 ? '' : 'disabled'}>Pago parcial</button>
+        <button class="btn sm" data-act="mover" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Pasar a una mesa' : 'Cambiar de lugar'}</button>
+        <button class="btn sm ghost" data-act="vaciar" ${items.length ? '' : 'disabled'}>${key === 'M' ? 'Vaciar' : 'Cancelar'}</button>
       </div>
     </div>`;
 }
@@ -852,23 +934,33 @@ function moverComanda() {
   const key = UI.com;
   const libres = DB.mesas.filter(m => !DB.comandas[m.id] && m.id !== key);
   if (!libres.length) return toast('No hay mesas libres', 'warn');
-  modal({ title: key === 'M' ? 'Pasar la cuenta a una mesa' : 'Cambiar la cuenta de mesa', body: `<p class="muted">Elegí una mesa libre.</p><div class="chips">${libres.map(m => `<button class="chip" data-act="mover-a" data-id="${m.id}">${esc(m.nombre)}</button>`).join('')}</div>`, actions: [{ label: 'Cancelar' }] });
+  modal({ title: key === 'M' ? 'Pasar la cuenta a una mesa' : 'Cambiar la cuenta de mesa', body: `<p class="muted">Elegí un lugar libre.</p><div class="chips">${libres.map(m => `<button class="chip" data-act="mover-a" data-id="${m.id}">${esc(m.nombre)}</button>`).join('')}</div>`, actions: [{ label: 'Cancelar' }] });
 }
 
-/* --- MESAS --- */
+/* --- MESAS Y CANCHAS --- */
+const LUGARES = { mesa: { n: 'Mesa', w: 14, h: 17 }, futbol: { n: 'FÚTBOL', w: 26, h: 20 }, padel: { n: 'PÁDEL', w: 18, h: 14 }, barra: { n: 'Barra', w: 34, h: 14 } };
+const lugarTipo = m => (m.tipo && LUGARES[m.tipo]) ? m.tipo : 'mesa';
 function mesaHTML(m) {
-  const c = DB.comandas[m.id], ocup = !!c;
-  return `<button class="mesa ${ocup ? 'busy' : ''} ${UI.editSalon && UI.mesaEdit === m.id ? 'sel' : ''}" style="left:${m.x}%;top:${m.y}%" data-act="mesa" data-id="${m.id}">
-    <b>${esc(m.nombre)}</b><span>${ocup ? money(totalItems(c.items)) : 'libre'}</span><small>${ocup && c.ts ? 'hace ' + hace(c.ts) : ''}</small></button>`;
+  const c = DB.comandas[m.id], ocup = !!c, t = lugarTipo(m);
+  const pag = ocup ? pagadoDe(c) : 0;
+  const peq = ocup ? (pag ? 'debe ' + money(saldoDe(c)) : (c.ts ? 'hace ' + hace(c.ts) : '')) : (m.rapido ? '★ acceso rápido' : '');
+  return `<button class="mesa t-${t} ${ocup ? 'busy' : ''} ${UI.editSalon && UI.mesaEdit === m.id ? 'sel' : ''}" style="left:${m.x}%;top:${m.y}%;width:${m.w || LUGARES[t].w}%;height:${m.h || LUGARES[t].h}%" data-act="mesa" data-id="${m.id}">
+    <b>${esc(m.nombre)}</b><span>${ocup ? money(totalItems(c.items)) : 'libre'}</span><small>${peq}</small><i class="rz" aria-hidden="true"></i></button>`;
 }
 views.mesas = () => {
   const ed = UI.editSalon, ocup = Object.keys(DB.comandas).filter(k => k !== 'M').length;
-  const sel = ed && UI.mesaEdit ? DB.mesas.find(m => m.id === UI.mesaEdit) : null;
-  $('#main').innerHTML = `<header class="ph"><div><h1>Mesas</h1><p class="muted">${ocup} ocupadas de ${DB.mesas.length}. Tocá una mesa para abrir o seguir su cuenta.</p></div>
-    <div class="row">${ed ? `<button class="btn" data-act="mesa-add">+ Agregar mesa</button><button class="btn primary" data-act="salon-fin">Listo</button>` : `<button class="btn ghost" data-act="salon-edit">${ic('admin')} Editar salón</button>`}</div></header>
-    ${ed ? `<div class="card" style="margin-bottom:12px"><div class="row">${sel ? `<label class="fld" style="flex:1;min-width:180px">Nombre de la mesa seleccionada<input class="in" id="mesa-name" data-in="mesa-name" value="${esc(sel.nombre)}"></label><button class="btn danger" data-act="mesa-del" style="align-self:flex-end">Eliminar mesa</button>` : '<span class="muted">Arrastrá las mesas para acomodarlas. Tocá una para renombrarla o eliminarla.</span>'}</div></div>` : ''}
+  const m = ed && UI.mesaEdit ? DB.mesas.find(x => x.id === UI.mesaEdit) : null;
+  const agregar = [['mesa', 'Mesa'], ['futbol', 'Cancha de fútbol'], ['padel', 'Cancha de pádel'], ['barra', 'Barra']].map(([k, n]) => `<button class="btn sm" data-act="mesa-add" data-t="${k}">+ ${n}</button>`).join('');
+  const editor = m ? `<div class="grid2"><label class="fld">Nombre<input class="in" id="mesa-name" data-in="mesa-name" value="${esc(m.nombre)}"></label>
+      <label class="fld">Forma<select class="in" data-in="mesa-tipo">${Object.entries(LUGARES).map(([k, t]) => `<option value="${k}" ${lugarTipo(m) === k ? 'selected' : ''}>${k === 'futbol' ? 'Cancha de fútbol' : k === 'padel' ? 'Cancha de pádel' : t.n}</option>`).join('')}</select></label></div>
+    <div class="grid2"><label class="fld">Ancho<input type="range" min="6" max="70" data-in="mesa-w" value="${m.w}"></label><label class="fld">Alto<input type="range" min="8" max="70" data-in="mesa-h" value="${m.h}"></label></div>
+    <div class="row"><label class="row" style="gap:6px"><input type="checkbox" data-in="mesa-rapido" ${m.rapido ? 'checked' : ''}> Acceso rápido (aparece en la Caja y en el menú)</label><button class="btn danger sm" data-act="mesa-del" style="margin-left:auto">Eliminar</button></div>`
+    : '<span class="muted">Arrastrá un lugar para moverlo y tirá de su esquina para estirarlo. Tocá uno para cambiarle el nombre o la forma.</span>';
+  $('#main').innerHTML = `<header class="ph"><div><h1>Mesas y canchas</h1><p class="muted">${ocup} ocupadas de ${DB.mesas.length}. Tocá un lugar para abrir o seguir su cuenta.</p></div>
+    <div class="row">${ed ? `<button class="btn primary" data-act="salon-fin">Listo</button>` : `<button class="btn ghost" data-act="salon-edit">${ic('admin')} Editar mapa</button>`}</div></header>
+    ${ed ? `<div class="card" style="margin-bottom:12px"><div class="stack"><div class="row"><span class="muted" style="font-weight:600">Agregar:</span>${agregar}</div>${editor}</div></div>` : ''}
     <div class="salon ${ed ? 'editing' : ''}" id="salon">${DB.mesas.map(mesaHTML).join('')}</div>
-    <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado</span></div>`;
+    <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado (y lo que debe si pagó una parte)</span></div>`;
 };
 
 /* --- ALQUILERES --- */
@@ -902,7 +994,7 @@ views.stock = () => {
     const list = DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && (!q || norm(p.nombre).includes(q)) && (UI.stockF === 'all' || (UI.stockF === 'bajo' && stockEstado(p)[0] !== 'good')));
     body = `<div class="toolbar"><input class="in" data-in="stockq" id="stockq" placeholder="Buscar…" value="${esc(UI.stockQ)}">
       <div class="chips"><button class="chip" data-act="stk-f" data-v="all" aria-pressed="${UI.stockF === 'all'}">Todo</button><button class="chip" data-act="stk-f" data-v="bajo" aria-pressed="${UI.stockF === 'bajo'}">Bajo o sin stock</button></div>
-      <button class="btn sm" style="margin-left:auto" data-act="exp-stock">Exportar CSV</button></div>
+      <span class="row" style="margin-left:auto"><button class="btn sm primary" data-act="foto">Cargar por foto de remito</button><button class="btn sm" data-act="exp-stock">Exportar CSV</button></span></div>
       <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Tipo</th><th class="r">Stock</th><th class="r">Mínimo</th><th>Estado</th><th></th></tr></thead><tbody>
       ${list.map(p => { const [k, t] = stockEstado(p), rec = p.tipo === 'receta';
         return `<tr><td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:8px"></span><b>${esc(p.nombre)}</b></td><td class="muted">${TIPOS[p.tipo].n}</td>
@@ -960,6 +1052,61 @@ function modalAjuste(id) {
   });
 }
 
+/* ---------- carga de stock por foto de remito (la lectura es SIMULADA en el prototipo) ---------- */
+const REMITO_EJEMPLO = [
+  { texto: 'COCA COLA 500CC BULTO 6X12', cant: 2 }, { texto: 'SALCHICHA VIENA PAQ X6', cant: 3 },
+  { texto: 'PAN PANCHO X6', cant: 4 }, { texto: 'ALFAJOR TRIPLE CJ X24', cant: 1 }, { texto: 'SERVILLETAS PAPEL X500', cant: 2 },
+];
+function adivinarProducto(texto) {
+  const ruido = ['paq', 'caj', 'cja', 'bulto', 'cj', 'una', 'con', 'los'];
+  const pal = norm(texto).split(/[^a-z0-9]+/).filter(w => w.length > 2 && !/^x?\d/.test(w) && !ruido.includes(w));
+  let best = null, score = 0;
+  DB.productos.filter(p => p.tipo !== 'servicio' && p.tipo !== 'receta').forEach(p => {
+    const nom = norm(p.nombre), sc = pal.filter(w => nom.includes(w.slice(0, 5))).length;
+    if (sc > score) { score = sc; best = p; }
+  });
+  return best;
+}
+function modalFoto() {
+  modal({
+    title: 'Cargar stock con foto del remito',
+    body: `<div class="note warn"><b>Lectura simulada.</b> En este prototipo no se lee la foto de verdad: al tocar "Leer remito" aparece un remito de ejemplo para que veas el recorrido. En la versión real una IA lee el texto de la foto, y vos revisás todo antes de que se cargue algo.</div>
+      <label class="fld">Foto del remito o factura<input class="in" type="file" id="foto-file" accept="image/*" data-in="foto-file"></label><div id="foto-prev"></div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Leer remito', kind: 'primary', onClick: () => {
+      UI.foto = REMITO_EJEMPLO.map(r => { const p = adivinarProducto(r.texto); return { texto: r.texto, cant: r.cant, prodId: p ? p.id : '', modo: p && p.paqueteUnidades > 1 ? 'paq' : 'uni' }; });
+      revisarFoto(); return false;
+    } }],
+  });
+}
+function revisarFoto() {
+  const opts = id => `<option value="">— no cargar —</option>` + DB.productos.filter(p => p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => `<option value="${p.id}" ${p.id === id ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('');
+  const filas = UI.foto.map((f, i) => `<div class="frow"><code>${esc(f.texto)}</code>
+    <select class="in" id="foto-p-${i}" data-in="foto-row">${opts(f.prodId)}</select>
+    <input class="in" id="foto-c-${i}" data-in="foto-row" inputmode="numeric" value="${f.cant}" aria-label="Cantidad">
+    <select class="in" id="foto-m-${i}" data-in="foto-row"><option value="paq" ${f.modo === 'paq' ? 'selected' : ''}>paquetes</option><option value="uni" ${f.modo === 'uni' ? 'selected' : ''}>unidades</option></select>
+    <span class="pill" id="foto-r-${i}"></span></div>`).join('');
+  modal({
+    title: 'Revisá lo que leyó antes de cargar', wide: true,
+    body: `<p class="muted">A la izquierda, lo que dice el remito. Corregí el producto o la cantidad si algo no coincide. Lo que quede en "no cargar" se ignora.</p>${filas}`,
+    actions: [{ label: 'Cancelar' }, { label: 'Cargar al stock', kind: 'primary', onClick: () => {
+      const lista = UI.foto.map((f, i) => ({ f, id: $('#foto-p-' + i).value, u: unidadesFoto(i) })).filter(x => x.id && x.u > 0);
+      if (!lista.length) { toast('No hay renglones para cargar', 'warn'); return false; }
+      const r = tx(() => lista.forEach(x => moverStock(x.id, x.u, 'ingreso', { motivo: 'Remito (foto): ' + x.f.texto })));
+      if (r.ok) { toast(`Se cargaron ${lista.length} productos al stock`); render(); }
+    } }],
+  });
+  UI.foto.forEach((_, i) => fotoResumen(i));
+}
+function unidadesFoto(i) {
+  const id = $('#foto-p-' + i).value, p = id && prod(id); if (!p) return 0;
+  const c = num($('#foto-c-' + i).value);
+  return $('#foto-m-' + i).value === 'paq' ? c * p.paqueteUnidades : c;
+}
+function fotoResumen(i) {
+  const el = $('#foto-r-' + i), id = $('#foto-p-' + i).value, u = unidadesFoto(i);
+  el.className = 'pill ' + (id ? 'good' : 'warn'); el.textContent = id ? '+' + u + ' u.' : 'sin producto';
+}
+
 /* --- TICKETS --- */
 views.tickets = () => {
   const q = norm(UI.tkQ);
@@ -978,17 +1125,26 @@ views.tickets = () => {
 
 /* --- REPORTES --- */
 function ventasRango(d, h) { return DB.ventas.filter(v => v.estado === 'ok' && dayKey(v.ts) >= d && dayKey(v.ts) <= h); }
+/* Lo cobrado en el período, por medio de pago: incluye pagos parciales de cuentas abiertas y descuenta devoluciones */
+function cobros(d, h) {
+  const m = {}; DB.metodos.forEach(x => { m[x.id] = { nombre: x.nombre, n: 0, monto: 0 }; });
+  const en = ts => { const k = dayKey(ts); return k >= d && k <= h; };
+  const add = (p, signo) => { const o = m[p.metodoId] || (m[p.metodoId] = { nombre: p.nombre, n: 0, monto: 0 }); if (signo > 0) o.n++; o.monto += signo * p.monto; };
+  DB.ventas.filter(v => v.estado === 'ok').forEach(v => v.pagos.forEach(p => { if (en(p.ts || v.ts)) add(p, 1); }));
+  Object.values(DB.comandas).forEach(c => pagosDe(c).forEach(p => { if (en(p.ts)) add(p, 1); }));
+  DB.devoluciones.forEach(x => { if (en(x.ts)) add(x, -1); });
+  return Object.values(m);
+}
 function resumen(d, h) {
   const vs = ventasRango(d, h), total = sum(vs, v => v.total);
-  const met = {}; DB.metodos.forEach(m => { met[m.id] = { nombre: m.nombre, n: 0, monto: 0 }; });
-  vs.forEach(v => v.pagos.forEach(p => { const o = met[p.metodoId] || (met[p.metodoId] = { nombre: p.nombre, n: 0, monto: 0 }); o.n++; o.monto += p.monto; }));
+  const met = cobros(d, h);
   const cats = {}, prods = {};
   vs.forEach(v => v.items.forEach(l => {
     const cn = catDe(l.catId) ? catDe(l.catId).nombre : 'Sin categoría';
     cats[cn] = (cats[cn] || 0) + l.cant * l.precio;
     const o = prods[l.nombre] || (prods[l.nombre] = { cant: 0, monto: 0 }); o.cant += l.cant; o.monto += l.cant * l.precio;
   }));
-  return { vs, total, met: Object.values(met), cats: Object.entries(cats).sort((a, b) => b[1] - a[1]), prods: Object.entries(prods).sort((a, b) => b[1].cant - a[1].cant) };
+  return { vs, total, met, cobrado: sum(met, m => m.monto), cats: Object.entries(cats).sort((a, b) => b[1] - a[1]), prods: Object.entries(prods).sort((a, b) => b[1].cant - a[1].cant) };
 }
 function barras(rows, fmt) {
   const max = Math.max(1, ...rows.map(r => r[1]));
@@ -1003,10 +1159,12 @@ views.reportes = () => {
       <button class="btn sm ghost" data-act="rep-hoy">Hoy</button></div></header>
     <div class="kpis"><div class="kpi"><span>Total vendido</span><b>${money(R.total)}</b></div><div class="kpi"><span>Tickets</span><b>${R.vs.length}</b></div>
       <div class="kpi"><span>Ticket promedio</span><b>${money(R.vs.length ? R.total / R.vs.length : 0)}</b></div>
+      <div class="kpi"><span>Cobrado en el período</span><b>${money(R.cobrado)}</b></div>
       <div class="kpi"><span>Efectivo en caja</span><b>${money(sum(efe, m => m.monto))}</b></div>
+      <div class="kpi"><span>Por cobrar (cuentas abiertas)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0))}</b></div>
       <div class="kpi"><span>Anulados</span><b>${anul}</b></div></div>
     <div class="cols">
-      <div class="card"><h2>Por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}</div>
+      <div class="card"><h2>Cobrado por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}<p class="muted" style="margin-top:8px;font-size:12px">Incluye pagos parciales de cuentas abiertas y descuenta devoluciones.</p></div>
       <div class="card"><h2>Por categoría</h2>${barras(R.cats, money)}</div>
       <div class="card"><h2>Más vendidos</h2>${barras(R.prods.slice(0, 8).map(([n, o]) => [n, o.cant]), v => v + ' u.')}</div></div>
     <div class="card" style="margin-top:16px"><h2>Exportar a Excel / CSV</h2><div class="row">
@@ -1015,7 +1173,7 @@ views.reportes = () => {
 };
 function rowsPagos() {
   const R = resumen(UI.repDesde, UI.repHasta);
-  return [['Desde', 'Hasta', 'Medio de pago', 'Cantidad de pagos', 'Monto'], ...R.met.map(m => [UI.repDesde, UI.repHasta, m.nombre, m.n, m.monto]), ['', '', 'TOTAL', R.vs.length + ' tickets', R.total]];
+  return [['Desde', 'Hasta', 'Medio de pago', 'Cantidad de pagos', 'Monto'], ...R.met.map(m => [UI.repDesde, UI.repHasta, m.nombre, m.n, m.monto]), ['', '', 'TOTAL COBRADO', '', R.cobrado]];
 }
 function rowsVentas() {
   const rows = [['Ticket', 'Fecha', 'Hora', 'Destino', 'Cliente', 'Producto', 'Categoría', 'Cantidad', 'Precio', 'Subtotal', 'Medios de pago', 'Estado']];
@@ -1173,26 +1331,46 @@ const A = {
     } }] });
   },
   cobrar: () => abrirCobro(),
+  'cobrar-parcial': () => abrirCobro(true),
+  dest: d => { UI.com = d.id; renderCart(); renderSide(); },
+  'ir-lugar': d => { UI.com = d.id; UI.view = 'venta'; UI.editSalon = false; render(); },
+  'ab-del': d => {
+    const key = UI.com, p = pagosDe(getCom(key)).find(x => x.id === d.id); if (!p) return;
+    ask('Devolver un pago', `Se devuelven <b>${money(p.monto)}</b> (${esc(p.nombre)}) al cliente y queda registrada la devolución. La cuenta vuelve a deber ese monto.`, 'Devolver', () => {
+      const r = tx(() => devolverAbono(key, d.id)); if (r.ok) { toast('Pago devuelto'); render(); }
+    }, true);
+  },
+  foto: () => modalFoto(),
   mover: () => moverComanda(),
   'mover-a': d => {
     const from = UI.com, to = d.id;
-    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
+    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, pagos: pagosDe(src), ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
     if (r.ok) { UI.com = to; toast('Cuenta pasada a ' + DB.mesas.find(m => m.id === to).nombre); closeModal(); render(); }
   },
-  vaciar: () => ask(UI.com === 'M' ? 'Vaciar la venta' : 'Cancelar la comanda', 'Se quitan todos los productos de esta cuenta. No se descuenta stock porque no se cobró.', 'Sí, quitar todo', () => aplicarItems(UI.com, []), true),
+  vaciar: () => {
+    const key = UI.com, c = getCom(key), pag = pagadoDe(c);
+    const msg = pag > 0 ? `Esta cuenta ya tiene <b>${money(pag)}</b> pagados. Se registra la devolución de ese dinero y se quitan todos los productos.` : 'Se quitan todos los productos de esta cuenta. No se descuenta stock porque no se cobró.';
+    ask(key === 'M' ? 'Vaciar la venta' : 'Cancelar la cuenta', msg, pag > 0 ? 'Devolver y cancelar' : 'Sí, quitar todo', () => {
+      const r = tx(() => {
+        pagosDe(c).forEach(p => DB.devoluciones.push({ id: uid('dv'), ts: Date.now(), metodoId: p.metodoId, nombre: p.nombre, monto: p.monto, motivo: 'Cuenta cancelada (' + lugarNombre(key) + ')' }));
+        if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
+      });
+      if (r.ok) render();
+    }, true);
+  },
   // cobro
   'pg-add': d => {
     const P = UI.pago, ex = P.rows.findIndex(r => r.metodoId === d.id);
     if (ex >= 0) return renderCobro(ex);
-    const resto = P.total - sum(P.rows, r => r.monto);
-    let monto = Math.max(0, resto);
-    if (resto <= 0) { const k = P.rows.length - 1; monto = P.rows[k] ? P.rows[k].monto : P.total; if (P.rows[k]) P.rows[k].monto = 0; }
+    const resto = P.saldo - sum(P.rows, r => r.monto);
+    let monto = P.parcial ? 0 : Math.max(0, resto);
+    if (!P.parcial && resto <= 0) { const k = P.rows.length - 1; monto = P.rows[k] ? P.rows[k].monto : P.saldo; if (P.rows[k]) P.rows[k].monto = 0; }
     P.rows.push({ metodoId: d.id, monto }); renderCobro(P.rows.length - 1);
   },
   'pg-del': d => { UI.pago.rows.splice(+d.i, 1); renderCobro(); },
   'pg-set': d => {
     const P = UI.pago, i = +d.i;
-    P.rows[i].monto = d.v === 'resto' ? Math.max(0, P.total - sum(P.rows.filter((_, k) => k !== i), r => r.monto)) : +d.v;
+    P.rows[i].monto = d.v === 'resto' ? Math.max(0, P.saldo - sum(P.rows.filter((_, k) => k !== i), r => r.monto)) : +d.v;
     renderCobro(i);
   },
   // mesas
@@ -1202,9 +1380,15 @@ const A = {
   },
   'salon-edit': () => requirePin(() => { UI.editSalon = true; UI.mesaEdit = null; render(); }),
   'salon-fin': () => { UI.editSalon = false; UI.mesaEdit = null; render(); },
-  'mesa-add': () => {
-    const r = tx(() => { const n = DB.mesas.length + 1; const m = { id: uid('m'), nombre: 'Mesa ' + n, x: 5 + (n * 7) % 70, y: 6 + (n * 11) % 60 }; DB.mesas.push(m); UI.mesaEdit = m.id; });
-    if (r.ok) views.mesas();
+  'mesa-add': d => {
+    const t = d.t || 'mesa', Lg = LUGARES[t];
+    const r = tx(() => {
+      const n = DB.mesas.filter(m => lugarTipo(m) === t).length + 1, k = DB.mesas.length;
+      const nombre = t === 'mesa' ? 'Mesa ' + n : t === 'barra' ? (n === 1 ? 'Barra' : 'Barra ' + n) : Lg.n + ' ' + n;
+      const m = { id: uid('m'), nombre, tipo: t, w: Lg.w, h: Lg.h, x: Math.min(100 - Lg.w, 4 + (k * 9) % 60), y: Math.min(100 - Lg.h, 8 + (k * 13) % 55), rapido: t === 'barra' && !DB.mesas.some(x => x.rapido) };
+      DB.mesas.push(m); UI.mesaEdit = m.id;
+    });
+    if (r.ok) { views.mesas(); renderSide(); }
   },
   'mesa-del': () => {
     const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (!m) return;
@@ -1269,7 +1453,7 @@ const A = {
       <div class="note">${q.stock === antes && DB.contadores.venta === nv ? 'Todo quedó igual que antes: no se perdió ni se inventó nada (rollback).' : 'Algo quedó a medias.'}</div>`, actions: [{ label: 'Entendido', kind: 'primary' }] });
   },
   'reset-hist': () => ask('Borrar ventas e historial', 'Se borran tickets, movimientos de stock y alquileres. Los productos y su stock actual se mantienen.', 'Borrar', () => {
-    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.alquileres = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
+    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.alquileres = []; DB.devoluciones = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
     if (r.ok) { toast('Historial borrado'); render(); }
   }, true),
   'reset-demo': () => ask('Volver a datos de ejemplo', 'Se pierde todo lo que cargaste y se vuelven a cargar los datos de ejemplo.', 'Restablecer', () => { seed(); normalizar(); persist(); UI.com = 'M'; toast('Datos de ejemplo cargados'); render(); }, true),
@@ -1281,7 +1465,14 @@ document.addEventListener('click', e => {
 });
 
 /* campos de texto, selectores y fechas (evento "input") */
+const mesaSel = () => DB.mesas.find(x => x.id === UI.mesaEdit);
 const I = {
+  'mesa-tipo': el => { const m = mesaSel(); if (m) { m.tipo = el.value; persist(); views.mesas(); } },
+  'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
+  'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
+  'mesa-rapido': el => { const m = mesaSel(); if (m) { m.rapido = el.checked; persist(); renderSide(); views.mesas(); } },
+  'foto-file': el => { const f = el.files && el.files[0]; if (f) $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`; },
+  'foto-row': el => { const i = el.id.split('-')[2]; fotoResumen(+i); },
   q: el => { UI.q = el.value; renderGrid(); },
   dest: el => { UI.com = el.value; renderCart(); },
   pg: el => { UI.pago.rows[+el.dataset.i].monto = num(el.value); updateCobro(); },
@@ -1315,12 +1506,12 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* arrastrar mesas en modo edición */
+/* arrastrar y estirar lugares en modo edición */
 let drag = null;
 document.addEventListener('pointerdown', e => {
   const t = e.target.closest('.salon.editing .mesa'); if (!t) return;
   const r = $('#salon').getBoundingClientRect(), tr = t.getBoundingClientRect();
-  drag = { t, id: t.dataset.id, dx: e.clientX - tr.left, dy: e.clientY - tr.top, r, w: tr.width, h: tr.height, moved: false, sx: e.clientX, sy: e.clientY };
+  drag = { mode: e.target.closest('.rz') ? 'resize' : 'move', t, id: t.dataset.id, dx: e.clientX - tr.left, dy: e.clientY - tr.top, r, w: tr.width, h: tr.height, left: tr.left, top: tr.top, moved: false, sx: e.clientX, sy: e.clientY };
   try { t.setPointerCapture(e.pointerId); } catch (x) { /* ok */ }
 });
 document.addEventListener('pointermove', e => {
@@ -1328,6 +1519,13 @@ document.addEventListener('pointermove', e => {
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
   if (!drag.moved) return;
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  if (drag.mode === 'resize') {
+    const x0 = (drag.left - drag.r.left) / drag.r.width * 100, y0 = (drag.top - drag.r.top) / drag.r.height * 100;
+    drag.nw = clamp((e.clientX - drag.left) / drag.r.width * 100, 6, 100 - x0);
+    drag.nh = clamp((e.clientY - drag.top) / drag.r.height * 100, 8, 100 - y0);
+    drag.t.style.width = drag.nw + '%'; drag.t.style.height = drag.nh + '%';
+    return;
+  }
   drag.x = clamp((e.clientX - drag.dx - drag.r.left) / drag.r.width * 100, 0, (drag.r.width - drag.w) / drag.r.width * 100);
   drag.y = clamp((e.clientY - drag.dy - drag.r.top) / drag.r.height * 100, 0, (drag.r.height - drag.h) / drag.r.height * 100);
   drag.t.style.left = drag.x + '%'; drag.t.style.top = drag.y + '%';
@@ -1335,7 +1533,14 @@ document.addEventListener('pointermove', e => {
 document.addEventListener('pointerup', () => {
   if (!drag) return;
   const d = drag; drag = null;
-  if (d.moved) { const m = DB.mesas.find(x => x.id === d.id); if (m) { m.x = Math.round(d.x * 10) / 10; m.y = Math.round(d.y * 10) / 10; persist(); } UI.mesaEdit = d.id; setTimeout(() => views.mesas(), 0); }
+  if (!d.moved) return;
+  const m = DB.mesas.find(x => x.id === d.id);
+  if (m) {
+    if (d.mode === 'resize') { m.w = Math.round(d.nw * 10) / 10; m.h = Math.round(d.nh * 10) / 10; }
+    else { m.x = Math.round(d.x * 10) / 10; m.y = Math.round(d.y * 10) / 10; }
+    persist();
+  }
+  UI.mesaEdit = d.id; setTimeout(() => views.mesas(), 0);
 });
 
 /* ---------- arranque ---------- */
