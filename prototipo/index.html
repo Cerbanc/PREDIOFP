@@ -288,8 +288,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .tmp-strip{margin-top:16px}
 .tmp-strip h2{margin-bottom:2px}
 .tmp-strip .row{margin-top:10px}
-.tmp{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:130px;padding:8px 12px;border-radius:10px;border:2px solid var(--warn);background:var(--warn-soft);cursor:pointer;line-height:1.25}
+.tmp{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:150px;padding:8px 12px;border-radius:10px;border:2px solid var(--warn);background:var(--warn-soft);line-height:1.25}
+.tmp-open{border:0;background:transparent;text-align:left;cursor:pointer;display:flex;flex-direction:column;padding:0}
 .tmp b{font-size:13px}.tmp span{font-weight:700;color:var(--warn);font-variant-numeric:tabular-nums}.tmp small{color:var(--muted);font-size:11px}
+.line.turno{background:color-mix(in srgb,var(--accent-soft) 55%,transparent);border-radius:8px;padding-inline:8px;margin-block:4px;border-bottom:0}
 .slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface) 6px,var(--surface) 12px)}
 .slot.past{opacity:.55}
 .l2{display:flex;justify-content:space-between;padding:3px 0}
@@ -359,7 +361,7 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ---------- base de datos (en memoria + localStorage) ---------- */
-const LS_KEY = 'predio_pos_proto_v5';
+const LS_KEY = 'predio_pos_proto_v6';
 let DB = null;
 let STORAGE_OK = true;
 const UI = {
@@ -496,6 +498,11 @@ function costoReceta(receta) {
 const costoUnit = p => p.tipo === 'receta' ? costoReceta(p.receta) : (p.costo > 0 ? p.costo : 0);
 function lineasDeItems(items) {
   return items.map(it => {
+    if (it.turnoId) {
+      const t = DB.turnos.find(x => x.id === it.turnoId);
+      if (!t) throw new Error('El turno de la cuenta ya no existe');
+      return { prodId: null, nombre: nombreTurno(t), catId: cancha(t.canchaId).catId, tipo: 'servicio', cant: 1, precio: t.precio, costo: 0, nota: t.cliente, turnoId: t.id };
+    }
     const p = prod(it.prodId);
     if (!p) throw new Error('Un producto de la comanda ya no existe');
     return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, costo: costoUnit(p), nota: it.nota || '' };
@@ -547,7 +554,8 @@ function commitVenta(o) {
   if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied, ts });
   pagos.forEach(p => cajaPush(p.metodoId, p.monto, 'cobro', 'Ticket #' + nro, ts));
   const ajuste = o.ajuste ? { tipo: o.ajuste.tipo, valor: o.ajuste.valor || 0, motivo: o.ajuste.motivo, nota: String(o.ajuste.nota || '').trim(), descuento } : null;
-  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, subtotal, descuento, ajuste, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '', turnoId: o.turnoId || null });
+  const turnoIds = lineas.filter(l => l.turnoId).map(l => l.turnoId);
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, subtotal, descuento, ajuste, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '', turnoId: turnoIds[0] || null, turnoIds });
   if (ajuste) {
     const nombres = { pct: 'descuento del ' + ajuste.valor + '%', monto: 'descuento de ' + money(ajuste.valor), final: 'total final fijado en ' + money(ajuste.valor), costo: 'vendido al costo' };
     logPush('descuento', '#' + nro, `Ticket #${nro}: ${nombres[ajuste.tipo]}. Subtotal ${money(subtotal)}, descuento ${money(descuento)}, total ${money(total)}. Motivo: ${ajuste.motivo}${ajuste.nota ? ' (' + ajuste.nota + ')' : ''}`, ajuste);
@@ -612,7 +620,7 @@ function anularVenta(id, map) {
     cajaPush(mid, -p.monto, 'devolucion', `Ticket #${v.nro} anulado · había pagado con ${p.nombre}`);
     return `${money(p.monto)} (pagó ${p.nombre}) devuelto en ${metodo(mid).nombre}`;
   });
-  if (v.turnoId) { const t = DB.turnos.find(x => x.id === v.turnoId); if (t) t.estado = 'cancelado'; }
+  (v.turnoIds || (v.turnoId ? [v.turnoId] : [])).forEach(tid => { const t = DB.turnos.find(x => x.id === tid); if (t) t.estado = 'cancelado'; });
   v.estado = 'anulada'; v.tsAnul = Date.now();
   logPush('anulacion', '#' + v.nro, `Ticket #${v.nro} anulado (${money(v.total)}, ${v.destino}). ${devs.join('; ') || 'No había pagos que devolver'}`);
 }
@@ -688,12 +696,14 @@ function turnoReal(id) {
 function suspenderOcurrencia(id) {
   const t = turnoReal(id);
   if (t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+  if (cuentaDe(t)) throw new Error('El turno está en una cuenta abierta: sacalo de la cuenta primero');
   t.estado = 'cancelado';
   logPush('turno', cancha(t.canchaId).nombre, `Turno fijo de ${t.cliente || 'sin nombre'} suspendido el ${t.fecha} (${cancha(t.canchaId).nombre}, ${hm(t.ini)}). El horario quedó libre ese día.`);
 }
 function posponerOcurrencia(id, fecha, ini) {
   const t = turnoReal(id), c = cancha(t.canchaId);
   if (t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+  if (cuentaDe(t)) throw new Error('El turno está en una cuenta abierta: sacalo de la cuenta primero');
   t.estado = 'cancelado';
   const nid = crearTurno({ canchaId: t.canchaId, fecha, ini, cliente: t.cliente, tel: t.tel, nota: t.nota, fijo: true, fijoId: t.fijoId });
   logPush('turno', c.nombre, `Turno de ${t.cliente || 'sin nombre'} pospuesto: del ${t.fecha} ${hm(t.ini)} al ${fecha} ${hm(ini)} (${c.nombre}).`);
@@ -708,6 +718,7 @@ function terminarFijo(fijoId, desdeFecha) {
 function cancelarTurno(id, map) {
   const t = DB.turnos.find(x => x.id === id);
   if (!t || t.estado !== 'reservado') throw new Error('Ese turno no se puede cancelar');
+  if (cuentaDe(t)) throw new Error('El turno está en una cuenta abierta: sacalo de la cuenta primero');
   pagosDe(t).slice().forEach((p, i) => devolverPago('T:' + id, p.id, (map && map[i]) || p.metodoId));
   t.estado = 'cancelado';
   logPush('turno', cancha(t.canchaId).nombre, `Turno cancelado: ${t.cliente || 'sin nombre'}, ${cancha(t.canchaId).nombre}, ${t.fecha} ${hm(t.ini)}.`);
@@ -735,13 +746,13 @@ function limpiarTemporales() {
 /* Devuelve las cuentas que se movieron. Se llama al mostrar pantallas y cada 30 segundos. */
 function moverTerminados() {
   const ahora = Date.now();
-  const hay = Object.keys(DB.comandas).some(k => { const c = DB.comandas[k]; return k !== 'M' && c.turnoFin && ahora >= c.turnoFin && c.items.length; }) || DB.mesas.some(m => m.temporal && !DB.comandas[m.id]);
+  const hay = Object.keys(DB.comandas).some(k => { const c = DB.comandas[k]; return k !== 'M' && c.turnoFin && ahora >= c.turnoFin && c.items.length && DB.canchas.some(cn => cn.lugarId === k); }) || DB.mesas.some(m => m.temporal && !DB.comandas[m.id]);
   if (!hay) return [];
   const r = tx(() => {
     const movidas = [];
     Object.keys(DB.comandas).forEach(k => {
       const c = DB.comandas[k], m = DB.mesas.find(x => x.id === k);
-      if (k === 'M' || !m || m.temporal || !c.turnoFin || ahora < c.turnoFin || !c.items.length) return;
+      if (k === 'M' || !m || m.temporal || !c.turnoFin || ahora < c.turnoFin || !c.items.length || !DB.canchas.some(cn => cn.lugarId === k)) return;
       const nm = { id: uid('m'), nombre: `${m.nombre} ${c.turnoLabel}hs`, tipo: 'mesa', temporal: true, x: 0, y: 0, w: 10, h: 10, rapido: false };
       DB.mesas.push(nm);
       const { turnoFin, turnoLabel, turnoCliente, ...resto } = c;
@@ -756,10 +767,45 @@ function moverTerminados() {
   });
   return r.ok ? r.value : [];
 }
+/* Cuando empieza un turno, su costo se carga solo en la cuenta del lugar de la cancha; ahí se suman los consumos.
+   Al terminar, la cuenta sale de la cancha y se sienta en una mesa (o se cobra). El turno y la cuenta quedan siempre juntos. */
+const cuentaDe = t => Object.keys(DB.comandas).find(k => DB.comandas[k].items.some(i => i.turnoId === t.id)) || null;
+function adjuntarTurnos() {
+  const ahora = Date.now(), d = new Date(ahora), min = d.getHours() * 60 + d.getMinutes(), hoy = dayKey(ahora);
+  const pend = turnosDelDia(hoy).filter(t => {
+    const c = cancha(t.canchaId);
+    return t.estado === 'reservado' && !t.aparte && t.ini <= min && min < t.fin && c && c.lugarId && DB.mesas.some(m => m.id === c.lugarId) && (t.virtual || !cuentaDe(t));
+  });
+  if (!pend.length) return [];
+  const r = tx(() => {
+    const hecho = [];
+    pend.forEach(t0 => {
+      const t = t0.virtual ? materializarFijo(t0.fijoId, t0.fecha) : t0, c = cancha(t.canchaId);
+      const com = DB.comandas[c.lugarId] || (DB.comandas[c.lugarId] = { items: [], ts: Date.now() });
+      com.items.unshift({ turnoId: t.id, cant: 1, nota: '' });
+      com.pagos = pagosDe(com).concat(t.pagos || []); t.pagos = [];     // la seña pasa a la cuenta
+      com.turnoFin = turnoFinTs(t); com.turnoLabel = hm(t.ini); com.turnoCliente = t.cliente;
+      hecho.push({ cliente: t.cliente, lugar: DB.mesas.find(m => m.id === c.lugarId).nombre, precio: t.precio });
+    });
+    return hecho;
+  });
+  return r.ok ? r.value : [];
+}
+/* Sacar el turno de la cuenta: porque no se jugó (se suspende) o porque se va a cobrar aparte */
+function quitarTurnoDeCuenta(key, turnoId, suspender) {
+  const c = DB.comandas[key], t = DB.turnos.find(x => x.id === turnoId);
+  if (!c || !t) throw new Error('No se encontró el turno en la cuenta');
+  const nuevos = c.items.filter(i => i.turnoId !== turnoId);
+  if (pagadoDe(c) > totalItems(nuevos)) throw new Error(`Ya pagaron ${money(pagadoDe(c))}: primero devolvé un pago de la cuenta`);
+  setItems(key, nuevos);
+  if (suspender) { t.estado = 'cancelado'; logPush('turno', nombreTurno(t), `Turno no jugado: ${nombreTurno(t)} (${t.cliente || 'sin nombre'}) se sacó de la cuenta y se suspendió.`); }
+  else { t.aparte = true; logPush('turno', nombreTurno(t), `El turno ${nombreTurno(t)} (${t.cliente || 'sin nombre'}) se sacó de la cuenta para cobrarlo aparte.`); }
+}
 function revisarTurnos() {
-  const mv = moverTerminados();
-  mv.forEach(m => toast(`La cuenta de ${m.de} pasó a "${m.a}" porque terminó el turno`, 'warn'));
-  return mv.length > 0;
+  const mv = moverTerminados(), ad = adjuntarTurnos();
+  mv.forEach(m => toast(`Terminó el turno en ${m.de}: la cuenta (con el costo del turno) salió de la cancha. Falta sentarlos en una mesa o cobrar.`, 'warn'));
+  ad.forEach(a => toast(`Empezó el turno de ${a.cliente || 'la cancha'} en ${a.lugar}: el costo (${money(a.precio)}) ya está en la cuenta`));
+  return mv.length > 0 || ad.length > 0;
 }
 
 /* ---------- datos de ejemplo ---------- */
@@ -841,7 +887,7 @@ function seed() {
   const tc = crearTurno({ canchaId: f5b, fecha: hoy, ini: 600, cliente: 'Café Central', ts: Date.now() - 200 * 60000, pagos: [{ metodoId: efe, monto: 8000 }] });
   const tt = d.turnos.find(x => x.id === tc), cc = cancha(f5b);
   tt.ventaId = commitVenta({ ts: Date.now() - 100 * 60000, abonos: tt.pagos, pagos: [{ metodoId: tr, monto: 20000 }], mesaNombre: 'Turno · ' + cc.nombre, cliente: 'Café Central', turnoId: tc,
-    lineas: [{ prodId: null, nombre: 'Turno ' + cc.nombre + ' · 10:00-11:00', catId: futbol, tipo: 'servicio', cant: 1, precio: 28000, costo: 0, nota: 'Café Central' }] });
+    lineas: [{ prodId: null, nombre: 'Turno ' + cc.nombre + ' · 10:00-11:00', catId: futbol, tipo: 'servicio', cant: 1, precio: 28000, costo: 0, nota: 'Café Central', turnoId: tc }] });
   tt.estado = 'cobrado';
   // turnos comunes abiertos
   crearTurno({ canchaId: f5a, fecha: hoy, ini: 1200, cliente: 'Los Pibes', tel: '11 5555-0101', ts: Date.now() - 300 * 60000, pagos: [{ metodoId: efe, monto: 5000 }] });
@@ -863,12 +909,17 @@ function seed() {
   const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
   const sA = slotsDe(cancha(pT)).find(s => s <= ahoraMin && ahoraMin < s + 90);
   if (sA !== undefined) {
-    let tA = ocupante(pT, hoy, sA, sA + 90);
-    if (!tA) { const idA = crearTurno({ canchaId: pT, fecha: hoy, ini: sA, cliente: 'Gaby y Lean' }); tA = d.turnos.find(x => x.id === idA); }
-    d.comandas[padel1.id] = { ts: Date.now() - 12 * 60000, items: [{ prodId: cerv, cant: 1, nota: '' }, { prodId: alfa, cant: 2, nota: '' }], turnoFin: turnoFinTs(tA), turnoLabel: hm(tA.ini), turnoCliente: tA.cliente };
+    if (!ocupante(pT, hoy, sA, sA + 90)) crearTurno({ canchaId: pT, fecha: hoy, ini: sA, cliente: 'Gaby y Lean' });
+    d.comandas[padel1.id] = { ts: Date.now() - 12 * 60000, items: [{ prodId: cerv, cant: 1, nota: '' }, { prodId: alfa, cant: 2, nota: '' }] };   // el costo del turno se suma solo al empezar
   }
   const sB = slotsDe(cancha(pA)).filter(s => s + 90 <= ahoraMin).pop();
-  if (sB !== undefined) d.comandas[padel2.id] = { ts: Date.now() - 80 * 60000, items: [{ prodId: cerv, cant: 2, nota: '' }, { prodId: pancho, cant: 2, nota: '' }], turnoFin: new Date(hoy + 'T00:00:00').getTime() + (sB + 90) * 60000, turnoLabel: hm(sB), turnoCliente: 'Sofi y amigas' };
+  if (sB !== undefined) {
+    let tB = ocupante(pA, hoy, sB, sB + 90);
+    if (tB && tB.virtual) tB = materializarFijo(tB.fijoId, tB.fecha);
+    if (!tB) { const idB = crearTurno({ canchaId: pA, fecha: hoy, ini: sB, cliente: 'Sofi y amigas' }); tB = d.turnos.find(x => x.id === idB); }
+    d.comandas[padel2.id] = { ts: Date.now() - 80 * 60000, items: [{ turnoId: tB.id, cant: 1, nota: '' }, { prodId: cerv, cant: 2, nota: '' }, { prodId: pancho, cant: 2, nota: '' }], pagos: tB.pagos.splice(0),
+      turnoFin: turnoFinTs(tB), turnoLabel: hm(tB.ini), turnoCliente: tB.cliente };
+  }
   return d;
 }
 
@@ -948,12 +999,16 @@ function exportar(nombre, rows) {
 
 /* ---------- caja: comandas ---------- */
 const getCom = key => key === 'M' ? (DB.comandas.M || (DB.comandas.M = { items: [] })) : (DB.comandas[key] || { items: [] });
-const totalItems = items => sum(items, it => { const p = prod(it.prodId); return p ? p.precio * it.cant : 0; });
+/* Una cuenta puede llevar, además de productos, líneas de TURNO ({ turnoId }): el costo del turno va adentro de la cuenta */
+const totalItems = items => sum(items, it => {
+  if (it.turnoId) { const t = DB.turnos.find(x => x.id === it.turnoId); return t ? t.precio : 0; }
+  const p = prod(it.prodId); return p ? p.precio * it.cant : 0;
+});
 const pagosDe = c => c.pagos || [];
 const pagadoDe = c => sum(pagosDe(c), p => p.monto);
 const saldoDe = c => totalItems(c.items) - pagadoDe(c);
 function setItems(key, items, neg) {
-  items = items.filter(i => i.cant > 0 && prod(i.prodId));
+  items = items.filter(i => i.cant > 0 && (i.turnoId || prod(i.prodId)));
   if (key !== 'M' && !items.length) { delete DB.comandas[key]; return; }
   const prev = DB.comandas[key] || {};
   const nuevo = { ...prev, items, ts: prev.ts || Date.now(), negOk: prev.negOk || !!neg || undefined };
@@ -1046,6 +1101,8 @@ function abrirCobro(parcial) {
 }
 function abrirCobroTurno(id, parcial) {
   const t = DB.turnos.find(x => x.id === id), ya = pagadoDe(t);
+  const kk = cuentaDe(t);
+  if (kk) return toast('El costo de este turno está en la cuenta de ' + lugarNombre(kk) + '. Cobralo desde ahí.', 'warn');
   if (t.precio - ya <= 0) return toast('Este turno ya está pago', 'warn');
   iniciarCobro('T:' + id, t.precio, ya, [{ prodId: null, nombre: nombreTurno(t), costo: 0, cant: 1, precio: t.precio }], parcial);
 }
@@ -1150,12 +1207,13 @@ function confirmarCobro() {
       if (!t || t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
       const c = cancha(t.canchaId);
       const id = commitVenta({ abonos: pagosDe(t), pagos: P.rows, ajuste: P.ajuste, mesaNombre: 'Turno · ' + c.nombre, cliente: t.cliente, turnoId: t.id,
-        lineas: [{ prodId: null, nombre: nombreTurno(t), catId: c.catId, tipo: 'servicio', cant: 1, precio: t.precio, costo: 0, nota: t.cliente }] });
+        lineas: [{ prodId: null, nombre: nombreTurno(t), catId: c.catId, tipo: 'servicio', cant: 1, precio: t.precio, costo: 0, nota: t.cliente, turnoId: t.id }] });
       t.estado = 'cobrado'; t.ventaId = id;
       return id;
     }
     const c = getCom(key), mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
     const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, ajuste: P.ajuste, mesaNombre: mesa ? mesa.nombre : null, negativo: P.negativo });
+    c.items.filter(i => i.turnoId).forEach(i => { const t = DB.turnos.find(x => x.id === i.turnoId); if (t) { t.estado = 'cobrado'; t.ventaId = id; } });
     if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
     return id;
   });
@@ -1302,7 +1360,7 @@ function renderGrid() {
   $('#grid').innerHTML = html || '<p class="muted">No hay productos con ese filtro.</p>';
 }
 function renderCart() {
-  const key = UI.com, c = getCom(key), items = c.items.filter(i => prod(i.prodId)), total = totalItems(items);
+  const key = UI.com, c = getCom(key), items = c.items.filter(i => i.turnoId || prod(i.prodId)), total = totalItems(items);
   const pagos = pagosDe(c), pag = pagadoDe(c), saldo = total - pag;
   const chipDest = (id, nombre, deuda) => `<button class="chip" data-act="dest" data-id="${id}" aria-pressed="${key === id}">${esc(nombre)}${deuda ? ' <span class="pill warn">' + money(deuda) + '</span>' : ''}</button>`;
   const quick = chipDest('M', 'Mostrador', 0) + DB.mesas.filter(m => m.rapido).map(m => chipDest(m.id, m.nombre, DB.comandas[m.id] ? saldoDe(DB.comandas[m.id]) : 0)).join('');
@@ -1311,6 +1369,12 @@ function renderCart() {
     return `<option value="${m.id}" ${key === m.id ? 'selected' : ''}>${esc(m.nombre)} · ${oc ? 'ocupada, debe ' + money(saldoDe(oc)) : 'libre'}</option>`;
   }).join('');
   const lines = items.map((it, i) => {
+    if (it.turnoId) {
+      const t = DB.turnos.find(x => x.id === it.turnoId);
+      return `<div class="line turno"><div class="nm"><b>${esc(nombreTurno(t))}</b><small>${esc(t.cliente || 'Sin nombre')}${t.esFijo ? ' · FIJO' : ''}</small></div>
+        <div class="qty"><span>1</span></div><div class="ln-sub">${money(t.precio)}</div>
+        <div class="ln-tools"><button data-act="quitar-turno" data-t="${t.id}">sacar el turno de la cuenta</button></div></div>`;
+    }
     const p = prod(it.prodId);
     return `<div class="line"><div class="nm"><b>${esc(p.nombre)}</b><small>${money(p.precio)} c/u${it.nota ? ' · ' + esc(it.nota) : ''}</small></div>
       <div class="qty"><button class="icon" data-act="dec" data-i="${i}" aria-label="Menos">−</button><span>${it.cant}</span><button class="icon" data-act="inc" data-i="${i}" aria-label="Más">+</button></div>
@@ -1356,8 +1420,8 @@ function mesaHTML(m) {
 views.mesas = () => {
   const ed = UI.editSalon, ocup = Object.keys(DB.comandas).filter(k => k !== 'M').length;
   const sueltas = DB.mesas.filter(m => m.temporal && DB.comandas[m.id]);
-  const tira = sueltas.length ? `<div class="tmp-strip"><h2>Cuentas de turnos que ya terminaron</h2><p class="muted">Siguen consumiendo después del turno: la cuenta salió de la cancha (que quedó libre) y espera acá hasta que la cobren.</p>
-    <div class="row">${sueltas.map(m => { const c = DB.comandas[m.id]; return `<button class="tmp" data-act="mesa" data-id="${m.id}"><b>${esc(m.nombre)}</b><span>${money(saldoDe(c))}</span><small>hace ${hace(c.ts)}</small></button>`; }).join('')}</div></div>` : '';
+  const tira = sueltas.length ? `<div class="tmp-strip"><h2>Terminó el turno: falta sentarlos en una mesa o cobrar</h2><p class="muted">La cuenta (con el costo del turno y lo que consumieron) salió de la cancha para dejarla libre. Tocá "Sentar en mesa" para pasarla a la mesa donde están, o abrila para cobrarla.</p>
+    <div class="row">${sueltas.map(m => { const c = DB.comandas[m.id]; return `<div class="tmp"><button class="tmp-open" data-act="mesa" data-id="${m.id}"><b>${esc(m.nombre)}</b><span>${money(saldoDe(c))}</span><small>${esc(c.turnoCliente || '')} · hace ${hace(c.ts)}</small></button><button class="btn sm" data-act="sentar" data-id="${m.id}">Sentar en mesa</button></div>`; }).join('')}</div></div>` : '';
   const m = ed && UI.mesaEdit ? DB.mesas.find(x => x.id === UI.mesaEdit) : null;
   const agregar = [['mesa', 'Mesa'], ['futbol', 'Cancha de fútbol'], ['padel', 'Cancha de pádel'], ['barra', 'Barra']].map(([k, n]) => `<button class="btn sm" data-act="mesa-add" data-t="${k}">+ ${n}</button>`).join('');
   const editor = m ? `<div class="grid2"><label class="fld">Nombre<input class="in" id="mesa-name" data-in="mesa-name" value="${esc(m.nombre)}"></label>
@@ -1379,6 +1443,8 @@ const fechaLarga = f => new Date(f + 'T12:00:00').toLocaleDateString('es-AR', { 
 function textoEstadoTurno(t) {
   const pag = pagadoDe(t);
   if (t.estado === 'cobrado') return 'cobrado ✓';
+  const kc = t.virtual ? null : cuentaDe(t);
+  if (kc) return 'en la cuenta de ' + lugarNombre(kc) + ' · debe ' + money(saldoDe(DB.comandas[kc]));
   if (t.esFijo && !pag) return 'FIJO · ' + money(t.precio);
   return pag > 0 ? `seña ${money(pag)} · debe ${money(t.precio - pag)}` : 'sin pago · ' + money(t.precio);
 }
@@ -1442,8 +1508,10 @@ function verTurno(id) {
   const c = cancha(t.canchaId), pag = pagadoDe(t), saldo = t.precio - pag, abierto = t.estado === 'reservado';
   const rel = DB.canchas.filter(x => x.id !== c.id && relacionadas(c, x));
   const pagos = pagosDe(t).map(p => `<div class="ab"><span>Pagó ${esc(p.nombre)} <small class="muted">${fechaHora(p.ts)}</small></span><b>${money(p.monto)}</b>${abierto ? `<button data-act="tpg-del" data-id="${p.id}">devolver</button>` : '<span></span>'}</div>`).join('');
+  const kCuenta = abierto && !t.virtual ? cuentaDe(t) : null;
   let acciones;
-  if (!abierto) acciones = [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
+  if (kCuenta) acciones = [{ label: 'Cerrar' }, { label: 'Ir a la cuenta', kind: 'primary', onClick: () => { UI.com = kCuenta; UI.view = 'venta'; UI.editSalon = false; render(); } }];
+  else if (!abierto) acciones = [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
   else if (t.esFijo) acciones = [{ label: 'Cerrar' }, { label: 'Terminar el fijo', kind: 'danger', onClick: () => terminarFijoUI(id) }, { label: 'Posponer', onClick: () => modalPosponer(id) }, { label: 'Suspender este día', onClick: () => suspenderUI(id) }, { label: 'Cobrar', kind: 'primary', onClick: () => cobrarTurnoUI(id, false) }];
   else acciones = [{ label: 'Cerrar' }, { label: 'Cancelar turno', kind: 'danger', onClick: () => cancelarTurnoUI(id) }, { label: 'Editar datos', onClick: () => editarTurno(id) }, { label: 'Pago parcial', onClick: () => abrirCobroTurno(id, true) }, { label: 'Cobrar saldo', kind: 'primary', onClick: () => abrirCobroTurno(id, false) }];
   modal({
@@ -1458,11 +1526,15 @@ function verTurno(id) {
   });
 }
 function cuentasTurno(t) {
+  const k = t.virtual ? null : cuentaDe(t);
+  if (k) {
+    const c = DB.comandas[k];
+    return `<div class="card" style="padding:12px"><div class="l2"><span>El costo del turno está en la cuenta de <b>${esc(lugarNombre(k))}</b>${c.turnoCliente ? '' : ''}</span><b>debe ${money(saldoDe(c))}</b></div>
+      <p class="muted" style="font-size:12px;margin-top:4px">El turno y sus consumos se cobran juntos en un solo ticket. Cuando termine el turno, la cuenta se sienta en una mesa o se cobra.</p></div>`;
+  }
   const d = new Date(), min = d.getHours() * 60 + d.getMinutes();
-  if (t.fecha !== dayKey(Date.now()) || !(t.ini <= min && min < t.fin)) return '';
-  const filas = lugaresDeTurno(t).map(id => DB.mesas.find(m => m.id === id)).filter(m => m && DB.comandas[m.id] && DB.comandas[m.id].items.length)
-    .map(m => `<div class="l2"><span>Cuenta de ${esc(m.nombre)} (consumos del turno)</span><span><b>${money(saldoDe(DB.comandas[m.id]))}</b> <button class="btn sm" data-act="ir-cuenta" data-id="${m.id}">Ir a la cuenta</button></span></div>`).join('');
-  return filas ? `<div class="card" style="padding:12px">${filas}</div>` : '<div class="note">Turno en juego. Los consumos se cargan en la cuenta del lugar de la cancha, y cuando termine el turno pasan solos a una mesa suelta.</div>';
+  if (t.fecha === dayKey(Date.now()) && t.ini <= min && min < t.fin && t.estado === 'reservado') return '<div class="note">Turno en juego: el costo se carga solo en la cuenta de la cancha.</div>';
+  return '';
 }
 function cancelarTurnoUI(id) {
   const t = DB.turnos.find(x => x.id === id), ps = pagosDe(t), c = cancha(t.canchaId);
@@ -1707,7 +1779,7 @@ views.reportes = () => {
       <div class="kpi"><span>Descuentos otorgados</span><b>${money(sum(R.vs, v => v.descuento || 0))}</b></div>
       <div class="kpi"><span>Cobrado en el período</span><b>${money(R.cobrado)}</b></div>
       <div class="kpi"><span>Efectivo en caja</span><b>${money(sum(efe, m => m.monto))}</b></div>
-      <div class="kpi"><span>Por cobrar (cuentas y turnos abiertos)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0) + sum(DB.turnos.filter(t => t.estado === 'reservado' && t.fecha <= dayKey(Date.now())), t => t.precio - pagadoDe(t)))}</b></div>
+      <div class="kpi"><span>Por cobrar (cuentas y turnos abiertos)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0) + sum(DB.turnos.filter(t => t.estado === 'reservado' && t.fecha <= dayKey(Date.now()) && !cuentaDe(t)), t => t.precio - pagadoDe(t)))}</b></div>
       <div class="kpi"><span>Anulados</span><b>${anul}</b></div></div>
     <div class="cols">
       <div class="card"><h2>Cobrado por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}<p class="muted" style="margin-top:8px;font-size:12px">Suma señas y pagos parciales, y descuenta las devoluciones en el medio en que se devolvió.</p></div>
@@ -1771,7 +1843,7 @@ admBody.canchas = () => {
       <label class="fld">Precio FIJO (turno de todas las semanas)<input class="in" inputmode="numeric" data-in="cn-f" data-f="precioFijo" data-id="${c.id}" value="${c.precioFijo}"></label></div>
       <div class="grid2" style="margin-top:12px"><label class="fld">Duración del turno (minutos)<input class="in" inputmode="numeric" data-in="cn-f" data-f="dur" data-id="${c.id}" value="${c.dur}"></label>
       <label class="fld">Nombre<input class="in" data-in="cn-f" data-f="nombre" data-id="${c.id}" value="${esc(c.nombre)}"></label></div>
-      <label class="fld" style="margin-top:12px">Lugar del mapa donde se abre la cuenta de esta cancha<select class="in" data-in="cn-f" data-f="lugarId" data-id="${c.id}"><option value="">(ninguno)</option>${DB.mesas.filter(m => !m.temporal).map(m => `<option value="${m.id}" ${m.id === c.lugarId ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('')}</select><small>Mientras se juega, los consumos van a la cuenta de ese lugar. Al terminar el turno, la cuenta pasa sola a una mesa suelta y la cancha queda libre.</small></label>
+      <label class="fld" style="margin-top:12px">Lugar del mapa donde se abre la cuenta de esta cancha<select class="in" data-in="cn-f" data-f="lugarId" data-id="${c.id}"><option value="">(ninguno)</option>${DB.mesas.filter(m => !m.temporal).map(m => `<option value="${m.id}" ${m.id === c.lugarId ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('')}</select><small>Cuando empieza el turno, su costo se carga solo en la cuenta de ese lugar y ahí se suman los consumos. Al terminar, la cuenta sale de la cancha (queda libre) y se sienta en una mesa o se cobra.</small></label>
       <div class="grid2" style="margin-top:12px"><label class="fld">Abre<select class="in" data-in="cn-f" data-f="ap" data-id="${c.id}">${horas(c.ap / 60, 0, 23)}</select></label>
       <label class="fld">Cierra<select class="in" data-in="cn-f" data-f="ci" data-id="${c.id}">${horas(c.ci / 60, 1, 24)}</select></label></div></div>`).join('')}</div>`;
 };
@@ -1924,6 +1996,15 @@ const A = {
       onConfirm: map => { const r = tx(() => devolverPago(key, p.id, map[0])); if (r.ok) { toast('Pago devuelto'); render(); } } });
   },
   foto: () => modalFoto(),
+  'quitar-turno': d => {
+    const key = UI.com, t = DB.turnos.find(x => x.id === d.t); if (!t) return;
+    modal({ title: 'Sacar el turno de la cuenta',
+      body: `<p>El turno <b>${esc(nombreTurno(t))}</b> (${esc(t.cliente || 'sin nombre')}) está en esta cuenta, con su costo de ${money(t.precio)}.</p><p class="muted">Si no se jugó, suspendelo. Si querés cobrarlo aparte (por ejemplo, lo pagan otro día), desvinculalo y se cobra desde el calendario.</p>`,
+      actions: [{ label: 'Cancelar' },
+        { label: 'Cobrarlo aparte', onClick: () => { const r = tx(() => quitarTurnoDeCuenta(key, t.id, false)); if (r.ok) { toast('El turno quedó pendiente de cobro en el calendario'); render(); } } },
+        { label: 'No se jugó: suspenderlo', kind: 'danger', onClick: () => { const r = tx(() => quitarTurnoDeCuenta(key, t.id, true)); if (r.ok) { toast('Turno suspendido'); render(); } } }] });
+  },
+  sentar: d => { UI.com = d.id; moverComanda(); },
   // turnos
   slot: d => modalNuevoTurno(d.c, +d.s),
   turno: d => verTurno(d.id),
@@ -1946,7 +2027,7 @@ const A = {
   mover: () => moverComanda(),
   'mover-a': d => {
     const from = UI.com, to = d.id;
-    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, pagos: pagosDe(src), negOk: src.negOk, ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
+    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, pagos: pagosDe(src), negOk: src.negOk, turnoCliente: src.turnoCliente, ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
     if (r.ok) { UI.com = to; toast('Cuenta pasada a ' + DB.mesas.find(m => m.id === to).nombre); closeModal(); render(); }
   },
   vaciar: () => {
@@ -1954,7 +2035,7 @@ const A = {
     const hacer = map => {
       const r = tx(() => {
         ps.forEach((p, i) => devolverPago(key, p.id, map ? map[i] : p.metodoId));
-        if (c.items.length) logPush('cancelacion', lugarNombre(key), `Cuenta de ${lugarNombre(key)} cancelada sin cobrar: ${c.items.map(i => i.cant + ' x ' + (prod(i.prodId) ? prod(i.prodId).nombre : '?')).join(', ')} (${money(totalItems(c.items))})${ps.length ? '. Se devolvieron ' + money(sum(ps, p => p.monto)) : ''}`);
+        if (c.items.length) logPush('cancelacion', lugarNombre(key), `Cuenta de ${lugarNombre(key)} cancelada sin cobrar: ${c.items.map(i => i.cant + ' x ' + (i.turnoId ? 'Turno' : prod(i.prodId) ? prod(i.prodId).nombre : '?')).join(', ')} (${money(totalItems(c.items))})${ps.length ? '. Se devolvieron ' + money(sum(ps, p => p.monto)) : ''}`);
         if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
       });
       if (r.ok) render();
