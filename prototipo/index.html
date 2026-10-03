@@ -264,6 +264,28 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
   .search{max-width:none;width:100%}
   h1{font-size:21px}
 }
+/* Calendario de turnos */
+.cal-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);max-height:calc(100vh - 230px);min-height:320px}
+.cal{display:grid;min-width:max-content}
+.chead{position:sticky;top:0;z-index:3;background:var(--surface2);padding:8px 10px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:1px;min-width:0}
+.chead small{color:var(--muted);font-size:11px}
+.chead.corner{left:0;z-index:5;border-left:0}
+.tcol{position:sticky;left:0;z-index:2;background:var(--surface);border-right:1px solid var(--line)}
+.tcol span{position:absolute;right:6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+.ccol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% var(--hp)}
+.slot{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:color-mix(in srgb,var(--surface) 70%,transparent);line-height:1.25}
+.slot b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.free:hover{border-color:var(--accent);background:var(--accent-soft)}
+.slot.res{border-style:solid}
+.slot.res.t-futbol{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.slot.res.t-padel{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 50%,var(--line))}
+.slot.res.t-otro{background:var(--warn-soft)}
+.slot.res.done{opacity:.7}
+.slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface) 6px,var(--surface) 12px)}
+.slot.past{opacity:.55}
+.l2{display:flex;justify-content:space-between;padding:3px 0}
+.drow{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:end}
 @media print{
   body *{visibility:hidden}
   #ticket-paper,#ticket-paper *{visibility:visible}
@@ -305,21 +327,21 @@ const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 const num = v => Math.max(0, Math.round(parseFloat(String(v).replace(',', '.')) || 0));
 const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
 const hace = ts => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min'; };
+const hm = m => pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
 const CAT_HUES = { ambar: 38, azul: 205, rojo: 8, verde: 150, violeta: 265, gris: 200 };
 const TIPOS = {
   directo:  { n: 'Stock propio', d: 'Descuenta su propio stock (gaseosas, golosinas, pelotas).' },
   receta:   { n: 'Receta / combo', d: 'Al venderlo descuenta insumos (pancho = 1 salchicha + 1 pan).' },
   servicio: { n: 'Servicio sin stock', d: 'No se controla stock (turno de cancha, café, minutas).' },
-  alquiler: { n: 'Alquiler (sale y vuelve)', d: 'Se presta y vuelve: el stock sale al cobrar y regresa al devolver.' },
   insumo:   { n: 'Insumo (no se vende solo)', d: 'Sólo se usa dentro de recetas (salchichas, panes).' },
 };
-const MOV = { ingreso: ['Ingreso', 'good'], venta: ['Venta', ''], ajuste: ['Ajuste', 'warn'], alquiler_salida: ['Alquiler sale', ''], alquiler_devolucion: ['Alquiler vuelve', 'good'], baja: ['Baja', 'bad'], anulacion: ['Anulación', 'warn'] };
+const MOV = { ingreso: ['Ingreso', 'good'], venta: ['Venta', ''], ajuste: ['Ajuste', 'warn'], baja: ['Baja', 'bad'], anulacion: ['Anulación', 'warn'] };
 
 /* ---------- íconos ---------- */
 const ICON = {
   venta: '<path d="M3 4h2l2.4 11h10.2L20 7H6"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/>',
   mesas: '<rect x="3" y="5" width="7" height="6" rx="1.5"/><rect x="14" y="5" width="7" height="6" rx="1.5"/><rect x="3" y="14" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/>',
-  alq: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   stock: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   tickets: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   rep: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
@@ -329,11 +351,11 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ---------- base de datos (en memoria + localStorage) ---------- */
-const LS_KEY = 'predio_pos_proto_v2';
+const LS_KEY = 'predio_pos_proto_v3';
 let DB = null;
 let STORAGE_OK = true;
 const UI = {
-  view: 'venta', cat: 'all', q: '', com: 'M',
+  view: 'venta', cat: 'all', q: '', com: 'M', turFecha: dayKey(Date.now()), turSel: null,
   stockTab: 'inv', stockQ: '', stockF: 'all', stockMov: 'all',
   repDesde: dayKey(Date.now()), repHasta: dayKey(Date.now()),
   tkDesde: dayKey(Date.now() - 6 * 864e5), tkHasta: dayKey(Date.now()), tkQ: '',
@@ -356,7 +378,7 @@ function normalizar() {
   DB.comandas = DB.comandas || {};
   if (!DB.comandas.M) DB.comandas.M = { items: [] };
   DB.negocio = DB.negocio || 'Predio Deportivo';
-  DB.devoluciones = DB.devoluciones || [];
+  DB.caja = DB.caja || []; DB.canchas = DB.canchas || []; DB.turnos = DB.turnos || [];
   DB.mesas.forEach(m => { m.tipo = m.tipo || 'mesa'; m.w = m.w || 14; m.h = m.h || 17; });
 }
 
@@ -420,12 +442,12 @@ function moverStock(id, delta, tipo, o = {}) {
   const p = prod(id);
   if (!p) throw new Error('Producto inexistente');
   const antes = p.stock, despues = antes + delta;
-  if (despues < 0) throw new Error(`Stock insuficiente de ${p.nombre} (hay ${antes}, se necesitan ${-delta})`);
+  if (despues < 0 && !o.permitirNegativo) throw new Error(`Stock insuficiente de ${p.nombre} (hay ${antes}, se necesitan ${-delta})`);
   p.stock = despues;
-  DB.movimientos.push({ id: uid('mv'), ts: o.ts || Date.now(), prodId: id, nombre: p.nombre, tipo, cant: delta, antes, despues, ref: o.ref || null, motivo: o.motivo || '' });
+  DB.movimientos.push({ id: uid('mv'), ts: o.ts || Date.now(), prodId: id, nombre: p.nombre, tipo, cant: delta, antes, despues, ref: o.ref || null, motivo: (o.motivo || '') + (despues < 0 ? ' · stock en negativo' : '') });
 }
 
-/* Registrar una venta completa (stock + ticket + pagos + alquileres), todo dentro de una transacción */
+/* Cobro: lo pagado puede cubrir parte o todo; el efectivo que sobra es vuelto */
 function evalPago(total, rows) {
   const filas = rows.filter(r => r.monto > 0);
   const noCash = sum(filas.filter(r => !metodo(r.metodoId).efectivo), r => r.monto);
@@ -439,9 +461,20 @@ function evalPago(total, rows) {
   out.ok = out.falta === 0 && total > 0;
   return out;
 }
+const cancha = id => DB.canchas.find(c => c.id === id);
+
+/* Libro de caja: cada cobro (parcial o total) y cada devolución, con el medio de pago real. De acá salen los reportes. */
+function cajaPush(metodoId, monto, tipo, motivo, ts) {
+  const m = metodo(metodoId);
+  if (!m) throw new Error('Medio de pago inexistente');
+  DB.caja.push({ id: uid('cj'), ts: ts || Date.now(), metodoId, nombre: m.nombre, monto, tipo, motivo });
+}
+
+/* Registrar una venta completa (stock + ticket + pagos + caja), todo dentro de una transacción.
+   `items` son productos de la comanda; `lineas` permite ventas sin producto (por ejemplo un turno de cancha). */
 function commitVenta(o) {
   const ts = o.ts || Date.now();
-  const lineas = o.items.map(it => {
+  const lineas = o.lineas || o.items.map(it => {
     const p = prod(it.prodId);
     if (!p) throw new Error('Un producto de la comanda ya no existe');
     return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, nota: it.nota || '' };
@@ -457,58 +490,90 @@ function commitVenta(o) {
   const ventaId = uid('v');
   const nro = ++DB.contadores.venta;
   lineas.forEach(l => {
-    const p = prod(l.prodId);
-    consumo(p, l.cant).forEach(c => moverStock(c.id, -c.cant, p.tipo === 'alquiler' ? 'alquiler_salida' : 'venta', { ref: ventaId, ts, motivo: `Ticket #${nro} · ${l.nombre}` }));
-    if (p.tipo === 'alquiler') {
-      for (let i = 0; i < l.cant; i++) DB.alquileres.push({ id: uid('al'), ts, ventaId, nro, prodId: p.id, nombre: p.nombre, cliente: o.cliente || '', estado: 'prestado', tsDev: null });
-    }
+    const p = l.prodId ? prod(l.prodId) : null;
+    if (p) consumo(p, l.cant).forEach(c => moverStock(c.id, -c.cant, 'venta', { ref: ventaId, ts, permitirNegativo: o.negativo, motivo: `Ticket #${nro} · ${l.nombre}` }));
   });
   // Pagos guardados por el monto realmente aplicado (el efectivo ya sin el vuelto)
   const pagos = [];
   const cashRow = o.pagos.find(r => r.monto > 0 && metodo(r.metodoId).efectivo);
   o.pagos.filter(r => r.monto > 0 && !metodo(r.metodoId).efectivo).forEach(r => pagos.push({ metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto, ts }));
   if (cashRow && ev.applied > 0) pagos.unshift({ metodoId: cashRow.metodoId, nombre: metodo(cashRow.metodoId).nombre, monto: ev.applied, ts });
-  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '' });
+  pagos.forEach(p => cajaPush(p.metodoId, p.monto, 'cobro', 'Ticket #' + nro, ts));
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || '', turnoId: o.turnoId || null });
   return ventaId;
 }
-/* Pago parcial: queda guardado en la cuenta abierta y el resto se cobra después */
+
+/* Pagos parciales: sirven igual para cuentas (mesa, barra, mostrador) y para turnos */
+function cuentaGuardada(key) {
+  if (key.startsWith('T:')) {
+    const t = DB.turnos.find(x => x.id === key.slice(2));
+    if (!t || t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+    return { obj: t, total: t.precio, titulo: 'Turno ' + cancha(t.canchaId).nombre };
+  }
+  const c = DB.comandas[key];
+  if (!c || !c.items.length) throw new Error('La cuenta está vacía');
+  return { obj: c, total: totalItems(c.items), titulo: lugarNombre(key) };
+}
 function registrarAbono(key, rows) {
-  const com = DB.comandas[key];
-  if (!com || !com.items.length) throw new Error('La cuenta está vacía');
-  const filas = rows.filter(r => r.monto > 0), t = sum(filas, r => r.monto), saldo = saldoDe(com);
+  const cu = cuentaGuardada(key);
+  const filas = rows.filter(r => r.monto > 0), t = sum(filas, r => r.monto), saldo = cu.total - pagadoDe(cu.obj);
   if (t <= 0) throw new Error('Poné un monto mayor a cero');
   if (t >= saldo) throw new Error('Ese monto cubre todo el saldo: usá "Confirmar cobro"');
-  com.pagos = pagosDe(com).concat(filas.map(r => ({ id: uid('pg'), ts: Date.now(), metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto })));
+  const nuevos = filas.map(r => ({ id: uid('pg'), ts: Date.now(), metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto }));
+  cu.obj.pagos = pagosDe(cu.obj).concat(nuevos);
+  nuevos.forEach(p => cajaPush(p.metodoId, p.monto, 'cobro', 'Pago parcial · ' + cu.titulo));
 }
-function devolverAbono(key, pagoId) {
-  const com = DB.comandas[key], p = com && pagosDe(com).find(x => x.id === pagoId);
+/* La devolución puede hacerse en un medio distinto al que se pagó (pagó con Mercado Pago, se devuelve en efectivo) */
+function devolverPago(key, pagoId, metodoId) {
+  const cu = cuentaGuardada(key), p = pagosDe(cu.obj).find(x => x.id === pagoId);
   if (!p) throw new Error('Ese pago ya no está en la cuenta');
-  com.pagos = com.pagos.filter(x => x.id !== pagoId);
-  DB.devoluciones.push({ id: uid('dv'), ts: Date.now(), metodoId: p.metodoId, nombre: p.nombre, monto: p.monto, motivo: 'Pago parcial devuelto (' + lugarNombre(key) + ')' });
+  cu.obj.pagos = cu.obj.pagos.filter(x => x.id !== pagoId);
+  cajaPush(metodoId, -p.monto, 'devolucion', `Devolución (${cu.titulo}) · había pagado con ${p.nombre}`);
 }
-function anularVenta(id) {
+function anularVenta(id, map) {
   const v = DB.ventas.find(x => x.id === id);
   if (!v || v.estado !== 'ok') throw new Error('Ese ticket ya está anulado');
-  DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta').forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, motivo: `Anulación ticket #${v.nro}` }));
-  DB.alquileres.filter(a => a.ventaId === id && a.estado === 'prestado').forEach(a => {
-    moverStock(a.prodId, 1, 'anulacion', { ref: id, motivo: `Anulación ticket #${v.nro} (alquiler sin devolver)` });
-    a.estado = 'anulado';
-  });
+  DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta').forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, permitirNegativo: true, motivo: `Anulación ticket #${v.nro}` }));
+  v.pagos.forEach((p, i) => cajaPush((map && map[i]) || p.metodoId, -p.monto, 'devolucion', `Ticket #${v.nro} anulado · había pagado con ${p.nombre}`));
+  if (v.turnoId) { const t = DB.turnos.find(x => x.id === v.turnoId); if (t) t.estado = 'cancelado'; }
   v.estado = 'anulada'; v.tsAnul = Date.now();
 }
-function devolverAlquiler(id, perdido) {
-  const a = DB.alquileres.find(x => x.id === id);
-  if (!a || a.estado !== 'prestado') throw new Error('Ese alquiler ya está cerrado');
-  if (perdido) moverStock(a.prodId, 0, 'baja', { ref: a.ventaId, motivo: `No volvió: ${a.nombre} (${a.cliente || 'sin nombre'})` });
-  else moverStock(a.prodId, 1, 'alquiler_devolucion', { ref: a.ventaId, motivo: `Devolvió ${a.nombre} (${a.cliente || 'sin nombre'})` });
-  a.estado = perdido ? 'perdido' : 'devuelto'; a.tsDev = Date.now();
+
+/* Turnos de cancha. Una cancha puede "bloquear" a otras (Fútbol 7 usa las dos de Fútbol 5). */
+const relacionadas = (a, b) => a.id === b.id || a.bloquea.includes(b.id) || b.bloquea.includes(a.id);
+function ocupante(canchaId, fecha, ini, fin) {
+  const c = cancha(canchaId);
+  return DB.turnos.find(t => t.fecha === fecha && t.estado !== 'cancelado' && t.ini < fin && ini < t.fin && relacionadas(c, cancha(t.canchaId)));
+}
+function slotsDe(c) { const out = []; for (let s = c.ap; s + c.dur <= c.ci; s += c.dur) out.push(s); return out; }
+function crearTurno(o) {
+  const c = cancha(o.canchaId);
+  if (!c) throw new Error('La cancha no existe');
+  const fin = o.ini + c.dur, oc = ocupante(c.id, o.fecha, o.ini, fin);
+  if (oc) throw new Error('Ese horario ya está ocupado por ' + cancha(oc.canchaId).nombre + ' (' + (oc.cliente || 'sin nombre') + ')');
+  if (!(o.precio > 0)) throw new Error('Poné el precio del turno');
+  const filas = (o.pagos || []).filter(r => r.monto > 0), sena = sum(filas, r => r.monto);
+  if (sena >= o.precio) throw new Error('La seña tiene que ser menor al precio. Para pagar todo, reservá y cobrá el turno.');
+  const t = { id: uid('t'), canchaId: c.id, fecha: o.fecha, ini: o.ini, fin, cliente: o.cliente || '', tel: o.tel || '', nota: o.nota || '', precio: o.precio, estado: 'reservado', pagos: [], ventaId: null };
+  DB.turnos.push(t);
+  filas.forEach(r => {
+    t.pagos.push({ id: uid('pg'), ts: o.ts || Date.now(), metodoId: r.metodoId, nombre: metodo(r.metodoId).nombre, monto: r.monto });
+    cajaPush(r.metodoId, r.monto, 'cobro', 'Seña · Turno ' + c.nombre, o.ts);
+  });
+  return t.id;
+}
+function cancelarTurno(id, map) {
+  const t = DB.turnos.find(x => x.id === id);
+  if (!t || t.estado !== 'reservado') throw new Error('Ese turno no se puede cancelar');
+  pagosDe(t).slice().forEach((p, i) => devolverPago('T:' + id, p.id, (map && map[i]) || p.metodoId));
+  t.estado = 'cancelado';
 }
 
 /* ---------- datos de ejemplo ---------- */
 function seed() {
-  const d = { v: 1, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], alquileres: [], devoluciones: [], contadores: { venta: 0 } };
+  const d = { v: 3, seq: 1, pin: '1234', negocio: 'Predio Deportivo', categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], contadores: { venta: 0 } };
   DB = d;
-  const t0 = Date.now() - 9 * 3600e3;
+  const t0 = Date.now() - 9 * 3600e3, hoy = dayKey(Date.now()), manana = dayKey(Date.now() + 864e5);
   const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
   const met = (nombre, efectivo) => { const m = { id: uid('mp'), nombre, activo: true, efectivo: !!efectivo }; d.metodos.push(m); return m.id; };
   const add = o => {
@@ -517,19 +582,22 @@ function seed() {
     if (st > 0) moverStock(p.id, st, 'ingreso', { ts: t0, motivo: 'Stock inicial' });
     return p.id;
   };
-  const kiosco = cat('Kiosco', 'ambar'), padel = cat('Pádel', 'azul'), buffet = cat('Buffet', 'rojo');
+  const ab = (metodoId, monto, minAgo, motivo) => {
+    const ts = Date.now() - minAgo * 60000; cajaPush(metodoId, monto, 'cobro', motivo, ts);
+    return { id: uid('pg'), ts, metodoId, nombre: metodo(metodoId).nombre, monto };
+  };
+  const kiosco = cat('Kiosco', 'ambar'), padel = cat('Pádel', 'azul'), buffet = cat('Buffet', 'rojo'), futbol = cat('Fútbol', 'verde');
   const efe = met('Efectivo', true), mp = met('Mercado Pago'), tr = met('Transferencia'), tj = met('Tarjeta');
 
   const coca = add({ nombre: 'Coca-Cola 500 ml', catId: kiosco, precio: 2200, stock: 8, minimo: 6, paqueteNombre: 'Bulto 6 × 12', paqueteUnidades: 72 });
   const agua = add({ nombre: 'Agua mineral 500 ml', catId: kiosco, precio: 1500, stock: 24, minimo: 6, paqueteNombre: 'Pack × 6', paqueteUnidades: 6 });
-  add({ nombre: 'Gatorade 500 ml', catId: kiosco, precio: 2600, stock: 18, minimo: 6, paqueteNombre: 'Pack × 12', paqueteUnidades: 12 });
+  const gato = add({ nombre: 'Gatorade 500 ml', catId: kiosco, precio: 2600, stock: 18, minimo: 6, paqueteNombre: 'Pack × 12', paqueteUnidades: 12 });
   const alfa = add({ nombre: 'Alfajor', catId: kiosco, precio: 1200, stock: 40, minimo: 10, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
   add({ nombre: 'Papas fritas', catId: kiosco, precio: 2000, stock: 15, minimo: 5, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
   add({ nombre: 'Chicles', catId: kiosco, precio: 500, stock: 60, minimo: 10, paqueteNombre: 'Caja × 20', paqueteUnidades: 20 });
-  const turno = add({ nombre: 'Turno cancha 90 min', catId: padel, precio: 28000, tipo: 'servicio' });
-  const pelotas = add({ nombre: 'Pelotas (tubo × 3)', catId: padel, precio: 9000, stock: 10, minimo: 3, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
-  add({ nombre: 'Grip', catId: padel, precio: 3500, stock: 14, minimo: 4, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
-  const paleta = add({ nombre: 'Alquiler de paleta', catId: padel, precio: 3000, tipo: 'alquiler', stock: 6, minimo: 2 });
+  const pelotas = add({ nombre: 'Pelotas de pádel (tubo × 3)', catId: padel, precio: 9000, stock: 10, minimo: 3, paqueteNombre: 'Caja × 24', paqueteUnidades: 24 });
+  const grip = add({ nombre: 'Grip', catId: padel, precio: 3500, stock: 14, minimo: 4, paqueteNombre: 'Caja × 12', paqueteUnidades: 12 });
+  add({ nombre: 'Alquiler de paleta', catId: padel, precio: 3000, tipo: 'servicio' });
   const salch = add({ nombre: 'Salchicha', catId: buffet, tipo: 'insumo', stock: 24, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
   const pan = add({ nombre: 'Pan de pancho', catId: buffet, tipo: 'insumo', stock: 30, minimo: 6, paqueteNombre: 'Paquete × 6', paqueteUnidades: 6 });
   const medal = add({ nombre: 'Medallón de carne', catId: buffet, tipo: 'insumo', stock: 20, minimo: 5, paqueteNombre: 'Caja × 10', paqueteUnidades: 10 });
@@ -542,6 +610,7 @@ function seed() {
   const cerv = add({ nombre: 'Cerveza 1 L', catId: buffet, precio: 4200, stock: 18, minimo: 6, paqueteNombre: 'Cajón × 12', paqueteUnidades: 12 });
   add({ nombre: 'Café', catId: buffet, precio: 1800, tipo: 'servicio' });
 
+  // mapa del salón (lugares donde se abren cuentas)
   const L = (nombre, tipo, x, y, w, h, rapido) => { const m = { id: uid('m'), nombre, tipo, x, y, w, h, rapido: !!rapido }; d.mesas.push(m); return m; };
   const futbol1 = L('FÚTBOL 1', 'futbol', 2, 3, 26, 20); L('FÚTBOL 2', 'futbol', 30, 3, 26, 20);
   L('PÁDEL 1', 'padel', 59, 3, 18, 14); L('PÁDEL 2', 'padel', 79, 3, 18, 14);
@@ -550,32 +619,44 @@ function seed() {
   [2, 22, 42].forEach((x, i) => mesas.push(L('Mesa ' + (i + 6), 'mesa', x, 58, 14, 17)));
   const barra = L('Barra', 'barra', 62, 60, 34, 14, true);
 
+  // canchas del calendario de turnos
+  const cn = (nombre, deporte, dur, ap, precio, catId, bloquea) => { const c = { id: uid('cn'), nombre, deporte, dur, ap, ci: 1440, precio, catId, bloquea: bloquea || [] }; d.canchas.push(c); return c.id; };
+  const f5a = cn('Fútbol 5 · Cancha 1', 'futbol', 60, 600, 28000, futbol), f5b = cn('Fútbol 5 · Cancha 2', 'futbol', 60, 600, 28000, futbol);
+  const f7 = cn('Fútbol 7 · Cancha completa', 'futbol', 60, 600, 48000, futbol, [f5a, f5b]);
+  const pT = cn('Pádel · Techada', 'padel', 90, 480, 26000, padel), pA = cn('Pádel · Abierta', 'padel', 90, 480, 22000, padel);
+
   // ventas de ejemplo de hoy (pasan por la misma función que las ventas reales)
   const demo = [
     { items: [[pancho, 2], [coca, 1]], pagos: [[efe, 10000]], mesa: 'Mesa 2' },
     { items: [[hamb, 1], [cerv, 1]], pagos: [[mp, 12700]], mesa: 'Mesa 4' },
-    { items: [[turno, 1]], pagos: [[efe, 10000], [tr, 18000]], cliente: 'Cancha 1' },
-    { items: [[paleta, 1]], pagos: [[efe, 3000]], cliente: 'Cancha 2 · Martín' },
+    { items: [[grip, 1], [pelotas, 1]], pagos: [[efe, 5000], [tr, 7500]] },
     { items: [[alfa, 2], [agua, 1]], pagos: [[efe, 5000]] },
     { items: [[pelotas, 1]], pagos: [[mp, 9000]] },
     { items: [[coca, 2]], pagos: [[tj, 4400]] },
-    { items: [[paleta, 1]], pagos: [[efe, 3000]], cliente: 'Cancha 1 · Lucía' },
   ];
   demo.forEach((x, i) => commitVenta({
-    ts: Date.now() - (demo.length - i) * 17 * 60000,
+    ts: Date.now() - (demo.length + 1 - i) * 17 * 60000,
     items: x.items.map(([prodId, cant]) => ({ prodId, cant })),
     pagos: x.pagos.map(([metodoId, monto]) => ({ metodoId, monto })),
-    mesaNombre: x.mesa, cliente: x.cliente,
+    mesaNombre: x.mesa,
   }));
-  const dev = d.alquileres.find(a => a.cliente.includes('Lucía'));
-  dev.estado = 'devuelto'; dev.tsDev = Date.now() - 5 * 60000;
-  moverStock(paleta, 1, 'alquiler_devolucion', { motivo: 'Devolvió Alquiler de paleta (Cancha 1 · Lucía)' });
-  // comandas abiertas de ejemplo
-  d.comandas[mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }],
-    pagos: [{ id: uid('pg'), ts: Date.now() - 10 * 60000, metodoId: efe, nombre: 'Efectivo', monto: 5000 }] };
+  // un turno ya cobrado (seña en efectivo y el resto por transferencia)
+  const tc = crearTurno({ canchaId: f5b, fecha: hoy, ini: 600, cliente: 'Café Central', precio: 28000, ts: Date.now() - 200 * 60000, pagos: [{ metodoId: efe, monto: 8000 }] });
+  const tt = d.turnos.find(x => x.id === tc), cc = cancha(f5b);
+  tt.ventaId = commitVenta({ ts: Date.now() - 100 * 60000, abonos: tt.pagos, pagos: [{ metodoId: tr, monto: 20000 }], mesaNombre: 'Turno · ' + cc.nombre, cliente: 'Café Central', turnoId: tc,
+    lineas: [{ prodId: null, nombre: 'Turno ' + cc.nombre + ' · 10:00-11:00', catId: futbol, tipo: 'servicio', cant: 1, precio: 28000, nota: 'Café Central' }] });
+  tt.estado = 'cobrado';
+  // turnos abiertos
+  crearTurno({ canchaId: f5a, fecha: hoy, ini: 1200, cliente: 'Los Pibes', tel: '11 5555-0101', precio: 28000, ts: Date.now() - 300 * 60000, pagos: [{ metodoId: efe, monto: 5000 }] });
+  crearTurno({ canchaId: f5b, fecha: hoy, ini: 1140, cliente: 'Oficina Sur', precio: 28000 });
+  crearTurno({ canchaId: f7, fecha: hoy, ini: 1260, cliente: 'Cumple de Tomi', tel: '11 5555-0202', precio: 48000, ts: Date.now() - 150 * 60000, pagos: [{ metodoId: mp, monto: 15000 }] });
+  crearTurno({ canchaId: pT, fecha: hoy, ini: 1200, cliente: 'Martín y Ana', precio: 26000, ts: Date.now() - 120 * 60000, pagos: [{ metodoId: tr, monto: 8000 }] });
+  crearTurno({ canchaId: pA, fecha: hoy, ini: 1110, cliente: 'Sofi', precio: 22000 });
+  crearTurno({ canchaId: f5a, fecha: manana, ini: 1140, cliente: 'Torneo del viernes', precio: 28000 });
+  // cuentas abiertas de ejemplo (con pagos parciales ya hechos)
+  d.comandas[mesas[2].id] = { ts: Date.now() - 24 * 60000, items: [{ prodId: pancho, cant: 2, nota: '' }, { prodId: cerv, cant: 1, nota: '' }], pagos: [ab(efe, 5000, 10, 'Pago parcial · Mesa 3')] };
   d.comandas[mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
-  d.comandas[futbol1.id] = { ts: Date.now() - 40 * 60000, items: [{ prodId: turno, cant: 1, nota: '' }],
-    pagos: [{ id: uid('pg'), ts: Date.now() - 40 * 60000, metodoId: tr, nombre: 'Transferencia', monto: 10000 }] };
+  d.comandas[futbol1.id] = { ts: Date.now() - 40 * 60000, items: [{ prodId: gato, cant: 4, nota: '' }], pagos: [ab(tr, 4000, 35, 'Pago parcial · FÚTBOL 1')] };
   d.comandas[barra.id] = { ts: Date.now() - 15 * 60000, items: [{ prodId: cerv, cant: 2, nota: '' }, { prodId: alfa, cant: 1, nota: '' }] };
   return d;
 }
@@ -586,7 +667,8 @@ function toast(msg, kind = '', tag = '') {
   const el = document.createElement('div');
   if (tag) el.dataset.tag = tag;
   el.className = 'toast ' + kind; el.textContent = msg;
-  $('#toasts').appendChild(el);
+  const box = $('#toasts'); box.appendChild(el);
+  while (box.children.length > 3) box.firstChild.remove();
   setTimeout(() => el.remove(), kind === 'bad' ? 6000 : 3600);
 }
 let MODAL = null;
@@ -658,18 +740,19 @@ const totalItems = items => sum(items, it => { const p = prod(it.prodId); return
 const pagosDe = c => c.pagos || [];
 const pagadoDe = c => sum(pagosDe(c), p => p.monto);
 const saldoDe = c => totalItems(c.items) - pagadoDe(c);
-function setItems(key, items) {
+function setItems(key, items, neg) {
   items = items.filter(i => i.cant > 0 && prod(i.prodId));
   if (key !== 'M' && !items.length) { delete DB.comandas[key]; return; }
   const prev = DB.comandas[key] || {};
-  DB.comandas[key] = { ...prev, items, ts: prev.ts || Date.now() };
+  DB.comandas[key] = { ...prev, items, ts: prev.ts || Date.now(), negOk: prev.negOk || !!neg || undefined };
 }
-function aplicarItems(key, items) {
+function aplicarItems(key, items, neg) {
   const pag = pagadoDe(getCom(key));
   if (pag > 0 && totalItems(items) < pag) return toast(`No se puede: ya pagaron ${money(pag)}. Primero devolvé un pago.`, 'warn');
-  const r = tx(() => setItems(key, items));
+  const r = tx(() => setItems(key, items, neg));
   if (!r.ok) return;
-  avisoBajo(items);
+  if (neg) toast('Se vende igual: el stock va a quedar en negativo hasta que cargues la mercadería.', 'warn', 'neg');
+  else avisoBajo(items);
   if (UI.view === 'venta') { renderGrid(); renderCart(); }
   renderSide();
 }
@@ -684,7 +767,7 @@ function cambiarCantidad(items, idx, delta) {
   nuevo[idx].cant += delta;
   return nuevo;
 }
-/* Si lo que se pide supera el stock del sistema, pide confirmación humana con conteo real */
+/* Si lo que se pide supera el stock del sistema, pide confirmación humana: contar, o vender igual y dejar el stock en negativo */
 function chequearStock(nuevo, key, conReservas, cuando, onOk) {
   const f = faltantes(nuevo, key, conReservas);
   if (!f.length) return onOk();
@@ -694,20 +777,20 @@ function modalFaltante(f, items, key, conReservas, cuando, onOk, errorMsg) {
   const filas = f.map(x => `
     <div class="card" style="padding:12px">
       <b>${esc(x.nombre)}</b>
-      <p class="muted">El sistema dice que hay <b>${x.sistema}</b>${x.reservado ? ` (${x.reservado} ya reservadas en otras mesas)` : ''}. Estás ${cuando === 'cobrar' ? 'cobrando' : 'pidiendo'} <b>${x.need}</b>.</p>
+      <p class="muted">El sistema dice que hay <b>${x.sistema}</b>${x.reservado ? ` (${x.reservado} ya reservadas en otras cuentas)` : ''}. Estás ${cuando === 'cobrar' ? 'cobrando' : 'pidiendo'} <b>${x.need}</b>.</p>
       <label class="fld" style="margin-top:8px">¿Cuántas hay realmente ahora? (contalas)
         <input class="in" id="real-${x.id}" inputmode="numeric" value="${x.sistema}"></label>
     </div>`).join('');
   modal({
     title: 'El stock no alcanza: confirmá en persona',
-    body: `<div class="note warn">Contá lo que hay físicamente. Si realmente hay, se corrige el stock del sistema (queda registrado como ajuste) y se sigue con la venta. Si no hay, cancelá.</div>${filas}${errorMsg ? `<p class="err">${esc(errorMsg)}</p>` : ''}`,
-    actions: [{ label: 'Cancelar, no hay' }, { label: 'Confirmar conteo y seguir', kind: 'primary', onClick: () => {
+    body: `<div class="note warn"><b>Si hay</b> en la góndola o la heladera, poné el conteo real: el sistema se corrige y queda registrado como ajuste.<br><b>Si es que falta cargar el remito</b>, tocá "Vender igual": el stock queda en negativo y se compensa solo cuando cargues la mercadería.</div>${filas}${errorMsg ? `<p class="err">${esc(errorMsg)}</p>` : ''}`,
+    actions: [{ label: 'Cancelar, no hay' }, { label: 'Vender igual (queda en negativo)', onClick: () => { onOk(true); } }, { label: 'Confirmar conteo y seguir', kind: 'primary', onClick: () => {
       const reales = f.map(x => ({ x, real: num($('#real-' + x.id).value) }));
       const r = tx(() => reales.forEach(({ x, real }) => { const d = real - stk(x.id); if (d !== 0) moverStock(x.id, d, 'ajuste', { motivo: 'Conteo real confirmado al ' + (cuando === 'cobrar' ? 'cobrar' : 'vender') }); }));
       if (!r.ok) return false;
       renderSide();
       const f2 = faltantes(items, key, conReservas);
-      if (f2.length) { modalFaltante(f2, items, key, conReservas, cuando, onOk, 'Con ese conteo igual no alcanza para lo que se pide. Sacá unidades de la comanda o cargá mercadería.'); return false; }
+      if (f2.length) { modalFaltante(f2, items, key, conReservas, cuando, onOk, 'Con ese conteo igual no alcanza para lo que se pide. Sacá unidades, cargá mercadería o vendé igual.'); return false; }
       onOk();
     } }],
   });
@@ -717,22 +800,34 @@ function agregar(prodId) {
   const idx = items.findIndex(i => i.prodId === prodId && !i.nota);
   const nuevo = items.map(i => ({ ...i }));
   if (idx >= 0) nuevo[idx].cant++; else nuevo.push({ prodId, cant: 1, nota: '' });
-  chequearStock(nuevo, key, true, 'vender', () => aplicarItems(key, nuevo));
+  chequearStock(nuevo, key, true, 'vender', neg => aplicarItems(key, nuevo, neg));
 }
 
 /* ---------- cobro ---------- */
 const efectivoId = () => (DB.metodos.find(m => m.efectivo && m.activo) || DB.metodos.find(m => m.activo)).id;
 const lugarNombre = key => key === 'M' ? 'Mostrador' : (DB.mesas.find(m => m.id === key) || { nombre: 'Mesa' }).nombre;
+const nombreTurno = t => 'Turno ' + cancha(t.canchaId).nombre + ' · ' + hm(t.ini) + '-' + hm(t.fin);
+function tituloCuenta(key) {
+  if (key.startsWith('T:')) { const t = DB.turnos.find(x => x.id === key.slice(2)); return t ? 'Turno ' + cancha(t.canchaId).nombre + ' · ' + hm(t.ini) : 'Turno'; }
+  return lugarNombre(key);
+}
+function iniciarCobro(key, total, saldo, parcial, negativo) {
+  UI.pago = { key, total, saldo, parcial: !!parcial, negativo: !!negativo, rows: [{ metodoId: efectivoId(), monto: parcial ? 0 : saldo }] };
+  renderCobro(parcial ? 0 : undefined);
+}
 function abrirCobro(parcial) {
   const key = UI.com, c = getCom(key);
   if (!c.items.length) return toast('Primero agregá productos', 'warn');
-  const abrir = () => {
-    const total = totalItems(c.items), saldo = total - pagadoDe(c);
-    if (saldo <= 0) return toast('Esta cuenta ya está paga. Devolvé un pago o agregá productos.', 'warn');
-    UI.pago = { total, saldo, key, parcial: !!parcial, rows: [{ metodoId: efectivoId(), monto: parcial ? 0 : saldo }], cliente: '', alq: c.items.filter(i => prod(i.prodId).tipo === 'alquiler') };
-    renderCobro(parcial ? 0 : undefined);
-  };
-  if (parcial) abrir(); else chequearStock(c.items, key, false, 'cobrar', abrir);
+  const total = totalItems(c.items), saldo = total - pagadoDe(c);
+  if (saldo <= 0) return toast('Esta cuenta ya está paga. Devolvé un pago o agregá productos.', 'warn');
+  if (parcial) return iniciarCobro(key, total, saldo, true);
+  if (c.negOk) return iniciarCobro(key, total, saldo, false, true);
+  chequearStock(c.items, key, false, 'cobrar', neg => iniciarCobro(key, total, saldo, false, neg));
+}
+function abrirCobroTurno(id, parcial) {
+  const t = DB.turnos.find(x => x.id === id), saldo = t.precio - pagadoDe(t);
+  if (saldo <= 0) return toast('Este turno ya está pago', 'warn');
+  iniciarCobro('T:' + id, t.precio, saldo, parcial);
 }
 function renderCobro(focusIdx) {
   const P = UI.pago, ya = P.total - P.saldo;
@@ -746,13 +841,10 @@ function renderCobro(focusIdx) {
       <button class="icon" data-act="pg-del" data-i="${i}" aria-label="Quitar">×</button></div>
       ${quick ? `<div class="quick">${quick}</div>` : ''}`;
   }).join('');
-  const alqTxt = P.alq.length ? `<label class="fld">Para quién es el alquiler (nombre o cancha)<small>Sirve para saber quién tiene la paleta cuando la devuelvan.</small>
-      <input class="in" id="pg-cliente" data-in="pg-cliente" value="${esc(P.cliente)}" placeholder="Ej: Cancha 3 · Juan"></label>` : '';
   modal({
-    title: (P.parcial ? 'Pago parcial · ' : 'Cobrar · ') + lugarNombre(P.key),
+    title: (P.parcial ? 'Pago parcial · ' : 'Cobrar · ') + tituloCuenta(P.key),
     body: `<div class="big-total"><span>${ya > 0 ? 'Saldo a cobrar' : 'Total a cobrar'}</span><b>${money(P.saldo)}</b></div>
-      ${ya > 0 ? `<p class="muted">Total de la cuenta ${money(P.total)} · ya pagado ${money(ya)}</p>` : ''}
-      ${alqTxt}
+      ${ya > 0 ? `<p class="muted">Total ${money(P.total)} · ya pagado ${money(ya)}</p>` : ''}
       <div><div class="muted" style="margin-bottom:6px;font-weight:600">Medios de pago (se pueden combinar)</div><div class="chips">${chips}</div></div>
       <div class="stack" id="pg-rows">${rows}</div>
       <div class="pg-sum" id="pg-sum"></div>`,
@@ -763,38 +855,63 @@ function renderCobro(focusIdx) {
 }
 function updateCobro() {
   const P = UI.pago, ev = evalPago(P.saldo, P.rows);
-  const faltaCliente = P.alq.length && !P.cliente.trim();
   let html = `<div class="l"><span>Se está cobrando ahora</span><span class="num">${money(ev.pagado)}</span></div>`;
   if (ev.error) html += `<div class="err">${esc(ev.error)}</div>`;
   else if (ev.falta > 0) {
     html += `<div class="l falta"><span>Falta</span><b class="num">${money(ev.falta)}</b></div>`;
-    if (ev.pagado > 0) html += `<div class="muted" style="font-weight:400;font-size:12px">Si el cliente paga una parte ahora, tocá "Guardar pago parcial": la cuenta queda abierta y el resto se cobra después.</div>`;
+    if (ev.pagado > 0) html += `<div class="muted" style="font-weight:400;font-size:12px">Si el cliente paga una parte ahora, tocá "Guardar pago parcial": queda abierto y el resto se cobra después.</div>`;
   } else if (ev.vuelto > 0) html += `<div class="l vuelto"><span>Vuelto a entregar</span><b class="num">${money(ev.vuelto)}</b></div>`;
   else html += `<div class="l"><span>Pago completo</span><span class="pill good">OK</span></div>`;
-  if (faltaCliente) html += `<div class="err">Falta el nombre o cancha de quien alquila.</div>`;
   $('#pg-sum').innerHTML = html;
   const bp = $('#mact-1'), bc = $('#mact-2');
   if (bp) bp.disabled = !(!ev.error && ev.pagado > 0 && ev.falta > 0);
-  if (bc) bc.disabled = !(ev.ok && !faltaCliente);
+  if (bc) bc.disabled = !ev.ok;
 }
 function guardarParcial() {
   const P = UI.pago;
   const r = tx(() => registrarAbono(P.key, P.rows));
   if (!r.ok) return false;
-  toast('Pago parcial guardado. Saldo pendiente: ' + money(saldoDe(getCom(P.key))));
+  toast('Pago parcial guardado. Saldo pendiente: ' + money(P.saldo - sum(P.rows, x => x.monto)));
   render();
+  if (P.key.startsWith('T:')) verTurno(P.key.slice(2));
+}
+function avisoNegativos() {
+  const neg = DB.productos.filter(p => p.stock < 0);
+  if (neg.length) toast('Stock en negativo: ' + neg.map(p => `${p.nombre} (${p.stock})`).join(', ') + '. Cargá la mercadería cuando llegue.', 'warn', 'neg');
 }
 function confirmarCobro() {
-  const P = UI.pago, key = P.key, c = getCom(key);
-  const mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
+  const P = UI.pago, key = P.key;
   const r = tx(() => {
-    const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, cliente: P.cliente.trim() });
+    if (key.startsWith('T:')) {
+      const t = DB.turnos.find(x => x.id === key.slice(2));
+      if (!t || t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+      const c = cancha(t.canchaId);
+      const id = commitVenta({ abonos: pagosDe(t), pagos: P.rows, mesaNombre: 'Turno · ' + c.nombre, cliente: t.cliente, turnoId: t.id,
+        lineas: [{ prodId: null, nombre: nombreTurno(t), catId: c.catId, tipo: 'servicio', cant: 1, precio: t.precio, nota: t.cliente }] });
+      t.estado = 'cobrado'; t.ventaId = id;
+      return id;
+    }
+    const c = getCom(key), mesa = key === 'M' ? null : DB.mesas.find(m => m.id === key);
+    const id = commitVenta({ items: c.items, abonos: pagosDe(c), pagos: P.rows, mesaNombre: mesa ? mesa.nombre : null, negativo: P.negativo });
     if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
     return id;
   });
   if (!r.ok) return false;
   render();
   verTicket(r.value, true);
+  avisoNegativos();
+}
+
+/* Devolver dinero: se elige el medio de cada devolución, que puede ser distinto al que se usó para pagar */
+function modalDevolucion({ titulo, intro, confirmLabel, pagos, onConfirm }) {
+  const opts = sel => DB.metodos.filter(m => m.activo).map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('');
+  const filas = pagos.map((p, i) => `<div class="drow"><span><b>${money(p.monto)}</b><br><small class="muted">pagó con ${esc(p.nombre)}</small></span>
+    <label class="fld">Devolver en<select class="in" id="dv-${i}">${opts(metodo(p.metodoId) && metodo(p.metodoId).activo ? p.metodoId : efectivoId())}</select></label></div>`).join('');
+  modal({
+    title: titulo,
+    body: `<p>${intro}</p><div class="stack">${filas}</div><p class="muted" style="font-size:12px">Podés devolver en un medio distinto al que pagaron (por ejemplo, pagaron con Mercado Pago y devolvés en efectivo). La caja lo registra así.</p>`,
+    actions: [{ label: 'Cancelar' }, { label: confirmLabel, kind: 'danger', onClick: () => { onConfirm(pagos.map((_, i) => $('#dv-' + i).value)); } }],
+  });
 }
 
 /* ---------- ticket ---------- */
@@ -833,10 +950,12 @@ function imprimir() {
 function anularTicket(id) {
   requirePin(() => {
     const v = DB.ventas.find(x => x.id === id);
-    ask(`Anular ticket #${v.nro}`, `Se anula la venta de ${money(v.total)} y <b>se devuelve el stock</b> de los productos vendidos. El ticket queda en el historial marcado como anulado.`, 'Anular ticket', () => {
-      const r = tx(() => anularVenta(id));
-      if (r.ok) { toast('Ticket anulado y stock devuelto'); render(); }
-    }, true);
+    modalDevolucion({
+      titulo: `Anular ticket #${v.nro}`,
+      intro: `Se anula la venta de <b>${money(v.total)}</b> y <b>se devuelve el stock</b> de los productos. Elegí en qué medio devolvés cada pago.`,
+      confirmLabel: 'Anular ticket', pagos: v.pagos,
+      onConfirm: map => { const r = tx(() => anularVenta(id, map)); if (r.ok) { toast('Ticket anulado, stock devuelto y devolución registrada'); render(); } },
+    });
   });
 }
 
@@ -851,15 +970,15 @@ function render() {
 function renderSide() {
   $('#brand-name').textContent = DB.negocio;
   const ocup = Object.keys(DB.comandas).filter(k => k !== 'M' && DB.comandas[k].items.length).length;
-  const alq = DB.alquileres.filter(a => a.estado === 'prestado').length;
-  const bajo = DB.productos.filter(p => p.activo && ['directo', 'insumo', 'alquiler'].includes(p.tipo) && p.stock <= p.minimo).length;
+  const turHoy = DB.turnos.filter(t => t.fecha === dayKey(Date.now()) && t.estado === 'reservado').length;
+  const bajo = DB.productos.filter(p => p.activo && ['directo', 'insumo'].includes(p.tipo) && p.stock <= p.minimo).length;
   const rap = DB.mesas.filter(m => m.rapido);
   const enRap = UI.view === 'venta' && rap.some(m => m.id === UI.com);
   const btn = (attrs, label, icon, badge, warn, cur) => `<button ${attrs} ${cur ? 'aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<span class="badge ${warn ? 'warn' : ''}">${badge}</span>` : ''}</button>`;
   const nav = (v, n, i, b, w) => btn(`data-act="nav" data-v="${v}"`, n, i, b, w, UI.view === v);
   $('#nav').innerHTML = btn('data-act="nav" data-v="venta"', 'Caja', 'venta', 0, 0, UI.view === 'venta' && !enRap) +
     rap.map(m => btn(`data-act="ir-lugar" data-id="${m.id}"`, m.nombre, 'mesas', DB.comandas[m.id] && DB.comandas[m.id].items.length ? '●' : '', 0, UI.view === 'venta' && UI.com === m.id)).join('') +
-    nav('mesas', 'Mesas', 'mesas', ocup, 0) + nav('alquileres', 'Alquileres', 'alq', alq, 0) + nav('stock', 'Stock', 'stock', bajo, 1) +
+    nav('mesas', 'Mesas', 'mesas', ocup, 0) + nav('turnos', 'Turnos', 'cal', turHoy, 0) + nav('stock', 'Stock', 'stock', bajo, 1) +
     nav('tickets', 'Tickets', 'tickets', 0, 0) + nav('reportes', 'Reportes', 'rep', 0, 0) + nav('admin', 'Admin', 'admin', 0, 0);
   $('#side-foot').innerHTML = `<div class="demo-tag">Prototipo con datos de ejemplo. Se guarda sólo en este navegador.</div>
     ${STORAGE_OK ? '' : '<div class="demo-tag" style="background:var(--bad-soft);color:var(--bad)">Este navegador no deja guardar: al recargar se pierde todo.</div>'}
@@ -878,7 +997,7 @@ views.venta = () => {
 };
 function renderCats() {
   $('#cats').innerHTML = `<button class="chip" data-act="cat" data-id="all" aria-pressed="${UI.cat === 'all'}">Todo</button>` +
-    DB.categorias.map(c => `<button class="chip" style="--h:${CAT_HUES[c.color] ?? 160}" data-act="cat" data-id="${c.id}" aria-pressed="${UI.cat === c.id}"><span class="dot"></span>${esc(c.nombre)}</button>`).join('');
+    DB.categorias.filter(c => DB.productos.some(p => p.activo && p.tipo !== 'insumo' && p.catId === c.id)).map(c => `<button class="chip" style="--h:${CAT_HUES[c.color] ?? 160}" data-act="cat" data-id="${c.id}" aria-pressed="${UI.cat === c.id}"><span class="dot"></span>${esc(c.nombre)}</button>`).join('');
 }
 function listaVisible() {
   const q = norm(UI.q);
@@ -891,7 +1010,7 @@ function renderGrid() {
     let st, cls = '';
     if (r === Infinity) st = 'Sin control de stock';
     else if (r <= 0) { st = 'Sin stock'; cls = 'bad'; }
-    else { st = (p.tipo === 'receta' ? 'Salen ' : p.tipo === 'alquiler' ? 'Libres ' : 'Stock ') + r; if (r <= p.minimo) cls = 'warn'; }
+    else { st = (p.tipo === 'receta' ? 'Salen ' : 'Stock ') + r; if (r <= p.minimo) cls = 'warn'; }
     return `<button class="tile" style="--h:${hueDe(p.catId)}" data-act="add" data-id="${p.id}"><b>${esc(p.nombre)}</b><span class="st ${cls}">${st}</span><span class="pr">${money(p.precio)}</span></button>`;
   }).join('');
   $('#grid').innerHTML = html || '<p class="muted">No hay productos con ese filtro.</p>';
@@ -963,24 +1082,104 @@ views.mesas = () => {
     <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado (y lo que debe si pagó una parte)</span></div>`;
 };
 
-/* --- ALQUILERES --- */
-views.alquileres = () => {
-  const pend = DB.alquileres.filter(a => a.estado === 'prestado').sort((a, b) => a.ts - b.ts);
-  const hist = DB.alquileres.filter(a => a.estado !== 'prestado').sort((a, b) => b.ts - a.ts).slice(0, 30);
-  const fila = a => `<tr><td><b>${esc(a.nombre)}</b></td><td>${esc(a.cliente || '—')}</td><td class="num">${fechaHora(a.ts)}</td><td class="num">${hace(a.ts)}</td>
-    <td class="r"><div class="actions"><button class="btn sm primary" data-act="alq-dev" data-id="${a.id}">Devolvió</button><button class="btn sm" data-act="alq-perd" data-id="${a.id}">No volvió</button></div></td></tr>`;
-  $('#main').innerHTML = `<header class="ph"><div><h1>Alquileres</h1><p class="muted">Lo que está prestado ahora. El stock vuelve recién cuando lo devuelven.</p></div></header>
-    <div class="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Quién lo tiene</th><th>Desde</th><th>Hace</th><th></th></tr></thead>
-      <tbody>${pend.map(fila).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:28px">No hay nada prestado.</td></tr>'}</tbody></table></div>
-    <h2 style="margin:22px 0 10px">Últimos cerrados</h2>
-    <div class="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Quién</th><th>Salió</th><th>Estado</th></tr></thead><tbody>
-      ${hist.map(a => `<tr><td>${esc(a.nombre)}</td><td>${esc(a.cliente || '—')}</td><td class="num">${fechaHora(a.ts)}</td><td>${a.estado === 'devuelto' ? `<span class="pill good">devuelto ${a.tsDev ? hhmm(a.tsDev) : ''}</span>` : a.estado === 'perdido' ? '<span class="pill bad">no volvió</span>' : '<span class="pill">anulado</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted" style="text-align:center;padding:20px">Sin movimientos.</td></tr>'}
-    </tbody></table></div>`;
+/* --- TURNOS (calendario) --- */
+const HP = 46; // píxeles por hora en la grilla
+const fechaLarga = f => new Date(f + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+function textoEstadoTurno(t) {
+  const pag = pagadoDe(t);
+  if (t.estado === 'cobrado') return 'cobrado ✓';
+  return pag > 0 ? `seña ${money(pag)} · debe ${money(t.precio - pag)}` : 'sin pago · ' + money(t.precio);
+}
+function slotHTML(c, s, fecha, ap, hoy, ahora) {
+  const e = s + c.dur, top = (s - ap) / 60 * HP, h = c.dur / 60 * HP;
+  const oc = ocupante(c.id, fecha, s, e);
+  const pasado = fecha < hoy || (fecha === hoy && e <= ahora);
+  let cls, inner, act;
+  if (!oc) { cls = 'free'; inner = `<b>${hm(s)}</b><span>libre</span>`; act = `data-act="slot" data-c="${c.id}" data-s="${s}"`; }
+  else if (oc.canchaId === c.id) { cls = 'res t-' + c.deporte + (oc.estado === 'cobrado' ? ' done' : ''); inner = `<b>${hm(s)} · ${esc(oc.cliente || 'Sin nombre')}</b><span>${textoEstadoTurno(oc)}</span>`; act = `data-act="turno" data-id="${oc.id}"`; }
+  else { cls = 'blk'; inner = `<b>${hm(s)}</b><span>ocupada por ${esc(cancha(oc.canchaId).nombre)}</span>`; act = `data-act="turno" data-id="${oc.id}"`; }
+  return `<button class="slot ${cls} ${pasado ? 'past' : ''}" style="top:${top}px;height:${h}px" ${act}>${inner}</button>`;
+}
+views.turnos = () => {
+  const f = UI.turFecha, cs = DB.canchas, hoy = dayKey(Date.now()), now = new Date(), ahora = now.getHours() * 60 + now.getMinutes();
+  if (!cs.length) { $('#main').innerHTML = '<header class="ph"><h1>Turnos</h1></header><div class="card">No hay canchas cargadas. Agregalas en Admin → Canchas y turnos.</div>'; return; }
+  const ap = Math.min(...cs.map(c => c.ap)), ci = Math.max(...cs.map(c => c.ci)), H = (ci - ap) / 60 * HP;
+  const horas = []; for (let m = ap; m < ci; m += 60) horas.push(m);
+  const dia = DB.turnos.filter(t => t.fecha === f && t.estado !== 'cancelado');
+  const heads = cs.map(c => `<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)}</small>${c.bloquea.length ? `<small>ocupa también: ${c.bloquea.map(id => esc(cancha(id).nombre)).join(' + ')}</small>` : ''}</div>`).join('');
+  const cols = cs.map(c => `<div class="ccol" style="height:${H}px">${slotsDe(c).map(s => slotHTML(c, s, f, ap, hoy, ahora)).join('')}</div>`).join('');
+  $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos reservados</p></div>
+    <div class="row"><button class="icon" data-act="tur-dia" data-d="-1" aria-label="Día anterior">‹</button><input class="in" style="width:auto" type="date" data-in="turf" value="${f}" aria-label="Fecha">
+      <button class="icon" data-act="tur-dia" data-d="1" aria-label="Día siguiente">›</button><button class="btn sm ghost" data-act="tur-hoy">Hoy</button></div></header>
+    <div class="cal-wrap" id="cal-wrap"><div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(150px,1fr));--hp:${HP}px">
+      <div class="chead corner"></div>${heads}
+      <div class="tcol" style="height:${H}px">${horas.map((m, i) => `<span style="top:${i * HP}px">${hm(m)}</span>`).join('')}</div>${cols}</div></div>
+    <div class="legend"><span><span class="pill">libre</span> tocá para reservar</span><span><span class="pill good">fútbol</span></span><span><span class="pill" style="background:var(--info-soft);color:var(--info)">pádel</span></span><span>Franja rayada: la cancha está ocupada por otra que usa el mismo espacio (Fútbol 7 usa las dos de Fútbol 5).</span></div>`;
+  if (f === hoy) $('#cal-wrap').scrollTop = Math.max(0, ((ahora - ap) / 60 - 1) * HP);
 };
+function modalNuevoTurno(canchaId, ini) {
+  const c = cancha(canchaId), f = UI.turFecha;
+  const rel = DB.canchas.filter(x => x.id !== c.id && relacionadas(c, x));
+  const metodos = DB.metodos.filter(m => m.activo).map(m => `<option value="${m.id}" ${m.efectivo ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('');
+  modal({
+    title: 'Reservar · ' + c.nombre,
+    body: `<p><b>${esc(fechaLarga(f))}</b> · ${hm(ini)} a ${hm(ini + c.dur)} (${c.dur} min)</p>
+      ${rel.length ? `<div class="note">Al reservar esta cancha, en ese horario también quedan ocupadas: <b>${rel.map(x => esc(x.nombre)).join(' y ')}</b>.</div>` : ''}
+      <div class="grid2"><label class="fld">A nombre de<input id="tn-cli" class="in" placeholder="Ej: Los Pibes"></label><label class="fld">Teléfono (opcional)<input id="tn-tel" class="in" inputmode="tel"></label></div>
+      <div class="grid2"><label class="fld">Precio del turno<input id="tn-precio" class="in" inputmode="numeric" value="${c.precio}"></label><label class="fld">Nota (opcional)<input id="tn-nota" class="in"></label></div>
+      <div class="grid2"><label class="fld">Seña ahora (opcional)<input id="tn-sena" class="in" inputmode="numeric" placeholder="0"></label><label class="fld">Medio de la seña<select id="tn-med" class="in">${metodos}</select></label></div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Reservar', kind: 'primary', onClick: () => {
+      const sena = num($('#tn-sena').value);
+      const r = tx(() => crearTurno({ canchaId, fecha: f, ini, cliente: $('#tn-cli').value.trim(), tel: $('#tn-tel').value.trim(), nota: $('#tn-nota').value.trim(), precio: num($('#tn-precio').value), pagos: sena > 0 ? [{ metodoId: $('#tn-med').value, monto: sena }] : [] }));
+      if (!r.ok) return false;
+      toast('Turno reservado'); render();
+    } }],
+  });
+}
+function verTurno(id) {
+  const t = DB.turnos.find(x => x.id === id); if (!t) return;
+  UI.turSel = id;
+  const c = cancha(t.canchaId), pag = pagadoDe(t), saldo = t.precio - pag, abierto = t.estado === 'reservado';
+  const rel = DB.canchas.filter(x => x.id !== c.id && relacionadas(c, x));
+  const pagos = pagosDe(t).map(p => `<div class="ab"><span>Pagó ${esc(p.nombre)} <small class="muted">${fechaHora(p.ts)}</small></span><b>${money(p.monto)}</b>${abierto ? `<button data-act="tpg-del" data-id="${p.id}">devolver</button>` : '<span></span>'}</div>`).join('');
+  const acciones = abierto
+    ? [{ label: 'Cerrar' }, { label: 'Cancelar turno', kind: 'danger', onClick: () => cancelarTurnoUI(id) }, { label: 'Editar datos', onClick: () => editarTurno(id) }, { label: 'Pago parcial', onClick: () => abrirCobroTurno(id, true) }, { label: 'Cobrar saldo', kind: 'primary', onClick: () => abrirCobroTurno(id, false) }]
+    : [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
+  modal({
+    title: c.nombre,
+    body: `<p><b>${esc(fechaLarga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
+      <div class="grid2"><div><span class="muted">A nombre de</span><br><b>${esc(t.cliente || 'Sin nombre')}</b>${t.tel ? '<br>' + esc(t.tel) : ''}</div><div><span class="muted">Nota</span><br>${esc(t.nota || '—')}</div></div>
+      <div class="card" style="padding:12px"><div class="l2"><span>Precio</span><b>${money(t.precio)}</b></div>${pagos}<div class="l2"><span>${abierto ? 'Saldo a cobrar' : 'Estado'}</span><b>${abierto ? money(saldo) : 'Cobrado ✓'}</b></div></div>
+      ${rel.length && abierto ? `<div class="note">En este horario también están ocupadas: ${rel.map(x => esc(x.nombre)).join(' y ')}.</div>` : ''}`,
+    actions: acciones,
+  });
+}
+function cancelarTurnoUI(id) {
+  const t = DB.turnos.find(x => x.id === id), ps = pagosDe(t), c = cancha(t.canchaId);
+  const hacer = map => { const r = tx(() => cancelarTurno(id, map || [])); if (r.ok) { toast('Turno cancelado, el horario quedó libre'); render(); } };
+  if (ps.length) modalDevolucion({ titulo: 'Cancelar turno', intro: `${esc(t.cliente || 'Este turno')} había pagado <b>${money(sum(ps, p => p.monto))}</b>. Elegí cómo devolvés el dinero.`, confirmLabel: 'Devolver y cancelar turno', pagos: ps, onConfirm: hacer });
+  else ask('Cancelar turno', `¿Cancelar el turno de ${esc(t.cliente || 'sin nombre')} (${hm(t.ini)}, ${esc(c.nombre)})? El horario queda libre.`, 'Cancelar turno', () => hacer(null), true);
+}
+function editarTurno(id) {
+  const t = DB.turnos.find(x => x.id === id);
+  modal({
+    title: 'Editar turno',
+    body: `<div class="grid2"><label class="fld">A nombre de<input id="et-cli" class="in" value="${esc(t.cliente)}"></label><label class="fld">Teléfono<input id="et-tel" class="in" value="${esc(t.tel)}"></label></div>
+      <div class="grid2"><label class="fld">Precio<input id="et-precio" class="in" inputmode="numeric" value="${t.precio}"></label><label class="fld">Nota<input id="et-nota" class="in" value="${esc(t.nota)}"></label></div>`,
+    actions: [{ label: 'Cancelar' }, { label: 'Guardar', kind: 'primary', onClick: () => {
+      const precio = num($('#et-precio').value);
+      if (precio <= pagadoDe(t)) { toast('El precio tiene que ser mayor a lo ya pagado (' + money(pagadoDe(t)) + ')', 'warn'); return false; }
+      const r = tx(() => { Object.assign(DB.turnos.find(x => x.id === id), { cliente: $('#et-cli').value.trim(), tel: $('#et-tel').value.trim(), nota: $('#et-nota').value.trim(), precio }); });
+      if (!r.ok) return false;
+      render(); verTurno(id);
+    } }],
+  });
+}
 
 /* --- STOCK --- */
 function stockEstado(p) {
   if (p.tipo === 'receta') { const r = restante(p, {}); return r <= 0 ? ['bad', 'No se puede armar'] : ['good', 'Se pueden armar ' + r]; }
+  if (p.stock < 0) return ['bad', 'Falta cargar ' + (-p.stock)];
   if (p.stock <= 0) return ['bad', 'Sin stock'];
   if (p.stock <= p.minimo) return ['warn', 'Bajo'];
   return ['good', 'OK'];
@@ -998,7 +1197,7 @@ views.stock = () => {
       <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Tipo</th><th class="r">Stock</th><th class="r">Mínimo</th><th>Estado</th><th></th></tr></thead><tbody>
       ${list.map(p => { const [k, t] = stockEstado(p), rec = p.tipo === 'receta';
         return `<tr><td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:8px"></span><b>${esc(p.nombre)}</b></td><td class="muted">${TIPOS[p.tipo].n}</td>
-        <td class="r num"><b>${rec ? '—' : p.stock}</b></td><td class="r num">${rec ? '—' : p.minimo}</td><td><span class="pill ${k}">${t}</span></td>
+        <td class="r num"><b ${p.stock < 0 ? 'style="color:var(--bad)"' : ''}>${rec ? '—' : p.stock}</b></td><td class="r num">${rec ? '—' : p.minimo}</td><td><span class="pill ${k}">${t}</span></td>
         <td class="r">${rec ? '<span class="muted">usa insumos</span>' : `<div class="actions"><button class="btn sm primary" data-act="stk-ing" data-id="${p.id}">Ingreso</button><button class="btn sm" data-act="stk-aj" data-id="${p.id}">Contar</button></div>`}</td></tr>`; }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Nada para mostrar.</td></tr>'}
       </tbody></table></div>
       <p class="muted" style="margin-top:10px">Los productos de servicio (turnos, café, minutas) no llevan stock y no aparecen acá.</p>`;
@@ -1125,14 +1324,15 @@ views.tickets = () => {
 
 /* --- REPORTES --- */
 function ventasRango(d, h) { return DB.ventas.filter(v => v.estado === 'ok' && dayKey(v.ts) >= d && dayKey(v.ts) <= h); }
-/* Lo cobrado en el período, por medio de pago: incluye pagos parciales de cuentas abiertas y descuenta devoluciones */
+/* Lo cobrado en el período por medio de pago, según el libro de caja: cobros (con pagos parciales y señas) menos devoluciones */
 function cobros(d, h) {
   const m = {}; DB.metodos.forEach(x => { m[x.id] = { nombre: x.nombre, n: 0, monto: 0 }; });
-  const en = ts => { const k = dayKey(ts); return k >= d && k <= h; };
-  const add = (p, signo) => { const o = m[p.metodoId] || (m[p.metodoId] = { nombre: p.nombre, n: 0, monto: 0 }); if (signo > 0) o.n++; o.monto += signo * p.monto; };
-  DB.ventas.filter(v => v.estado === 'ok').forEach(v => v.pagos.forEach(p => { if (en(p.ts || v.ts)) add(p, 1); }));
-  Object.values(DB.comandas).forEach(c => pagosDe(c).forEach(p => { if (en(p.ts)) add(p, 1); }));
-  DB.devoluciones.forEach(x => { if (en(x.ts)) add(x, -1); });
+  DB.caja.forEach(e => {
+    const k = dayKey(e.ts); if (k < d || k > h) return;
+    const o = m[e.metodoId] || (m[e.metodoId] = { nombre: e.nombre, n: 0, monto: 0 });
+    if (e.tipo === 'cobro') o.n++;
+    o.monto += e.monto;
+  });
   return Object.values(m);
 }
 function resumen(d, h) {
@@ -1142,7 +1342,7 @@ function resumen(d, h) {
   vs.forEach(v => v.items.forEach(l => {
     const cn = catDe(l.catId) ? catDe(l.catId).nombre : 'Sin categoría';
     cats[cn] = (cats[cn] || 0) + l.cant * l.precio;
-    const o = prods[l.nombre] || (prods[l.nombre] = { cant: 0, monto: 0 }); o.cant += l.cant; o.monto += l.cant * l.precio;
+    if (l.prodId) { const o = prods[l.nombre] || (prods[l.nombre] = { cant: 0, monto: 0 }); o.cant += l.cant; o.monto += l.cant * l.precio; }
   }));
   return { vs, total, met, cobrado: sum(met, m => m.monto), cats: Object.entries(cats).sort((a, b) => b[1] - a[1]), prods: Object.entries(prods).sort((a, b) => b[1].cant - a[1].cant) };
 }
@@ -1161,15 +1361,15 @@ views.reportes = () => {
       <div class="kpi"><span>Ticket promedio</span><b>${money(R.vs.length ? R.total / R.vs.length : 0)}</b></div>
       <div class="kpi"><span>Cobrado en el período</span><b>${money(R.cobrado)}</b></div>
       <div class="kpi"><span>Efectivo en caja</span><b>${money(sum(efe, m => m.monto))}</b></div>
-      <div class="kpi"><span>Por cobrar (cuentas abiertas)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0))}</b></div>
+      <div class="kpi"><span>Por cobrar (cuentas y turnos abiertos)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0) + sum(DB.turnos.filter(t => t.estado === 'reservado' && t.fecha <= dayKey(Date.now())), t => t.precio - pagadoDe(t)))}</b></div>
       <div class="kpi"><span>Anulados</span><b>${anul}</b></div></div>
     <div class="cols">
-      <div class="card"><h2>Cobrado por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}<p class="muted" style="margin-top:8px;font-size:12px">Incluye pagos parciales de cuentas abiertas y descuenta devoluciones.</p></div>
+      <div class="card"><h2>Cobrado por medio de pago</h2>${barras(R.met.map(m => [m.nombre + (m.n ? ` (${m.n})` : ''), m.monto]), money)}<p class="muted" style="margin-top:8px;font-size:12px">Suma señas y pagos parciales, y descuenta las devoluciones en el medio en que se devolvió.</p></div>
       <div class="card"><h2>Por categoría</h2>${barras(R.cats, money)}</div>
       <div class="card"><h2>Más vendidos</h2>${barras(R.prods.slice(0, 8).map(([n, o]) => [n, o.cant]), v => v + ' u.')}</div></div>
     <div class="card" style="margin-top:16px"><h2>Exportar a Excel / CSV</h2><div class="row">
       <button class="btn" data-act="exp-pagos">Resumen por medio de pago</button><button class="btn" data-act="exp-ventas">Detalle de ventas</button>
-      <button class="btn" data-act="exp-stock">Stock actual</button><button class="btn" data-act="exp-mov">Movimientos de stock</button></div></div>`;
+      <button class="btn" data-act="exp-stock">Stock actual</button><button class="btn" data-act="exp-mov">Movimientos de stock</button><button class="btn" data-act="exp-caja">Movimientos de caja</button></div></div>`;
 };
 function rowsPagos() {
   const R = resumen(UI.repDesde, UI.repHasta);
@@ -1180,6 +1380,7 @@ function rowsVentas() {
   DB.ventas.filter(v => dayKey(v.ts) >= UI.repDesde && dayKey(v.ts) <= UI.repHasta).forEach(v => v.items.forEach(l => rows.push([v.nro, dayKey(v.ts), hhmm(v.ts), v.destino, v.cliente, l.nombre, catDe(l.catId) ? catDe(l.catId).nombre : '', l.cant, l.precio, l.cant * l.precio, v.pagos.map(p => p.nombre + ' ' + p.monto).join(' + '), v.estado])));
   return rows;
 }
+function rowsCaja() { return [['Fecha', 'Hora', 'Tipo', 'Medio de pago', 'Monto', 'Detalle'], ...DB.caja.filter(e => dayKey(e.ts) >= UI.repDesde && dayKey(e.ts) <= UI.repHasta).map(e => [dayKey(e.ts), hhmm(e.ts), e.tipo === 'cobro' ? 'Cobro' : 'Devolución', e.nombre, e.monto, e.motivo])]; }
 function rowsStock() { return [['Producto', 'Tipo', 'Stock', 'Mínimo'], ...DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => [p.nombre, TIPOS[p.tipo].n, p.stock, p.minimo])]; }
 function rowsMov() { return [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Antes', 'Después', 'Detalle'], ...DB.movimientos.map(m => [dayKey(m.ts) + ' ' + hhmm(m.ts), m.nombre, MOV[m.tipo][0], m.cant, m.antes, m.despues, m.motivo])]; }
 
@@ -1191,7 +1392,7 @@ views.admin = () => {
     return;
   }
   const t = UI.admTab;
-  const tabs = [['productos', 'Productos'], ['categorias', 'Categorías'], ['pagos', 'Medios de pago'], ['datos', 'Datos y seguridad']].map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
+  const tabs = [['productos', 'Productos'], ['categorias', 'Categorías'], ['canchas', 'Canchas y turnos'], ['pagos', 'Medios de pago'], ['datos', 'Datos y seguridad']].map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
   $('#main').innerHTML = `<header class="ph"><div><h1>Administración</h1><p class="muted">Sesión desbloqueada por 5 minutos desde la última acción.</p></div><button class="btn sm ghost" data-act="adm-lock">Bloquear ahora</button></header>
     <div class="chips" style="margin-bottom:14px">${tabs}</div><div id="adm-body"></div>`;
   admBody[t]();
@@ -1214,6 +1415,21 @@ admBody.categorias = () => {
       <select class="in" style="width:auto" data-in="cat-color" data-id="${c.id}">${Object.keys(CAT_HUES).map(k => `<option ${c.color === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
       <button class="btn sm ghost" data-act="cat-del" data-id="${c.id}">Eliminar</button></div>`).join('')}
     <button class="btn" data-act="cat-add" style="align-self:flex-start">+ Nueva categoría</button></div></div>`;
+};
+admBody.canchas = () => {
+  const horas = (sel, desde, hasta) => Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i).map(h => `<option value="${h}" ${h === sel ? 'selected' : ''}>${h === 24 ? '24:00 (medianoche)' : pad(h) + ':00'}</option>`).join('');
+  $('#adm-body').innerHTML = `<p class="muted" style="margin-bottom:12px">Las canchas del calendario de turnos. Si una cancha "bloquea" a otra, al reservar una queda ocupada la otra en ese horario: por ejemplo, Fútbol 7 bloquea a las dos de Fútbol 5.</p>
+    <div class="stack">${DB.canchas.map(c => `<div class="card"><div class="grid2">
+      <label class="fld">Nombre<input class="in" data-in="cn-f" data-f="nombre" data-id="${c.id}" value="${esc(c.nombre)}"></label>
+      <label class="fld">Categoría para los reportes<select class="in" data-in="cn-f" data-f="catId" data-id="${c.id}">${DB.categorias.map(k => `<option value="${k.id}" ${k.id === c.catId ? 'selected' : ''}>${esc(k.nombre)}</option>`).join('')}</select></label></div>
+      <div class="grid2" style="margin-top:12px"><label class="fld">Deporte<select class="in" data-in="cn-f" data-f="deporte" data-id="${c.id}">${['futbol', 'padel', 'otro'].map(k => `<option value="${k}" ${k === c.deporte ? 'selected' : ''}>${k === 'futbol' ? 'Fútbol' : k === 'padel' ? 'Pádel' : 'Otro'}</option>`).join('')}</select></label>
+      <label class="fld">Duración del turno (minutos)<input class="in" inputmode="numeric" data-in="cn-f" data-f="dur" data-id="${c.id}" value="${c.dur}"></label></div>
+      <div class="grid2" style="margin-top:12px"><label class="fld">Abre<select class="in" data-in="cn-f" data-f="ap" data-id="${c.id}">${horas(c.ap / 60, 0, 23)}</select></label>
+      <label class="fld">Cierra<select class="in" data-in="cn-f" data-f="ci" data-id="${c.id}">${horas(c.ci / 60, 1, 24)}</select></label></div>
+      <div class="grid2" style="margin-top:12px"><label class="fld">Precio del turno<input class="in" inputmode="numeric" data-in="cn-f" data-f="precio" data-id="${c.id}" value="${c.precio}"></label>
+      <div class="fld">Bloquea a estas canchas<div class="chips">${DB.canchas.filter(o => o.id !== c.id).map(o => `<label class="chip"><input type="checkbox" data-in="cn-bloq" data-id="${c.id}" data-o="${o.id}" ${c.bloquea.includes(o.id) ? 'checked' : ''}> ${esc(o.nombre)}</label>`).join('') || '<span class="muted">No hay otras canchas</span>'}</div></div></div>
+      <div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="cn-del" data-id="${c.id}">Eliminar cancha</button></div></div>`).join('')}
+      <button class="btn" data-act="cn-add" style="align-self:flex-start">+ Nueva cancha</button></div>`;
 };
 admBody.pagos = () => {
   $('#adm-body').innerHTML = `<div class="card" style="max-width:640px"><h2>Medios de pago</h2><p class="muted" style="margin-bottom:10px">Se pueden combinar en un mismo cobro. El efectivo es el único que admite vuelto.</p><div class="stack">
@@ -1253,7 +1469,7 @@ function leerPF() {
   if (f.tipo === 'receta') f.receta = f.receta.map((r, i) => ({ id: $('#pf-ri-' + i).value, cant: Math.max(1, num($('#pf-rc-' + i).value)) }));
 }
 function mostrarFormProducto() {
-  const f = UI.pf, editando = !!UI.pfId, conStock = ['directo', 'insumo', 'alquiler'].includes(f.tipo);
+  const f = UI.pf, editando = !!UI.pfId, conStock = ['directo', 'insumo'].includes(f.tipo);
   const insumos = DB.productos.filter(p => (p.tipo === 'insumo' || p.tipo === 'directo') && p.id !== UI.pfId);
   const receta = f.tipo === 'receta' ? `<div class="stack"><b>Ingredientes (se descuentan al vender)</b>
     ${f.receta.map((r, i) => `<div class="rrow"><select class="in" id="pf-ri-${i}">${insumos.map(x => `<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select><input class="in" id="pf-rc-${i}" inputmode="numeric" value="${r.cant}" aria-label="Cantidad"><button class="icon" data-act="pf-rdel" data-i="${i}" aria-label="Quitar">×</button></div>`).join('')}
@@ -1281,11 +1497,11 @@ function guardarProducto() {
   if (f.tipo === 'receta' && new Set(f.receta.map(r => r.id)).size !== f.receta.length) { toast('Un ingrediente está repetido', 'warn'); return false; }
   if (DB.productos.some(p => p.id !== UI.pfId && norm(p.nombre) === norm(f.nombre))) { toast('Ya existe un producto con ese nombre', 'warn'); return false; }
   const r = tx(() => {
-    const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo', 'alquiler'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, receta: f.tipo === 'receta' ? f.receta : [] };
+    const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, receta: f.tipo === 'receta' ? f.receta : [] };
     if (UI.pfId) Object.assign(prod(UI.pfId), campos);
     else {
       const p = { id: uid('p'), activo: true, stock: 0, ...campos }; DB.productos.push(p);
-      if (['directo', 'insumo', 'alquiler'].includes(p.tipo) && f.stock > 0) moverStock(p.id, f.stock, 'ingreso', { motivo: 'Stock inicial' });
+      if (['directo', 'insumo'].includes(p.tipo) && f.stock > 0) moverStock(p.id, f.stock, 'ingreso', { motivo: 'Stock inicial' });
     }
   });
   if (r.ok) { toast('Producto guardado'); render(); }
@@ -1295,7 +1511,6 @@ function eliminarProducto(id) {
   const usado = DB.productos.find(x => x.receta && x.receta.some(r => r.id === id));
   if (usado) return toast(`No se puede: "${usado.nombre}" lo usa en su receta`, 'warn');
   if (Object.values(DB.comandas).some(c => c.items.some(i => i.prodId === id))) return toast('No se puede: está en una cuenta abierta', 'warn');
-  if (DB.alquileres.some(a => a.prodId === id && a.estado === 'prestado')) return toast('No se puede: hay unidades prestadas', 'warn');
   ask('Eliminar producto', `¿Eliminar <b>${esc(p.nombre)}</b>? Los tickets viejos mantienen su nombre. Si sólo querés que no aparezca en la caja, usá "Ocultar".`, 'Eliminar', () => {
     const r = tx(() => { DB.productos = DB.productos.filter(x => x.id !== id); });
     if (r.ok) { toast('Producto eliminado'); render(); }
@@ -1320,7 +1535,7 @@ const A = {
   // caja
   cat: d => { UI.cat = d.id; renderCats(); renderGrid(); },
   add: d => agregar(d.id),
-  inc: d => { const key = UI.com, items = getCom(key).items, n = cambiarCantidad(items, +d.i, 1); chequearStock(n, key, true, 'vender', () => aplicarItems(key, n)); },
+  inc: d => { const key = UI.com, items = getCom(key).items, n = cambiarCantidad(items, +d.i, 1); chequearStock(n, key, true, 'vender', neg => aplicarItems(key, n, neg)); },
   dec: d => { const key = UI.com; aplicarItems(key, cambiarCantidad(getCom(key).items, +d.i, -1)); },
   del: d => { const key = UI.com; aplicarItems(key, getCom(key).items.filter((_, i) => i !== +d.i)); },
   nota: d => {
@@ -1336,27 +1551,44 @@ const A = {
   'ir-lugar': d => { UI.com = d.id; UI.view = 'venta'; UI.editSalon = false; render(); },
   'ab-del': d => {
     const key = UI.com, p = pagosDe(getCom(key)).find(x => x.id === d.id); if (!p) return;
-    ask('Devolver un pago', `Se devuelven <b>${money(p.monto)}</b> (${esc(p.nombre)}) al cliente y queda registrada la devolución. La cuenta vuelve a deber ese monto.`, 'Devolver', () => {
-      const r = tx(() => devolverAbono(key, d.id)); if (r.ok) { toast('Pago devuelto'); render(); }
-    }, true);
+    modalDevolucion({ titulo: 'Devolver un pago', intro: `El cliente había pagado <b>${money(p.monto)}</b>. La cuenta vuelve a deber ese monto.`, confirmLabel: 'Devolver', pagos: [p],
+      onConfirm: map => { const r = tx(() => devolverPago(key, p.id, map[0])); if (r.ok) { toast('Pago devuelto'); render(); } } });
   },
   foto: () => modalFoto(),
+  // turnos
+  slot: d => modalNuevoTurno(d.c, +d.s),
+  turno: d => verTurno(d.id),
+  'tur-dia': d => { UI.turFecha = dayKey(new Date(UI.turFecha + 'T12:00:00').getTime() + (+d.d) * 864e5); views.turnos(); },
+  'tur-hoy': () => { UI.turFecha = dayKey(Date.now()); views.turnos(); },
+  'tpg-del': d => {
+    const t = DB.turnos.find(x => x.id === UI.turSel), p = t && pagosDe(t).find(x => x.id === d.id); if (!p) return;
+    modalDevolucion({ titulo: 'Devolver un pago', intro: `El cliente había pagado <b>${money(p.monto)}</b>. El turno vuelve a deber ese monto.`, confirmLabel: 'Devolver', pagos: [p],
+      onConfirm: map => { const r = tx(() => devolverPago('T:' + t.id, p.id, map[0])); if (r.ok) { toast('Pago devuelto'); render(); } verTurno(t.id); } });
+  },
+  'exp-caja': () => exportar(`caja_${UI.repDesde}_a_${UI.repHasta}`, rowsCaja()),
+  'cn-add': () => { const r = tx(() => { DB.canchas.push({ id: uid('cn'), nombre: 'Nueva cancha', deporte: 'otro', dur: 60, ap: 600, ci: 1440, precio: 20000, catId: DB.categorias[0].id, bloquea: [] }); }); if (r.ok) views.admin(); },
+  'cn-del': d => {
+    if (DB.turnos.some(t => t.canchaId === d.id && t.estado !== 'cancelado')) return toast('Esa cancha tiene turnos reservados o cobrados. Cancelalos antes.', 'warn');
+    const r = tx(() => { DB.canchas = DB.canchas.filter(c => c.id !== d.id); DB.canchas.forEach(c => { c.bloquea = c.bloquea.filter(x => x !== d.id); }); }); if (r.ok) views.admin();
+  },
   mover: () => moverComanda(),
   'mover-a': d => {
     const from = UI.com, to = d.id;
-    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, pagos: pagosDe(src), ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
+    const r = tx(() => { const src = getCom(from); DB.comandas[to] = { items: src.items, pagos: pagosDe(src), negOk: src.negOk, ts: src.ts || Date.now() }; if (from === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[from]; });
     if (r.ok) { UI.com = to; toast('Cuenta pasada a ' + DB.mesas.find(m => m.id === to).nombre); closeModal(); render(); }
   },
   vaciar: () => {
-    const key = UI.com, c = getCom(key), pag = pagadoDe(c);
-    const msg = pag > 0 ? `Esta cuenta ya tiene <b>${money(pag)}</b> pagados. Se registra la devolución de ese dinero y se quitan todos los productos.` : 'Se quitan todos los productos de esta cuenta. No se descuenta stock porque no se cobró.';
-    ask(key === 'M' ? 'Vaciar la venta' : 'Cancelar la cuenta', msg, pag > 0 ? 'Devolver y cancelar' : 'Sí, quitar todo', () => {
+    const key = UI.com, c = getCom(key), ps = pagosDe(c);
+    const hacer = map => {
       const r = tx(() => {
-        pagosDe(c).forEach(p => DB.devoluciones.push({ id: uid('dv'), ts: Date.now(), metodoId: p.metodoId, nombre: p.nombre, monto: p.monto, motivo: 'Cuenta cancelada (' + lugarNombre(key) + ')' }));
+        ps.forEach((p, i) => devolverPago(key, p.id, map ? map[i] : p.metodoId));
         if (key === 'M') DB.comandas.M = { items: [] }; else delete DB.comandas[key];
       });
       if (r.ok) render();
-    }, true);
+    };
+    const titulo = key === 'M' ? 'Vaciar la venta' : 'Cancelar la cuenta';
+    if (ps.length) modalDevolucion({ titulo, intro: `Esta cuenta ya tiene <b>${money(sum(ps, p => p.monto))}</b> pagados. Elegí cómo devolvés el dinero y se quitan todos los productos.`, confirmLabel: 'Devolver y cancelar', pagos: ps, onConfirm: hacer });
+    else ask(titulo, 'Se quitan todos los productos de esta cuenta. No se descuenta stock porque no se cobró.', 'Sí, quitar todo', () => hacer(null), true);
   },
   // cobro
   'pg-add': d => {
@@ -1395,9 +1627,6 @@ const A = {
     if (DB.comandas[m.id]) return toast('Esa mesa tiene una cuenta abierta. Cobrala o cancelala primero.', 'warn');
     ask('Eliminar mesa', `¿Eliminar <b>${esc(m.nombre)}</b> del salón?`, 'Eliminar', () => { const r = tx(() => { DB.mesas = DB.mesas.filter(x => x.id !== m.id); }); if (r.ok) { UI.mesaEdit = null; views.mesas(); } }, true);
   },
-  // alquileres
-  'alq-dev': d => { const r = tx(() => devolverAlquiler(d.id, false)); if (r.ok) { toast('Devuelto: el stock volvió'); render(); } },
-  'alq-perd': d => ask('El artículo no volvió', 'Se cierra el alquiler y <b>el stock no vuelve</b> (queda como baja en el historial).', 'Marcar como no devuelto', () => { const r = tx(() => devolverAlquiler(d.id, true)); if (r.ok) { toast('Registrado como baja', 'warn'); render(); } }, true),
   // stock
   'stk-tab': d => { UI.stockTab = d.v; views.stock(); },
   'stk-f': d => { UI.stockF = d.v; views.stock(); },
@@ -1452,8 +1681,8 @@ const A = {
       <div class="card"><p>Stock antes: <b>${antes}</b> · Stock después de la falla: <b>${q.stock}</b></p><p>Nº de ticket antes: <b>${nv}</b> · después: <b>${DB.contadores.venta}</b></p></div>
       <div class="note">${q.stock === antes && DB.contadores.venta === nv ? 'Todo quedó igual que antes: no se perdió ni se inventó nada (rollback).' : 'Algo quedó a medias.'}</div>`, actions: [{ label: 'Entendido', kind: 'primary' }] });
   },
-  'reset-hist': () => ask('Borrar ventas e historial', 'Se borran tickets, movimientos de stock y alquileres. Los productos y su stock actual se mantienen.', 'Borrar', () => {
-    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.alquileres = []; DB.devoluciones = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
+  'reset-hist': () => ask('Borrar ventas e historial', 'Se borran tickets, turnos, movimientos de stock y movimientos de caja. Los productos y su stock actual se mantienen.', 'Borrar', () => {
+    const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.caja = []; DB.turnos = []; DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
     if (r.ok) { toast('Historial borrado'); render(); }
   }, true),
   'reset-demo': () => ask('Volver a datos de ejemplo', 'Se pierde todo lo que cargaste y se vuelven a cargar los datos de ejemplo.', 'Restablecer', () => { seed(); normalizar(); persist(); UI.com = 'M'; toast('Datos de ejemplo cargados'); render(); }, true),
@@ -1467,6 +1696,19 @@ document.addEventListener('click', e => {
 /* campos de texto, selectores y fechas (evento "input") */
 const mesaSel = () => DB.mesas.find(x => x.id === UI.mesaEdit);
 const I = {
+  turf: el => { if (el.value) { UI.turFecha = el.value; views.turnos(); } },
+  'cn-f': el => {
+    const c = cancha(el.dataset.id); if (!c) return;
+    const f = el.dataset.f, v = el.value;
+    if (f === 'nombre') { if (!v.trim()) return; c.nombre = v.trim(); }
+    else if (f === 'deporte' || f === 'catId') c[f] = v;
+    else if (f === 'ap') c.ap = num(v) * 60;
+    else if (f === 'ci') c.ci = num(v) * 60;
+    else if (f === 'dur') c.dur = Math.max(15, num(v));
+    else c[f] = num(v);
+    persist();
+  },
+  'cn-bloq': el => { const c = cancha(el.dataset.id), o = el.dataset.o; if (!c) return; c.bloquea = el.checked ? [...new Set([...c.bloquea, o])] : c.bloquea.filter(x => x !== o); persist(); },
   'mesa-tipo': el => { const m = mesaSel(); if (m) { m.tipo = el.value; persist(); views.mesas(); } },
   'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
   'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persist(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
