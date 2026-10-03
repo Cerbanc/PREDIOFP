@@ -19,7 +19,7 @@ Para **actualizarla**: se instala la versión nueva encima. Los datos de `C:\Pre
 2. Cargá los productos de una de estas formas, o combinándolas:
    - **Escribir en la tabla**: una fila por producto. Con *Enter* bajás, con las flechas te movés, con *Tab* pasás a la celda de al lado.
    - **Pegar desde Excel**: copiás las celdas en Excel y las pegás con *Ctrl+V* en la tabla. Funciona con o sin la fila de títulos.
-   - **Cargar archivo de Excel**: botón *Cargar archivo de Excel…*. Si no tenés una planilla armada, *Bajar plantilla vacía* te da una lista para completar (en la PC o en el celular).
+   - **Cargar archivo de Excel**: botón *Cargar archivo de Excel…*. Si no tenés una planilla armada, *Bajar plantilla vacía* te da una lista para completar (en la PC o en el celular). Esa misma plantilla está en este repositorio, en [`docs/plantilla_productos_y_stock.xlsx`](plantilla_productos_y_stock.xlsx): se puede ir completando **desde ya**, antes de instalar nada, y después cargarla de una sola vez.
 3. Qué va en cada columna:
    | Columna | Para qué sirve |
    |---|---|
