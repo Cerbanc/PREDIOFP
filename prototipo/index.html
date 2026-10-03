@@ -284,6 +284,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .slot.res.t-otro{background:var(--warn-soft)}
 .slot.res.done{opacity:.7}
 .slot.res.fijo{border-left:5px solid var(--accent)}
+.mesa.playing{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+.tmp-strip{margin-top:16px}
+.tmp-strip h2{margin-bottom:2px}
+.tmp-strip .row{margin-top:10px}
+.tmp{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:130px;padding:8px 12px;border-radius:10px;border:2px solid var(--warn);background:var(--warn-soft);cursor:pointer;line-height:1.25}
+.tmp b{font-size:13px}.tmp span{font-weight:700;color:var(--warn);font-variant-numeric:tabular-nums}.tmp small{color:var(--muted);font-size:11px}
 .slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface) 6px,var(--surface) 12px)}
 .slot.past{opacity:.55}
 .l2{display:flex;justify-content:space-between;padding:3px 0}
@@ -353,7 +359,7 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ---------- base de datos (en memoria + localStorage) ---------- */
-const LS_KEY = 'predio_pos_proto_v4';
+const LS_KEY = 'predio_pos_proto_v5';
 let DB = null;
 let STORAGE_OK = true;
 const UI = {
@@ -707,6 +713,55 @@ function cancelarTurno(id, map) {
   logPush('turno', cancha(t.canchaId).nombre, `Turno cancelado: ${t.cliente || 'sin nombre'}, ${cancha(t.canchaId).nombre}, ${t.fecha} ${hm(t.ini)}.`);
 }
 
+/* Cada cancha tiene un lugar en el mapa donde se abre la cuenta de lo que consumen mientras juegan.
+   Fútbol 7 usa los lugares de las dos de Fútbol 5. Cuando el turno termina y la cuenta sigue abierta,
+   sale de la cancha y pasa a una "mesa suelta" (ej: "PÁDEL 1 20:00hs") para que la cancha quede libre. */
+function lugaresDeTurno(t) {
+  const c = cancha(t.canchaId), ids = new Set();
+  if (c.lugarId) ids.add(c.lugarId);
+  if (c.clave === 'f7') DB.canchas.filter(x => CLAVES_F5.includes(x.clave)).forEach(x => { if (x.lugarId) ids.add(x.lugarId); });
+  return [...ids];
+}
+function turnoEnCurso(lugarId, ahoraMs) {
+  const d = new Date(ahoraMs), min = d.getHours() * 60 + d.getMinutes();
+  return turnosDelDia(dayKey(ahoraMs)).find(t => t.ini <= min && min < t.fin && lugaresDeTurno(t).includes(lugarId));
+}
+const turnoFinTs = t => new Date(t.fecha + 'T00:00:00').getTime() + t.fin * 60000;
+function limpiarTemporales() {
+  const antes = DB.mesas.length;
+  DB.mesas = DB.mesas.filter(m => !m.temporal || DB.comandas[m.id]);
+  return DB.mesas.length !== antes;
+}
+/* Devuelve las cuentas que se movieron. Se llama al mostrar pantallas y cada 30 segundos. */
+function moverTerminados() {
+  const ahora = Date.now();
+  const hay = Object.keys(DB.comandas).some(k => { const c = DB.comandas[k]; return k !== 'M' && c.turnoFin && ahora >= c.turnoFin && c.items.length; }) || DB.mesas.some(m => m.temporal && !DB.comandas[m.id]);
+  if (!hay) return [];
+  const r = tx(() => {
+    const movidas = [];
+    Object.keys(DB.comandas).forEach(k => {
+      const c = DB.comandas[k], m = DB.mesas.find(x => x.id === k);
+      if (k === 'M' || !m || m.temporal || !c.turnoFin || ahora < c.turnoFin || !c.items.length) return;
+      const nm = { id: uid('m'), nombre: `${m.nombre} ${c.turnoLabel}hs`, tipo: 'mesa', temporal: true, x: 0, y: 0, w: 10, h: 10, rapido: false };
+      DB.mesas.push(nm);
+      const { turnoFin, turnoLabel, turnoCliente, ...resto } = c;
+      DB.comandas[nm.id] = { ...resto, turnoCliente };
+      delete DB.comandas[k];
+      if (UI.com === k) UI.com = nm.id;
+      logPush('turno', m.nombre, `Terminó el turno de ${turnoCliente || 'la cancha'} en ${m.nombre} (${turnoLabel}hs): la cuenta abierta pasó a la mesa suelta "${nm.nombre}" y la cancha quedó libre.`);
+      movidas.push({ de: m.nombre, a: nm.nombre });
+    });
+    limpiarTemporales();
+    return movidas;
+  });
+  return r.ok ? r.value : [];
+}
+function revisarTurnos() {
+  const mv = moverTerminados();
+  mv.forEach(m => toast(`La cuenta de ${m.de} pasó a "${m.a}" porque terminó el turno`, 'warn'));
+  return mv.length > 0;
+}
+
 /* ---------- datos de ejemplo ---------- */
 function seed() {
   const d = { v: 4, seq: 1, pin: '1234', negocio: 'Predio Deportivo', config: { pedirPinAjuste: true }, categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], fijos: [], log: [], contadores: { venta: 0 } };
@@ -751,8 +806,8 @@ function seed() {
 
   // mapa del salón (lugares donde se abren cuentas)
   const L = (nombre, tipo, x, y, w, h, rapido) => { const m = { id: uid('m'), nombre, tipo, x, y, w, h, rapido: !!rapido }; d.mesas.push(m); return m; };
-  const futbol1 = L('FÚTBOL 1', 'futbol', 2, 3, 26, 20); L('FÚTBOL 2', 'futbol', 30, 3, 26, 20);
-  L('PÁDEL 1', 'padel', 59, 3, 18, 14); L('PÁDEL 2', 'padel', 79, 3, 18, 14);
+  const futbol1 = L('FÚTBOL 1', 'futbol', 2, 3, 26, 20), futbol2 = L('FÚTBOL 2', 'futbol', 30, 3, 26, 20);
+  const padel1 = L('PÁDEL 1', 'padel', 59, 3, 18, 14), padel2 = L('PÁDEL 2', 'padel', 79, 3, 18, 14);
   const mesas = [];
   [2, 22, 42, 62, 82].forEach((x, i) => mesas.push(L('Mesa ' + (i + 1), 'mesa', x, 34, 14, 17)));
   [2, 22, 42].forEach((x, i) => mesas.push(L('Mesa ' + (i + 6), 'mesa', x, 58, 14, 17)));
@@ -763,6 +818,8 @@ function seed() {
   const f5a = cn('f5a', 'Fútbol 5 · Cancha 1', 'futbol', 60, 600, 28000, 24000, futbol), f5b = cn('f5b', 'Fútbol 5 · Cancha 2', 'futbol', 60, 600, 28000, 24000, futbol);
   const f7 = cn('f7', 'Fútbol 7 · Cancha completa', 'futbol', 60, 600, 48000, 42000, futbol);
   const pT = cn('padelT', 'Pádel · Techada', 'padel', 90, 480, 26000, 22000, padel), pA = cn('padelA', 'Pádel · Abierta', 'padel', 90, 480, 22000, 19000, padel);
+  // lugar del mapa donde se abre la cuenta de cada cancha
+  [[f5a, futbol1], [f5b, futbol2], [f7, futbol1], [pT, padel1], [pA, padel2]].forEach(([cid, lugar]) => { cancha(cid).lugarId = lugar.id; });
 
   // ventas de ejemplo de hoy (pasan por la misma función que las ventas reales)
   const demo = [
@@ -802,6 +859,16 @@ function seed() {
   d.comandas[mesas[5].id] = { ts: Date.now() - 9 * 60000, items: [{ prodId: hamb, cant: 2, nota: 'sin cebolla' }] };
   d.comandas[futbol1.id] = { ts: Date.now() - 40 * 60000, items: [{ prodId: gato, cant: 4, nota: '' }], pagos: [ab(tr, 4000, 35, 'Pago parcial · FÚTBOL 1')] };
   d.comandas[barra.id] = { ts: Date.now() - 15 * 60000, items: [{ prodId: cerv, cant: 2, nota: '' }, { prodId: alfa, cant: 1, nota: '' }] };
+  // un turno de pádel jugándose ahora (con consumos) y otro que recién terminó con la cuenta abierta (según la hora en que abras el prototipo)
+  const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const sA = slotsDe(cancha(pT)).find(s => s <= ahoraMin && ahoraMin < s + 90);
+  if (sA !== undefined) {
+    let tA = ocupante(pT, hoy, sA, sA + 90);
+    if (!tA) { const idA = crearTurno({ canchaId: pT, fecha: hoy, ini: sA, cliente: 'Gaby y Lean' }); tA = d.turnos.find(x => x.id === idA); }
+    d.comandas[padel1.id] = { ts: Date.now() - 12 * 60000, items: [{ prodId: cerv, cant: 1, nota: '' }, { prodId: alfa, cant: 2, nota: '' }], turnoFin: turnoFinTs(tA), turnoLabel: hm(tA.ini), turnoCliente: tA.cliente };
+  }
+  const sB = slotsDe(cancha(pA)).filter(s => s + 90 <= ahoraMin).pop();
+  if (sB !== undefined) d.comandas[padel2.id] = { ts: Date.now() - 80 * 60000, items: [{ prodId: cerv, cant: 2, nota: '' }, { prodId: pancho, cant: 2, nota: '' }], turnoFin: new Date(hoy + 'T00:00:00').getTime() + (sB + 90) * 60000, turnoLabel: hm(sB), turnoCliente: 'Sofi y amigas' };
   return d;
 }
 
@@ -889,7 +956,12 @@ function setItems(key, items, neg) {
   items = items.filter(i => i.cant > 0 && prod(i.prodId));
   if (key !== 'M' && !items.length) { delete DB.comandas[key]; return; }
   const prev = DB.comandas[key] || {};
-  DB.comandas[key] = { ...prev, items, ts: prev.ts || Date.now(), negOk: prev.negOk || !!neg || undefined };
+  const nuevo = { ...prev, items, ts: prev.ts || Date.now(), negOk: prev.negOk || !!neg || undefined };
+  if (!prev.items) {   // cuenta nueva: si hay un turno jugándose en ese lugar, la cuenta queda atada a él
+    const t = turnoEnCurso(key, Date.now());
+    if (t) { nuevo.turnoFin = turnoFinTs(t); nuevo.turnoLabel = hm(t.ini); nuevo.turnoCliente = t.cliente; }
+  }
+  DB.comandas[key] = nuevo;
 }
 function aplicarItems(key, items, neg) {
   const pag = pagadoDe(getCom(key));
@@ -1175,6 +1247,7 @@ function corregirTicket(id) {
 /* ---------- vistas ---------- */
 const views = {};
 function render() {
+  revisarTurnos();
   if (UI.com !== 'M' && !DB.comandas[UI.com] && !DB.mesas.find(m => m.id === UI.com)) UI.com = 'M';
   renderSide();
   $('#main').scrollTop = 0;
@@ -1249,7 +1322,7 @@ function renderCart() {
   $('#cart').innerHTML = `
     <div class="cart-h"><label>Cuenta</label><div class="chips">${quick}</div>
       <select id="sel-dest" data-in="dest" class="in" aria-label="Otras cuentas">${opts}</select>
-      ${key !== 'M' && c.ts ? `<span class="muted">Abierta hace ${hace(c.ts)}</span>` : ''}</div>
+      ${key !== 'M' && c.ts ? `<span class="muted">Abierta hace ${hace(c.ts)}</span>${c.turnoLabel ? ` <span class="pill good">Turno ${c.turnoLabel}hs${c.turnoCliente ? ' · ' + esc(c.turnoCliente) : ''}</span>` : ''}` : ''}</div>
     <div class="lines">${lines || `<div class="empty"><b>Comanda vacía</b><span>Tocá un producto para agregarlo.</span></div>`}</div>
     <div class="cart-f">
       <div class="total-row ${pagos.length ? 'sm' : ''}"><span>Total</span><b>${money(total)}</b></div>
@@ -1275,12 +1348,16 @@ const lugarTipo = m => (m.tipo && LUGARES[m.tipo]) ? m.tipo : 'mesa';
 function mesaHTML(m) {
   const c = DB.comandas[m.id], ocup = !!c, t = lugarTipo(m);
   const pag = ocup ? pagadoDe(c) : 0;
-  const peq = ocup ? (pag ? 'debe ' + money(saldoDe(c)) : (c.ts ? 'hace ' + hace(c.ts) : '')) : (m.rapido ? '★ acceso rápido' : '');
-  return `<button class="mesa t-${t} ${ocup ? 'busy' : ''} ${UI.editSalon && UI.mesaEdit === m.id ? 'sel' : ''}" style="left:${m.x}%;top:${m.y}%;width:${m.w || LUGARES[t].w}%;height:${m.h || LUGARES[t].h}%" data-act="mesa" data-id="${m.id}">
-    <b>${esc(m.nombre)}</b><span>${ocup ? money(totalItems(c.items)) : 'libre'}</span><small>${peq}</small><i class="rz" aria-hidden="true"></i></button>`;
+  const tn = turnoEnCurso(m.id, Date.now());
+  const peq = tn ? `▶ ${hm(tn.ini)} ${tn.cliente || 'turno'}` : ocup ? (pag ? 'debe ' + money(saldoDe(c)) : (c.ts ? 'hace ' + hace(c.ts) : '')) : (m.rapido ? '★ acceso rápido' : '');
+  return `<button class="mesa t-${t} ${ocup ? 'busy' : ''} ${tn ? 'playing' : ''} ${UI.editSalon && UI.mesaEdit === m.id ? 'sel' : ''}" style="left:${m.x}%;top:${m.y}%;width:${m.w || LUGARES[t].w}%;height:${m.h || LUGARES[t].h}%" data-act="mesa" data-id="${m.id}">
+    <b>${esc(m.nombre)}</b><span>${ocup ? money(totalItems(c.items)) : (tn ? 'en juego' : 'libre')}</span><small>${esc(peq)}</small><i class="rz" aria-hidden="true"></i></button>`;
 }
 views.mesas = () => {
   const ed = UI.editSalon, ocup = Object.keys(DB.comandas).filter(k => k !== 'M').length;
+  const sueltas = DB.mesas.filter(m => m.temporal && DB.comandas[m.id]);
+  const tira = sueltas.length ? `<div class="tmp-strip"><h2>Cuentas de turnos que ya terminaron</h2><p class="muted">Siguen consumiendo después del turno: la cuenta salió de la cancha (que quedó libre) y espera acá hasta que la cobren.</p>
+    <div class="row">${sueltas.map(m => { const c = DB.comandas[m.id]; return `<button class="tmp" data-act="mesa" data-id="${m.id}"><b>${esc(m.nombre)}</b><span>${money(saldoDe(c))}</span><small>hace ${hace(c.ts)}</small></button>`; }).join('')}</div></div>` : '';
   const m = ed && UI.mesaEdit ? DB.mesas.find(x => x.id === UI.mesaEdit) : null;
   const agregar = [['mesa', 'Mesa'], ['futbol', 'Cancha de fútbol'], ['padel', 'Cancha de pádel'], ['barra', 'Barra']].map(([k, n]) => `<button class="btn sm" data-act="mesa-add" data-t="${k}">+ ${n}</button>`).join('');
   const editor = m ? `<div class="grid2"><label class="fld">Nombre<input class="in" id="mesa-name" data-in="mesa-name" value="${esc(m.nombre)}"></label>
@@ -1291,8 +1368,9 @@ views.mesas = () => {
   $('#main').innerHTML = `<header class="ph"><div><h1>Mesas y canchas</h1><p class="muted">${ocup} ocupadas de ${DB.mesas.length}. Tocá un lugar para abrir o seguir su cuenta.</p></div>
     <div class="row">${ed ? `<button class="btn primary" data-act="salon-fin">Listo</button>` : `<button class="btn ghost" data-act="salon-edit">${ic('admin')} Editar mapa</button>`}</div></header>
     ${ed ? `<div class="card" style="margin-bottom:12px"><div class="stack"><div class="row"><span class="muted" style="font-weight:600">Agregar:</span>${agregar}</div>${editor}</div></div>` : ''}
-    <div class="salon ${ed ? 'editing' : ''}" id="salon">${DB.mesas.map(mesaHTML).join('')}</div>
-    <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado (y lo que debe si pagó una parte)</span></div>`;
+    <div class="salon ${ed ? 'editing' : ''}" id="salon">${DB.mesas.filter(m => !m.temporal).map(mesaHTML).join('')}</div>
+    ${tira}
+    <div class="legend"><span><span class="pill good">libre</span></span><span><span class="pill warn">ocupada</span> con el total acumulado (y lo que debe si pagó una parte)</span><span>▶ turno jugándose ahora</span></div>`;
 };
 
 /* --- TURNOS (calendario) --- */
@@ -1373,10 +1451,18 @@ function verTurno(id) {
     body: `<p><b>${esc(fechaLarga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
       <div class="grid2"><div><span class="muted">A nombre de</span><br><b>${esc(t.cliente || 'Sin nombre')}</b>${t.tel ? '<br>' + esc(t.tel) : ''}</div><div><span class="muted">Nota</span><br>${esc(t.nota || '—')}</div></div>
       <div class="card" style="padding:12px"><div class="l2"><span>Precio ${t.esFijo ? 'de fijo' : ''}</span><b>${money(t.precio)}</b></div>${pagos}<div class="l2"><span>${abierto ? 'Saldo a cobrar' : 'Estado'}</span><b>${abierto ? money(saldo) : 'Cobrado ✓'}</b></div></div>
+      ${cuentasTurno(t)}
       ${t.esFijo && abierto ? '<div class="note">Turno fijo: se juega todas las semanas y no lleva seña. Si hoy no juegan, usá "Suspender este día" o "Posponer"; si se terminan del todo, "Terminar el fijo".</div>' : ''}
       ${rel.length && abierto ? `<div class="note">En este horario también están ocupadas: ${rel.map(x => esc(x.nombre)).join(' y ')}.</div>` : ''}`,
     actions: acciones,
   });
+}
+function cuentasTurno(t) {
+  const d = new Date(), min = d.getHours() * 60 + d.getMinutes();
+  if (t.fecha !== dayKey(Date.now()) || !(t.ini <= min && min < t.fin)) return '';
+  const filas = lugaresDeTurno(t).map(id => DB.mesas.find(m => m.id === id)).filter(m => m && DB.comandas[m.id] && DB.comandas[m.id].items.length)
+    .map(m => `<div class="l2"><span>Cuenta de ${esc(m.nombre)} (consumos del turno)</span><span><b>${money(saldoDe(DB.comandas[m.id]))}</b> <button class="btn sm" data-act="ir-cuenta" data-id="${m.id}">Ir a la cuenta</button></span></div>`).join('');
+  return filas ? `<div class="card" style="padding:12px">${filas}</div>` : '<div class="note">Turno en juego. Los consumos se cargan en la cuenta del lugar de la cancha, y cuando termine el turno pasan solos a una mesa suelta.</div>';
 }
 function cancelarTurnoUI(id) {
   const t = DB.turnos.find(x => x.id === id), ps = pagosDe(t), c = cancha(t.canchaId);
@@ -1685,6 +1771,7 @@ admBody.canchas = () => {
       <label class="fld">Precio FIJO (turno de todas las semanas)<input class="in" inputmode="numeric" data-in="cn-f" data-f="precioFijo" data-id="${c.id}" value="${c.precioFijo}"></label></div>
       <div class="grid2" style="margin-top:12px"><label class="fld">Duración del turno (minutos)<input class="in" inputmode="numeric" data-in="cn-f" data-f="dur" data-id="${c.id}" value="${c.dur}"></label>
       <label class="fld">Nombre<input class="in" data-in="cn-f" data-f="nombre" data-id="${c.id}" value="${esc(c.nombre)}"></label></div>
+      <label class="fld" style="margin-top:12px">Lugar del mapa donde se abre la cuenta de esta cancha<select class="in" data-in="cn-f" data-f="lugarId" data-id="${c.id}"><option value="">(ninguno)</option>${DB.mesas.filter(m => !m.temporal).map(m => `<option value="${m.id}" ${m.id === c.lugarId ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('')}</select><small>Mientras se juega, los consumos van a la cuenta de ese lugar. Al terminar el turno, la cuenta pasa sola a una mesa suelta y la cancha queda libre.</small></label>
       <div class="grid2" style="margin-top:12px"><label class="fld">Abre<select class="in" data-in="cn-f" data-f="ap" data-id="${c.id}">${horas(c.ap / 60, 0, 23)}</select></label>
       <label class="fld">Cierra<select class="in" data-in="cn-f" data-f="ci" data-id="${c.id}">${horas(c.ci / 60, 1, 24)}</select></label></div></div>`).join('')}</div>`;
 };
@@ -1853,6 +1940,7 @@ const A = {
     const abrir = () => { UI.pago.ajusteAbierto = true; UI.pago.ajuste = { tipo: 'pct', valor: 0, motivo: '', nota: '' }; renderCobro(); recalcCobro(); };
     if (DB.config.pedirPinAjuste) requirePin(abrir, () => renderCobro()); else abrir();
   },
+  'ir-cuenta': d => { closeModal(true); A['ir-lugar'](d); },
   'aj-quitar': () => { UI.pago.ajusteAbierto = false; UI.pago.ajuste = null; renderCobro(); recalcCobro(); },
   'exp-caja': () => exportar(`caja_${UI.repDesde}_a_${UI.repHasta}`, rowsCaja()),
   mover: () => moverComanda(),
@@ -1910,6 +1998,8 @@ const A = {
   'mesa-del': () => {
     const m = DB.mesas.find(x => x.id === UI.mesaEdit); if (!m) return;
     if (DB.comandas[m.id]) return toast('Esa mesa tiene una cuenta abierta. Cobrala o cancelala primero.', 'warn');
+    const asignada = DB.canchas.find(c => c.lugarId === m.id);
+    if (asignada) return toast('Esta mesa es el lugar de la cancha ' + asignada.nombre + '. Cambiá la asignación en Admin → Canchas y precios.', 'warn');
     ask('Eliminar mesa', `¿Eliminar <b>${esc(m.nombre)}</b> del salón?`, 'Eliminar', () => { const r = tx(() => { DB.mesas = DB.mesas.filter(x => x.id !== m.id); }); if (r.ok) { UI.mesaEdit = null; views.mesas(); } }, true);
   },
   // stock
@@ -1997,7 +2087,7 @@ const I = {
     const c = cancha(el.dataset.id); if (!c) return;
     const f = el.dataset.f, v = el.value;
     if (f === 'nombre') { if (!v.trim()) return; c.nombre = v.trim(); }
-    else if (f === 'deporte' || f === 'catId') c[f] = v;
+    else if (f === 'deporte' || f === 'catId' || f === 'lugarId') c[f] = v;
     else if (f === 'ap') c.ap = num(v) * 60;
     else if (f === 'ci') c.ci = num(v) * 60;
     else if (f === 'dur') c.dur = Math.max(15, num(v));
@@ -2086,6 +2176,7 @@ DB = cargar();
 if (!DB) { seed(); persist(); }
 normalizar();
 render();
+setInterval(() => { if (!MODAL && revisarTurnos()) render(); }, 30000);
 window.__pos = { get DB() { return DB; }, UI, tx };
 </script>
 </body>
