@@ -214,8 +214,11 @@ def _venta(ctx, col, id_, a, d):
     if a is None:
         medios = ", ".join(f"{p.get('nombre')} {plata(p.get('monto'))}" for p in d.get("pagos", []))
         txt = f"Ticket #{d.get('nro')} cobrado: {plata(d.get('total'))} · {d.get('destino')} · {medios}"
-        imp = bool(d.get("ajuste"))
-        if imp:
+        modif = [i for i in d.get("items") or [] if i.get("precioLista") is not None]
+        imp = bool(d.get("ajuste")) or bool(modif)
+        if modif:
+            txt += " · PRECIO MODIFICADO en " + ", ".join(f"{i.get('nombre')} ({plata(i.get('precioLista'))} → {plata(i.get('precio'))} c/u{' · ' + i['motivoPrecio'] if i.get('motivoPrecio') else ''})" for i in modif)
+        if d.get("ajuste"):
             aj = d["ajuste"]
             txt += f" · CON DESCUENTO de {plata(d.get('descuento'))} ({aj.get('motivo')}{' · ' + aj['nota'] if aj.get('nota') else ''})"
         return [Entrada(col, id_, "alta", imp, txt, None, d)]
@@ -262,15 +265,21 @@ def _caja_sesion(ctx, col, id_, a, d):
         txt = (f"Caja cerrada por {d.get('responsable')}: esperado {plata(d.get('esperado'))}, contado {plata(d.get('contado'))}, "
                f"{'sin diferencia' if dif == 0 else ('sobran ' if dif > 0 else 'faltan ') + plata(abs(dif))}. "
                f"Retiro a caja mayor {plata(d.get('retiroFinal'))}, quedan {plata(d.get('dejado'))} de cambio")
+        dig = d.get("digital") or []
+        if dig:
+            txt += ". Medios digitales: " + "; ".join(
+                f"{x.get('nombre')} debía {plata(x.get('esperado'))}" + (" (sin controlar)" if x.get("informado") is None else (" · cuadra" if not x.get("diferencia") else f" · {'sobran' if x['diferencia'] > 0 else 'faltan'} {plata(abs(x['diferencia']))}"))
+                for x in dig)
         return [Entrada(col, id_, "cambio", True, txt, ant, des)]
     return _generico(ctx, col, id_, a, d)
 
 
 def _mov_caja(ctx, col, id_, a, d):
-    nombres = {"gasto": "Gasto", "proveedor": "Pago a proveedor", "retiro": "Retiro a caja mayor", "ingreso": "Ingreso de efectivo"}
+    nombres = {"gasto": "Gasto", "proveedor": "Pago a proveedor", "retiro": "Retiro a caja mayor", "ingreso": "Ingreso", "perdida": "PÉRDIDA registrada"}
     if a is None:
         quien = f" · {d.get('proveedor')}" if d.get("proveedor") else ""
-        return [Entrada(col, id_, "alta", True, f"{nombres.get(d.get('tipo'), d.get('tipo'))}: {plata(d.get('monto'))} · {d.get('concepto')}{quien}", None, d)]
+        medio = f" en {ctx.nombre('metodos', d.get('metodoId'))}" if d.get("metodoId") and (ctx.doc("metodos", d["metodoId"]) or {}).get("efectivo") is False else ""
+        return [Entrada(col, id_, "alta", True, f"{nombres.get(d.get('tipo'), d.get('tipo'))}{medio}: {plata(d.get('monto'))} · {d.get('concepto')}{quien}", None, d)]
     if d is None:
         return [Entrada(col, id_, "baja", True, f"Movimiento de caja BORRADO: {nombres.get(a.get('tipo'), a.get('tipo'))} {plata(a.get('monto'))} · {a.get('concepto')}", a, None)]
     r = _generico(ctx, col, id_, a, d)
@@ -302,8 +311,10 @@ def _mapa_items(items: list | None, ctx: Contexto) -> dict:
     m: dict = {}
     for it in items or []:
         clave, nombre = _clave_item(it, ctx)
-        e = m.setdefault(clave, {"nombre": nombre, "cant": 0})
+        e = m.setdefault(clave, {"nombre": nombre, "cant": 0, "pu": None})
         e["cant"] += it.get("cant") or 1
+        if it.get("pu") is not None:
+            e["pu"] = it["pu"]
     return m
 
 
@@ -332,6 +343,8 @@ def _comanda(ctx, col, id_, a, d):
         x, y = ma.get(clave), md.get(clave)
         nombre = (y or x)["nombre"]
         ca, cd = (x or {}).get("cant", 0), (y or {}).get("cant", 0)
+        if x and y and x.get("pu") != y.get("pu"):
+            out.append(Entrada(col, id_, "cambio", True, f"Cuenta {lugar}: PRECIO de {nombre} cambiado {'a ' + plata(y['pu']) + ' c/u' if y.get('pu') is not None else 'de nuevo al precio de lista'}", {"pu": x.get("pu")}, {"pu": y.get("pu")}))
         if ca == cd:
             continue
         if ca == 0:

@@ -61,6 +61,8 @@ p{margin:0}
 #app{display:grid;grid-template-columns:212px minmax(0,1fr);height:100%}
 .side{background:var(--side-bg);color:var(--side-fg);display:flex;flex-direction:column;padding:16px 12px;gap:6px;overflow:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.lapiz{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1}
+.lapiz:hover{color:var(--accent)}
 .brand .logo{width:34px;height:34px;object-fit:contain;border-radius:8px;flex:none}
 .brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-style:normal;font-size:15px}
 .nav{display:flex;flex-direction:column;gap:2px}
@@ -706,10 +708,18 @@ function abrirCaja(fondo, responsable) {
   logPush('caja', 'Apertura', `Caja abierta por ${c.responsable} con ${money(fondo)} de cambio${ult && ult.dejado !== fondo ? `. La vez anterior se habían dejado ${money(ult.dejado)}.` : ''}`);
 }
 /* Efectivo de una caja: lo que había + cobros − devoluciones + correcciones + ingresos − egresos */
+/* Medios digitales (Mercado Pago QR, transferencia): se llevan igual que el efectivo. Debería haber = lo cobrado en el turno (con devoluciones y correcciones) + ingresos − egresos y pérdidas. */
+const metodosDigitales = () => DB.metodos.filter(m => m.activo && !m.efectivo && !m.fiado);
+function saldoDigital(c, metodoId) {
+  const ini = c.abierta, fin = c.cerrada || Infinity;
+  const led = sum(DB.caja.filter(e => e.metodoId === metodoId && e.ts >= ini && e.ts <= fin), e => e.monto);
+  const movs = DB.movCaja.filter(m => m.cajaId === c.id && !m.anulado && m.metodoId === metodoId);
+  return led + sum(movs.filter(m => m.tipo === 'ingreso'), m => m.monto) - sum(movs.filter(m => m.tipo !== 'ingreso'), m => m.monto);
+}
 function efectivoDeCaja(c) {
   const ini = c.abierta, fin = c.cerrada || Infinity;
   const efe = DB.caja.filter(e => e.ts >= ini && e.ts <= fin && metodo(e.metodoId) && metodo(e.metodoId).efectivo);
-  const movs = DB.movCaja.filter(m => m.cajaId === c.id && !m.anulado);
+  const movs = DB.movCaja.filter(m => m.cajaId === c.id && !m.anulado && (!m.metodoId || (metodo(m.metodoId) && metodo(m.metodoId).efectivo)));
   const cobros = sum(efe.filter(e => e.tipo === 'cobro'), e => e.monto), devol = sum(efe.filter(e => e.tipo === 'devolucion'), e => e.monto), corr = sum(efe.filter(e => e.tipo === 'correccion'), e => e.monto);
   const ingresos = sum(movs.filter(m => m.tipo === 'ingreso'), m => m.monto), egresos = sum(movs.filter(m => m.tipo !== 'ingreso'), m => m.monto);
   return { cobros, devol, corr, ingresos, egresos, esperado: c.fondo + cobros + devol + corr + ingresos - egresos };
@@ -720,20 +730,23 @@ function movimientoCaja(o) {
   if (!(o.monto > 0)) throw new Error('Poné un monto mayor a cero');
   if (o.tipo === 'proveedor' && !o.proveedor) throw new Error('Poné el nombre del proveedor');
   if (!o.concepto) throw new Error('Poné el concepto');
-  if (o.tipo !== 'ingreso') { const ef = efectivoDeCaja(c); if (o.monto > ef.esperado) throw new Error(`En la caja hay ${money(ef.esperado)}: no alcanza para sacar ${money(o.monto)}`); }
-  DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: o.tipo, concepto: o.concepto, proveedor: o.proveedor || '', monto: o.monto, nota: o.nota || '' });
-  logPush('caja', MOV_TIPOS[o.tipo][0], `${MOV_TIPOS[o.tipo][0]}: ${money(o.monto)} · ${o.proveedor ? o.proveedor + ' · ' : ''}${o.concepto}${o.nota ? ' (' + o.nota + ')' : ''}`);
+  const mid = o.metodoId || efectivoId(), me = metodo(mid);
+  if (!me || me.fiado) throw new Error('Elegí un medio de pago válido');
+  if (o.tipo !== 'ingreso') { const hay = me.efectivo ? efectivoDeCaja(c).esperado : saldoDigital(c, mid); if (o.monto > hay) throw new Error(`En ${me.efectivo ? 'la caja' : me.nombre} debería haber ${money(hay)}: no alcanza para sacar ${money(o.monto)}`); }
+  DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: o.tipo, metodoId: mid, concepto: o.concepto, proveedor: o.proveedor || '', monto: o.monto, nota: o.nota || '' });
+  logPush('caja', MOV_TIPOS[o.tipo][0], `${MOV_TIPOS[o.tipo][0]}${me.efectivo ? '' : ' en ' + me.nombre}: ${money(o.monto)} · ${o.proveedor ? o.proveedor + ' · ' : ''}${o.concepto}${o.nota ? ' (' + o.nota + ')' : ''}`);
 }
-function cerrarCaja(contado, dejado, nota) {
+function cerrarCaja(contado, dejado, nota, digitales) {
   const c = cajaAbierta();
   if (!c) throw new Error('La caja ya está cerrada');
   const ef = efectivoDeCaja(c), dif = contado - ef.esperado;
+  const dig = (digitales || []).map(d => { const esp = saldoDigital(c, d.metodoId), m = metodo(d.metodoId); return { metodoId: d.metodoId, nombre: m ? m.nombre : '?', esperado: esp, informado: d.informado, diferencia: d.informado === null ? null : d.informado - esp }; });
   if (dejado > contado) throw new Error('No se puede dejar más de lo que hay contado');
-  if (dif !== 0 && !String(nota || '').trim()) throw new Error('Hay diferencia: explicala en la nota');
+  if ((dif !== 0 || dig.some(d => d.diferencia)) && !String(nota || '').trim()) throw new Error('Hay diferencia: explicala en la nota');
   const retiro = contado - dejado;
   if (retiro > 0) DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: 'retiro', concepto: 'Retiro de cierre a caja mayor', proveedor: '', monto: retiro, nota: '' });
-  Object.assign(c, { cerrada: Date.now(), esperado: ef.esperado, contado, diferencia: dif, dejado, retiroFinal: retiro, nota: String(nota || '').trim(), desglose: ef });
-  logPush('caja', 'Cierre', `Caja cerrada por ${c.responsable}: esperado ${money(ef.esperado)}, contado ${money(contado)}, ${dif === 0 ? 'sin diferencia' : (dif > 0 ? 'sobran ' : 'faltan ') + money(Math.abs(dif))}. Retiro a caja mayor ${money(retiro)}, quedan ${money(dejado)} de cambio.${c.nota ? ' Nota: ' + c.nota : ''}`);
+  Object.assign(c, { cerrada: Date.now(), esperado: ef.esperado, contado, diferencia: dif, dejado, retiroFinal: retiro, nota: String(nota || '').trim(), desglose: ef, digital: dig });
+  logPush('caja', 'Cierre', `Caja cerrada por ${c.responsable}: esperado ${money(ef.esperado)}, contado ${money(contado)}, ${dif === 0 ? 'sin diferencia' : (dif > 0 ? 'sobran ' : 'faltan ') + money(Math.abs(dif))}. Retiro a caja mayor ${money(retiro)}, quedan ${money(dejado)} de cambio.${dig.length ? ' Medios digitales: ' + dig.map(d => d.nombre + ' debía ' + money(d.esperado) + (d.informado === null ? ' (sin controlar)' : d.diferencia === 0 ? ' · cuadra' : ' · ' + (d.diferencia > 0 ? 'sobran ' : 'faltan ') + money(Math.abs(d.diferencia)))).join('; ') + '.' : ''}${c.nota ? ' Nota: ' + c.nota : ''}`);
 }
 
 /* ---------- clientes y fiado (cuenta corriente) ---------- */
@@ -786,7 +799,9 @@ function lineasDeItems(items) {
     }
     const p = prod(it.prodId);
     if (!p) throw new Error('Un producto de la comanda ya no existe');
-    return { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: p.precio, costo: costoUnit(p), nota: it.nota || '' };
+    const l = { prodId: p.id, nombre: p.nombre, catId: p.catId, tipo: p.tipo, cant: it.cant, precio: precioU(it, p), costo: costoUnit(p), nota: it.nota || '' };
+    if (it.pu != null && it.pu !== p.precio) { l.precioLista = p.precio; l.motivoPrecio = it.pm || ''; }      // precio cambiado sólo en esta venta
+    return l;
   });
 }
 /* Descuento que corresponde a un ajuste: % , monto, total final o "al costo" */
@@ -840,9 +855,11 @@ function commitVenta(o) {
     if (p.fiado) { DB.cc.push({ id: uid('cc'), ts, clienteId: p.clienteId, tipo: 'cargo', monto: p.monto, ref: '#' + nro, nota: '' }); logPush('fiado', '#' + nro, `Ticket #${nro}: ${money(p.monto)} fiados a ${clienteF.nombre}. Debe en total ${money(saldoCliente(p.clienteId))}.`); }
     else cajaPush(p.metodoId, p.monto, 'cobro', 'Ticket #' + nro, ts);
   });
+  const descuentoItems = sum(lineas, l => l.precioLista != null && l.precioLista > l.precio ? (l.precioLista - l.precio) * l.cant : 0);
+  const recargoItems = sum(lineas, l => l.precioLista != null && l.precioLista < l.precio ? (l.precio - l.precioLista) * l.cant : 0);
   const ajuste = o.ajuste ? { tipo: o.ajuste.tipo, valor: o.ajuste.valor || 0, motivo: o.ajuste.motivo, nota: String(o.ajuste.nota || '').trim(), descuento } : null;
   const turnoIds = lineas.filter(l => l.turnoId).map(l => l.turnoId);
-  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, subtotal, descuento, ajuste, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || (clienteF ? clienteF.nombre : ''), clienteId: clienteF ? clienteF.id : null, turnoId: turnoIds[0] || null, turnoIds });
+  DB.ventas.push({ id: ventaId, nro, ts, destino: o.mesaNombre || 'Mostrador', items: lineas, subtotal, descuento, descuentoItems, recargoItems, ajuste, total, pagos: abonos.map(a => ({ ...a })).concat(pagos), recibido: ev.cashIn, vuelto: ev.vuelto, estado: 'ok', cliente: o.cliente || (clienteF ? clienteF.nombre : ''), clienteId: clienteF ? clienteF.id : null, turnoId: turnoIds[0] || null, turnoIds });
   if (ajuste) {
     const nombres = { pct: 'descuento del ' + ajuste.valor + '%', monto: 'descuento de ' + money(ajuste.valor), final: 'total final fijado en ' + money(ajuste.valor), costo: 'vendido al costo' };
     logPush('descuento', '#' + nro, `Ticket #${nro}: ${nombres[ajuste.tipo]}. Subtotal ${money(subtotal)}, descuento ${money(descuento)}, total ${money(total)}. Motivo: ${ajuste.motivo}${ajuste.nota ? ' (' + ajuste.nota + ')' : ''}`, ajuste);
@@ -1316,9 +1333,11 @@ function exportar(nombre, rows) {
 /* ---------- caja: comandas ---------- */
 const getCom = key => key === 'M' ? (DB.comandas.M || (DB.comandas.M = { items: [] })) : (DB.comandas[key] || { items: [] });
 /* Una cuenta puede llevar, además de productos, líneas de TURNO ({ turnoId }): el costo del turno va adentro de la cuenta */
+/* Precio de un ítem de la cuenta: el del producto, salvo que se lo haya cambiado (lápiz) sólo para esta venta: it.pu = precio por unidad, it.pm = motivo */
+const precioU = (it, p) => it.pu != null ? it.pu : p.precio;
 const totalItems = items => sum(items, it => {
   if (it.turnoId) { const t = DB.turnos.find(x => x.id === it.turnoId); return t ? t.precio : 0; }
-  const p = prod(it.prodId); return p ? p.precio * it.cant : 0;
+  const p = prod(it.prodId); return p ? precioU(it, p) * it.cant : 0;
 });
 const pagosDe = c => c.pagos || [];
 const pagadoDe = c => sum(pagosDe(c), p => p.monto);
@@ -1385,7 +1404,7 @@ function modalFaltante(f, items, key, conReservas, cuando, onOk, errorMsg) {
 }
 function agregar(prodId) {
   const key = UI.com, items = getCom(key).items;
-  const idx = items.findIndex(i => i.prodId === prodId && !i.nota);
+  const idx = items.findIndex(i => i.prodId === prodId && !i.nota && i.pu == null);
   const nuevo = items.map(i => ({ ...i }));
   if (idx >= 0) nuevo[idx].cant++; else nuevo.push({ prodId, cant: 1, nota: '' });
   chequearStock(nuevo, key, true, 'vender', neg => aplicarItems(key, nuevo, neg));
@@ -1551,7 +1570,7 @@ function restanSeparado(i) {
 const maxSeparado = i => Math.max(0, restanSeparado(i));
 function precioLinea(it) {
   if (it.turnoId) { const t = DB.turnos.find(x => x.id === it.turnoId); return t ? t.precio : 0; }
-  const pr = prod(it.prodId); return pr ? pr.precio * it.cant : 0;
+  const pr = prod(it.prodId); return pr ? precioU(it, pr) * it.cant : 0;
 }
 function montoSeparado() {
   const S = UI.sep, c = getCom(S.key);
@@ -1667,7 +1686,8 @@ function ticketTexto(v) {
   if (v.estado !== 'ok') L.push('*** ANULADO ***');
   L.push(line);
   v.items.forEach(l => {
-    L.push(lr(`${l.cant} x ${l.nombre}`, m(l.cant * l.precio)));
+    L.push(lr(`${l.cant} x ${l.nombre}${l.precioLista != null ? ' *' : ''}`, m(l.cant * l.precio)));
+    if (l.precioLista != null) L.push('   * lista ' + m(l.precioLista) + ' c/u' + (l.motivoPrecio ? ' · ' + l.motivoPrecio : ''));
     if (l.nota) L.push('   (' + l.nota + ')');
   });
   L.push(line);
@@ -1734,10 +1754,26 @@ function render() {
   pintarAvisoCaja();
   pintarAvisoGuardado();
   pintarAvisosSistema();
+  pintarActualizacion();
 }
 function pintarAvisoGuardado() {
   if (!SERVIDOR || ESTADO_GUARDADO.ok) return;
   $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-guardado" style="background:var(--bad-soft);color:var(--bad);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span><b>No se está guardando.</b> ${esc(ESTADO_GUARDADO.error)} No cierres la ventana: se reintenta solo.</span><button class="btn sm danger" data-act="reintentar-guardado">Reintentar ahora</button></div>`);
+}
+/* Actualizaciones: se consulta en segundo plano (sin trabar la pantalla) y sólo se baja algo cuando se lo pide. */
+let ACTUALIZACION = null;
+function consultarActualizacion(forzar, avisar) {
+  if (!SERVIDOR) return;
+  fetch('/api/actualizacion' + (forzar ? '?forzar=1&' : '?') + 't=' + encodeURIComponent(PREDIO.token), { headers: { 'X-Predio-Token': PREDIO.token } })
+    .then(r => r.json()).then(r => {
+      ACTUALIZACION = r; pintarActualizacion();
+      if (avisar) toast(r.hay ? `Hay una versión nueva: ${r.version}` : (r.error ? r.error : `Ya tenés la última versión (${r.actual})`), r.hay ? '' : (r.error ? 'warn' : ''));
+    }).catch(() => { if (avisar) toast('No se pudo consultar. ¿Hay internet?', 'warn'); });
+}
+function pintarActualizacion() {
+  const viejo = document.getElementById('aviso-actualizacion'); if (viejo) viejo.remove();
+  if (!SERVIDOR || !ACTUALIZACION || !ACTUALIZACION.hay) return;
+  $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-actualizacion" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span>Hay una <b>versión nueva</b> del programa: ${esc(ACTUALIZACION.version)} (tenés la ${esc(ACTUALIZACION.actual)}).</span><button class="btn sm primary" data-act="act-ver">Ver qué cambió y actualizar</button></div>`);
 }
 let AVISOS_SIS = [];
 function pintarAvisosSistema() {
@@ -1805,6 +1841,37 @@ function renderGrid() {
   }).join('');
   $('#grid').innerHTML = html || (DB.productos.length ? '<p class="muted">No hay productos con ese filtro.</p>' : `<div class="card" style="grid-column:1/-1;max-width:560px"><h2>Todavía no hay productos</h2><p class="muted" style="margin-bottom:14px">Cargá los productos y el stock de una sola vez en la planilla: escribís directo en la tabla o pegás tu lista desde Excel.</p><button class="btn primary lg" data-act="abrir-planilla">Abrir la planilla de productos y stock</button></div>`);
 }
+/* Lápiz de la cuenta: cambia el precio de UN ítem sólo en esta venta (el producto no cambia). Queda marcado con * y anotado con el motivo. */
+function modalPrecioItem(i) {
+  const key = UI.com, it = getCom(key).items[i], p = it && prod(it.prodId); if (!p) return;
+  const actual = precioU(it, p), motivos = ['Promoción', 'Cobré mal / ajuste', 'Se quedó sin plata', 'Otro'];
+  modal({
+    title: 'Precio de ' + p.nombre,
+    body: `<p class="muted">Precio de lista: <b>${money(p.precio)}</b> por unidad (${it.cant} en la cuenta). El cambio vale <b>sólo para esta venta</b> y queda marcado con * en el ticket.</p>
+      <label class="fld">Precio por unidad<input class="in" id="pi-precio" inputmode="numeric" value="${actual}"></label>
+      <label class="fld">Motivo<select class="in" id="pi-motivo">${motivos.map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label class="fld">Detalle (opcional)<input class="in" id="pi-nota" maxlength="60" placeholder="Ej: pagó en efectivo, promo de la semana"></label>`,
+    actions: [{ label: 'Cancelar' }, ...(it.pu != null ? [{ label: 'Volver al precio de lista', onClick: () => guardarPrecioItem(i, null) }] : []), { label: 'Guardar precio', kind: 'primary', onClick: () => guardarPrecioItem(i, true) }],
+  });
+}
+function guardarPrecioItem(i, nuevo) {
+  const key = UI.com, items = getCom(key).items.map(x => ({ ...x })), it = items[i], p = prod(it.prodId);
+  let pu = null, pm = '';
+  if (nuevo) {
+    pu = num($('#pi-precio').value); pm = $('#pi-motivo').value + ($('#pi-nota').value.trim() ? ' · ' + $('#pi-nota').value.trim() : '');
+    if ($('#pi-precio').value.trim() === '') { toast('Poné el precio', 'warn'); return false; }
+    if (pu === p.precio) pu = null;
+  }
+  const antes = precioU(it, p);
+  if (pu === null) { delete it.pu; delete it.pm; } else { it.pu = pu; it.pm = pm; }
+  const pag = pagadoDe(getCom(key));
+  if (pag > 0 && totalItems(items) < pag) { toast(`No se puede: ya pagaron ${money(pag)}. Primero devolvé un pago.`, 'warn'); return false; }
+  const r = tx(() => {
+    setItems(key, items);
+    logPush('descuento', lugarNombre(key), pu === null ? `${p.nombre} volvió al precio de lista (${money(p.precio)}) en ${lugarNombre(key)}` : `${p.nombre} en ${lugarNombre(key)}: precio ${money(antes)} → ${money(pu)} c/u (lista ${money(p.precio)}, ${it.cant} u.) · ${pm}`);
+  });
+  if (r.ok) { toast(pu === null ? 'Precio de lista' : 'Precio cambiado sólo en esta venta'); renderCart(); renderSide(); }
+}
 function renderCart() {
   const key = UI.com, c = getCom(key), items = c.items.filter(i => i.turnoId || prod(i.prodId)), total = totalItems(items);
   const pagos = pagosDe(c), pag = pagadoDe(c), saldo = total - pag;
@@ -1822,9 +1889,10 @@ function renderCart() {
         <div class="ln-tools"><button data-act="quitar-turno" data-t="${t.id}">sacar el turno de la cuenta</button></div></div>`;
     }
     const p = prod(it.prodId);
-    return `<div class="line"><div class="nm"><b>${esc(p.nombre)}</b><small>${money(p.precio)} c/u${it.nota ? ' · ' + esc(it.nota) : ''}</small></div>
+    const pu = precioU(it, p), mod = it.pu != null && it.pu !== p.precio;
+    return `<div class="line"><div class="nm"><b>${esc(p.nombre)}</b><small>${mod ? `<s>${money(p.precio)}</s> <b>${money(pu)}</b> c/u *` : money(p.precio) + ' c/u'}${it.nota ? ' · ' + esc(it.nota) : ''}${mod && it.pm ? ' · ' + esc(it.pm) : ''}</small></div>
       <div class="qty"><button class="icon" data-act="dec" data-i="${i}" aria-label="Menos">−</button><span>${it.cant}</span><button class="icon" data-act="inc" data-i="${i}" aria-label="Más">+</button></div>
-      <div class="ln-sub">${money(p.precio * it.cant)}</div>
+      <div class="ln-sub">${money(pu * it.cant)}${mod ? ' *' : ''} <button class="lapiz" data-act="lapiz" data-i="${i}" aria-label="Cambiar el precio de este ítem sólo en esta venta" title="Cambiar el precio de este ítem sólo en esta venta">✎</button></div>
       <div class="ln-tools"><button data-act="nota" data-i="${i}">${it.nota ? 'editar nota' : 'agregar nota'}</button><button data-act="del" data-i="${i}">quitar</button></div></div>`;
   }).join('');
   const abonos = pagos.length ? `<div class="abonos">${pagos.map(p => `<div class="ab"><span>Pagó ${esc(p.nombre)}${p.quien ? ' (' + esc(p.quien) + ')' : ''} <small class="muted">${hhmm(p.ts)}</small></span><b>− ${money(p.monto)}</b><button data-act="ab-del" data-id="${p.id}">devolver</button></div>`).join('')}
@@ -2190,7 +2258,8 @@ function fotoResumen(i) {
 }
 
 /* --- CAJA (efectivo del día) --- */
-const MOV_TIPOS = { gasto: ['Gasto', 'warn'], proveedor: ['Proveedor', 'warn'], retiro: ['Retiro a caja mayor', ''], ingreso: ['Ingreso', 'good'] };
+const MOV_TIPOS = { gasto: ['Gasto', 'warn'], proveedor: ['Proveedor', 'warn'], retiro: ['Retiro a caja mayor', ''], ingreso: ['Ingreso', 'good'], perdida: ['Pérdida', 'bad'] };
+const notaCierre = c => (c.nota || '') + ((c.digital || []).some(d => d.diferencia) ? ' [' + c.digital.filter(d => d.diferencia).map(d => d.nombre + ': ' + (d.diferencia > 0 ? '+' : '−') + money(Math.abs(d.diferencia))).join(', ') + ']' : '');
 views.caja = () => {
   const c = cajaAbierta(), cerradas = DB.cajas.filter(x => x.cerrada).slice().reverse();
   let top, movs = '';
@@ -2199,15 +2268,15 @@ views.caja = () => {
     top = `<div class="card" style="max-width:600px"><h2>La caja está cerrada</h2><p class="muted" style="margin-bottom:14px">${ult ? `Último cierre: ${fechaHora(ult.cerrada)}. Se contaron ${money(ult.contado)}, se retiraron ${money(ult.retiroFinal)} y quedaron ${money(ult.dejado)} de cambio.` : 'Todavía no hay cierres.'}</p><button class="btn primary lg" data-act="caja-abrir">Abrir caja</button></div>`;
   } else {
     const ef = efectivoDeCaja(c);
-    const otros = DB.metodos.filter(m => !m.efectivo && !m.fiado).map(m => `<div class="l2"><span>${esc(m.nombre)}</span><b>${money(sum(DB.caja.filter(e => e.metodoId === m.id && e.ts >= c.abierta), e => e.monto))}</b></div>`).join('');
+    const otros = metodosDigitales().map(m => `<div class="l2"><span>${esc(m.nombre)} <button class="btn sm ghost" data-act="pagos-medio" data-id="${m.id}">revisar pagos</button></span><b>${money(saldoDigital(c, m.id))}</b></div>`).join('');
     top = `<div class="kpis"><div class="kpi"><span>Efectivo que debería haber</span><b>${money(ef.esperado)}</b></div><div class="kpi"><span>Efectivo inicial</span><b>${money(c.fondo)}</b></div>
       <div class="kpi"><span>Cobros en efectivo</span><b>${money(ef.cobros + ef.devol + ef.corr)}</b></div><div class="kpi"><span>Ingresos</span><b>${money(ef.ingresos)}</b></div><div class="kpi"><span>Egresos y retiros</span><b>${money(ef.egresos)}</b></div></div>
-      <div class="row" style="margin-bottom:16px"><button class="btn" data-act="mv-new" data-t="gasto">+ Gasto varios</button><button class="btn" data-act="mv-new" data-t="proveedor">+ Pago a proveedor</button><button class="btn" data-act="mv-new" data-t="retiro">+ Retiro a caja mayor</button><button class="btn" data-act="mv-new" data-t="ingreso">+ Ingreso</button><button class="btn primary" style="margin-left:auto" data-act="caja-cerrar">Cerrar caja</button></div>
+      <div class="row" style="margin-bottom:16px"><button class="btn" data-act="mv-new" data-t="perdida">+ Registrar pérdida</button><button class="btn" data-act="mv-new" data-t="gasto">+ Gasto varios</button><button class="btn" data-act="mv-new" data-t="proveedor">+ Pago a proveedor</button><button class="btn" data-act="mv-new" data-t="retiro">+ Retiro a caja mayor</button><button class="btn" data-act="mv-new" data-t="ingreso">+ Ingreso</button><button class="btn primary" style="margin-left:auto" data-act="caja-cerrar">Cerrar caja</button></div>
       <div class="cols" style="margin-bottom:16px"><div class="card"><h2>Esta caja</h2><div class="l2"><span>Abierta por</span><b>${esc(c.responsable)} · ${fechaHora(c.abierta)}</b></div>
-        <p class="muted" style="margin:10px 0 4px;font-size:12px">Cobrado con otros medios en este turno (no entra al cajón):</p>${otros}</div></div>`;
+        <p class="muted" style="margin:10px 0 4px;font-size:12px">Lo que debería haber en cada medio digital (comparalo con la app de Mercado Pago; si no da, revisá los pagos y corregilos, o cargá un movimiento o una pérdida):</p>${otros}</div></div>`;
     const lista = DB.movCaja.filter(m => m.cajaId === c.id).slice().reverse();
-    movs = `<h2 style="margin:6px 0 10px">Movimientos de efectivo</h2><div class="tbl-wrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Detalle</th><th>Nota</th><th class="r">Monto</th><th></th></tr></thead><tbody>
-      ${lista.map(m => `<tr style="${m.anulado ? 'opacity:.5;text-decoration:line-through' : ''}"><td class="num">${hhmm(m.ts)}</td><td><span class="pill ${MOV_TIPOS[m.tipo][1]}">${MOV_TIPOS[m.tipo][0]}</span></td><td>${m.proveedor ? '<b>' + esc(m.proveedor) + '</b> · ' : ''}${esc(m.concepto)}</td><td class="muted">${esc(m.nota)}</td>
+    movs = `<h2 style="margin:6px 0 10px">Movimientos de caja</h2><div class="tbl-wrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Detalle</th><th>Nota</th><th class="r">Monto</th><th></th></tr></thead><tbody>
+      ${lista.map(m => `<tr style="${m.anulado ? 'opacity:.5;text-decoration:line-through' : ''}"><td class="num">${hhmm(m.ts)}</td><td><span class="pill ${MOV_TIPOS[m.tipo][1]}">${MOV_TIPOS[m.tipo][0]}</span></td><td>${m.proveedor ? '<b>' + esc(m.proveedor) + '</b> · ' : ''}${esc(m.concepto)}${m.metodoId && metodo(m.metodoId) && !metodo(m.metodoId).efectivo ? ` <span class="pill">${esc(metodo(m.metodoId).nombre)}</span>` : ''}</td><td class="muted">${esc(m.nota)}</td>
         <td class="r num"><b style="color:${m.tipo === 'ingreso' ? 'var(--good)' : 'var(--bad)'}">${m.tipo === 'ingreso' ? '+' : '−'}${money(m.monto)}</b></td><td class="r">${m.anulado ? '' : `<button class="btn sm ghost" data-act="mc-anular" data-id="${m.id}">Anular</button>`}</td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">Todavía no hay movimientos en esta caja.</td></tr>'}
       </tbody></table></div>`;
   }
@@ -2216,6 +2285,17 @@ views.caja = () => {
     </tbody></table></div>`;
   $('#main').innerHTML = `<header class="ph"><div><h1>Caja</h1><p class="muted">Apertura, gastos, pagos a proveedores, retiros y cierre del efectivo del día.</p></div></header>${top}${movs}${hist}`;
 };
+/* Pagos del turno en un medio digital: para encontrar el que se cargó con otro medio y corregirlo (queda anotado en el registro de cambios) */
+function modalPagosMedio(metodoId) {
+  const c = cajaAbierta(), m = metodo(metodoId); if (!c || !m) return;
+  const filas = DB.caja.filter(e => e.metodoId === metodoId && e.ts >= c.abierta).slice().reverse();
+  modal({
+    title: m.nombre + ' · pagos de este turno', wide: true,
+    body: `<p class="muted">Debería haber <b>${money(saldoDigital(c, metodoId))}</b>. Si en la app de Mercado Pago no coincide, buscá acá el pago que se cargó con otro medio y corregilo.</p>
+      <div class="tbl-wrap" style="max-height:340px"><table style="min-width:0"><thead><tr><th>Hora</th><th>Tipo</th><th>Detalle</th><th class="r">Monto</th><th></th></tr></thead><tbody>${filas.map(e => { const mt = /Ticket #(\d+)/.exec(e.motivo || ''); return `<tr><td class="num">${hhmm(e.ts)}</td><td>${esc(e.tipo)}</td><td>${esc(e.motivo || '')}</td><td class="r num">${money(e.monto)}</td><td class="r">${mt ? `<button class="btn sm" data-act="corr-tk" data-nro="${mt[1]}">Corregir ticket</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">Todavía no hay pagos con este medio.</td></tr>'}</tbody></table></div>`,
+    actions: [{ label: 'Cerrar', kind: 'primary' }],
+  });
+}
 function modalAbrirCaja(cb) {
   const ult = DB.cajas.filter(c => c.cerrada).pop();
   modal({
@@ -2236,18 +2316,20 @@ function modalMovimiento(tipo) {
   const c = cajaAbierta();
   if (!c) return modalAbrirCaja(() => modalMovimiento(tipo));
   const ef = efectivoDeCaja(c);
-  const titulos = { gasto: 'Gasto varios', proveedor: 'Pago a proveedor', retiro: 'Retiro a caja mayor', ingreso: 'Ingreso de efectivo' };
+  const titulos = { gasto: 'Gasto varios', proveedor: 'Pago a proveedor', retiro: 'Retiro a caja mayor', ingreso: 'Ingreso', perdida: 'Registrar una pérdida' };
+  const medios = [DB.metodos.find(m => m.efectivo && m.activo)].concat(metodosDigitales()).filter(Boolean);
   const provs = [...new Set(DB.movCaja.filter(m => m.proveedor).map(m => m.proveedor))];
-  const conceptos = { gasto: ['Limpieza', 'Mantenimiento', 'Librería', 'Flete', 'Comida del personal', 'Otro'], proveedor: ['Bebidas', 'Comida', 'Kiosco', 'Otro'], retiro: ['Retiro a caja mayor'], ingreso: ['Cambio', 'Aporte', 'Otro'] };
+  const conceptos = { gasto: ['Limpieza', 'Mantenimiento', 'Librería', 'Flete', 'Comida del personal', 'Otro'], proveedor: ['Bebidas', 'Comida', 'Kiosco', 'Otro'], retiro: ['Retiro a caja mayor'], ingreso: ['Cambio', 'Aporte', 'Sobrante / diferencia a favor', 'Otro'], perdida: ['Diferencia sin explicar', 'Faltante', 'Billete falso', 'Otro'] };
   modal({
     title: titulos[tipo],
-    body: `<p class="muted">En el cajón debería haber ${money(ef.esperado)} en efectivo.</p>
+    body: `<p class="muted">${medios.map(m => `${esc(m.nombre)}: debería haber <b>${money(m.efectivo ? ef.esperado : saldoDigital(c, m.id))}</b>`).join(' · ')}.${tipo === 'perdida' ? ' Usá la pérdida sólo cuando ya revisaste y no pudiste encontrar la diferencia.' : ''}</p>
+      <label class="fld">Medio<select class="in" id="mv-med">${medios.map(m => `<option value="${m.id}">${esc(m.nombre)}</option>`).join('')}</select></label>
       ${tipo === 'proveedor' ? `<label class="fld">Proveedor<input class="in" id="mv-prov" list="dl-prov" placeholder="Ej: Distribuidora Sur"><datalist id="dl-prov">${provs.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>` : ''}
       <div class="grid2"><label class="fld">Concepto<input class="in" id="mv-conc" list="dl-conc" value="${tipo === 'retiro' ? 'Retiro a caja mayor' : ''}"><datalist id="dl-conc">${conceptos[tipo].map(x => `<option value="${x}">`).join('')}</datalist></label>
       <label class="fld">Monto<input class="in" id="mv-monto" inputmode="numeric" placeholder="0"></label></div>
       <label class="fld">Nota (opcional)<input class="in" id="mv-nota" placeholder="Ej: factura 0001-1234"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Guardar', kind: 'primary', onClick: () => {
-      const r = tx(() => movimientoCaja({ tipo, proveedor: tipo === 'proveedor' ? $('#mv-prov').value.trim() : '', concepto: $('#mv-conc').value.trim(), monto: num($('#mv-monto').value), nota: $('#mv-nota').value.trim() }));
+      const r = tx(() => movimientoCaja({ tipo, metodoId: $('#mv-med').value, proveedor: tipo === 'proveedor' ? $('#mv-prov').value.trim() : '', concepto: $('#mv-conc').value.trim(), monto: num($('#mv-monto').value), nota: $('#mv-nota').value.trim() }));
       if (!r.ok) return false;
       toast('Movimiento registrado'); render();
     } }],
@@ -2256,17 +2338,19 @@ function modalMovimiento(tipo) {
 function modalCerrarCaja() {
   const c = cajaAbierta(), ef = efectivoDeCaja(c);
   const abiertas = Object.entries(DB.comandas).filter(([k, x]) => x.items.length);
-  UI.cierre = { esperado: ef.esperado };
+  UI.cierre = { esperado: ef.esperado, dig: metodosDigitales().map(m => ({ id: m.id, nombre: m.nombre, esperado: saldoDigital(c, m.id) })) };
   modal({
     title: 'Cerrar caja',
     body: `${abiertas.length ? `<div class="note warn">Hay <b>${abiertas.length} cuentas abiertas</b> sin cobrar (${money(sum(abiertas, ([, x]) => saldoDe(x)))}). Siguen abiertas después del cierre.</div>` : ''}
       <div class="card" style="padding:12px"><div class="l2"><span>Efectivo inicial</span><span>${money(c.fondo)}</span></div><div class="l2"><span>Cobros en efectivo (con devoluciones)</span><span>${money(ef.cobros + ef.devol + ef.corr)}</span></div>
         <div class="l2"><span>Ingresos</span><span>+ ${money(ef.ingresos)}</span></div><div class="l2"><span>Gastos, proveedores y retiros</span><span>− ${money(ef.egresos)}</span></div><div class="l2"><b>Debería haber</b><b>${money(ef.esperado)}</b></div></div>
       <div class="grid2"><label class="fld">Efectivo contado ahora<input class="in" id="cc-contado" data-in="cc" inputmode="numeric" placeholder="0"></label><label class="fld">Dejar de cambio para mañana<input class="in" id="cc-dejado" data-in="cc" inputmode="numeric" value="0"></label></div>
+      ${UI.cierre.dig.map((d, i) => `<div class="card" style="padding:12px"><div class="l2"><b>${esc(d.nombre)}</b><span>debería haber <b>${money(d.esperado)}</b></span></div>
+        <label class="fld">Según la app (lo que ves en Mercado Pago)<input class="in" id="cd-${i}" data-in="cc" inputmode="numeric" placeholder="${d.esperado}" autocomplete="off"></label><div id="cd-r-${i}" class="muted" style="margin-top:6px"></div></div>`).join('')}
       <div class="pg-sum" id="cc-res"></div>
       <label class="fld">Nota (obligatoria si hay diferencia)<input class="in" id="cc-nota" data-in="cc" placeholder="Ej: faltaron $200 de vuelto"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Cerrar caja', kind: 'primary', disabled: true, onClick: () => {
-      const r = tx(() => cerrarCaja(num($('#cc-contado').value), num($('#cc-dejado').value), $('#cc-nota').value));
+      const r = tx(() => cerrarCaja(num($('#cc-contado').value), num($('#cc-dejado').value), $('#cc-nota').value, UI.cierre.dig.map((d, i) => ({ metodoId: d.id, informado: $('#cd-' + i).value.trim() === '' ? null : num($('#cd-' + i).value) }))));
       if (!r.ok) return false;
       toast('Caja cerrada'); render();
     } }],
@@ -2282,8 +2366,15 @@ function pintarCierre() {
     if (dejado > contado) html += '<div class="err">No se puede dejar más de lo que hay.</div>';
     else html += `<div class="l"><span>Se retiran a caja mayor</span><b>${money(contado - dejado)}</b></div><div class="l"><span>Queda de cambio</span><b>${money(dejado)}</b></div>`;
   }
-  $('#cc-res').innerHTML = html;
-  const b = $('#mact-1'); if (b) b.disabled = !hay || dejado > contado || (dif !== 0 && !$('#cc-nota').value.trim());
+  let difDig = false;
+  UI.cierre.dig.forEach((d, i) => {
+    const v = $('#cd-' + i).value.trim(), el = $('#cd-r-' + i);
+    if (v === '') { el.innerHTML = 'Sin controlar (opcional). Si lo cargás, el cierre lo compara.'; return; }
+    const df = num(v) - d.esperado; if (df !== 0) difDig = true;
+    el.innerHTML = df === 0 ? '<span class="pill good">cuadra</span>' : `<b style="color:var(--bad)">${df > 0 ? 'sobran' : 'faltan'} ${money(Math.abs(df))}</b> · revisá los pagos en Caja, corregí tickets o cargá un movimiento o una pérdida y volvé a cerrar`;
+  });
+  $('#cc-res').innerHTML = html + (hay && dif === 0 && !difDig ? '<div class="l"><span>Resultado</span><span class="pill good">todo cuadra</span></div>' : '');
+  const b = $('#mact-1'); if (b) b.disabled = !hay || dejado > contado || ((dif !== 0 || difDig) && !$('#cc-nota').value.trim());
 }
 
 /* --- CLIENTES --- */
@@ -2359,7 +2450,7 @@ views.tickets = () => {
     <div class="tbl-wrap"><table><thead><tr><th>Nº</th><th>Fecha</th><th>Destino</th><th>Pagos</th><th class="r">Total</th><th></th></tr></thead><tbody>
     ${vs.map(v => `<tr><td class="num"><b>#${v.nro}</b></td><td class="num">${fechaHora(v.ts)}</td><td>${esc(v.destino)}${v.cliente ? ` <span class="muted">· ${esc(v.cliente)}</span>` : ''}</td>
       <td>${v.pagos.map(p => `<span class="pill">${esc(p.nombre)} ${money(p.monto)}</span>`).join(' ')}</td>
-      <td class="r num"><b>${money(v.total)}</b> ${v.estado !== 'ok' ? '<span class="pill bad">anulado</span>' : ''}${v.descuento > 0 ? ' <span class="pill warn">descuento</span>' : ''}${v.corregido ? ' <span class="pill">corregido</span>' : ''}</td>
+      <td class="r num"><b>${money(v.total)}</b> ${v.estado !== 'ok' ? '<span class="pill bad">anulado</span>' : ''}${v.descuento > 0 ? ' <span class="pill warn">descuento</span>' : ''}${(v.descuentoItems || 0) + (v.recargoItems || 0) > 0 ? ' <span class="pill warn">precio modificado *</span>' : ''}${v.corregido ? ' <span class="pill">corregido</span>' : ''}</td>
       <td class="r"><button class="btn sm" data-act="tk-ver" data-id="${v.id}">Ver / reimprimir</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No hay tickets en ese período.</td></tr>'}
     </tbody></table></div>`;
 };
@@ -2429,7 +2520,7 @@ repBody.resumen = () => {
   const efe = R.met.filter(m => { const mm = DB.metodos.find(x => x.nombre === m.nombre); return mm && mm.efectivo; });
   return `<div class="kpis"><div class="kpi"><span>Total vendido</span><b>${money(R.total)}</b></div><div class="kpi"><span>Tickets</span><b>${R.vs.length}</b></div>
       <div class="kpi"><span>Ticket promedio</span><b>${money(R.vs.length ? R.total / R.vs.length : 0)}</b></div>
-      <div class="kpi"><span>Descuentos otorgados</span><b>${money(sum(R.vs, v => v.descuento || 0))}</b></div>
+      <div class="kpi"><span>Descuentos otorgados (total e ítems)</span><b>${money(sum(R.vs, v => (v.descuento || 0) + (v.descuentoItems || 0)))}</b></div>
       <div class="kpi"><span>Cobrado en el período</span><b>${money(R.cobrado)}</b></div>
       <div class="kpi"><span>Efectivo cobrado</span><b>${money(sum(efe, m => m.monto))}</b></div>
       <div class="kpi"><span>Por cobrar (cuentas y turnos abiertos)</span><b>${money(sum(Object.values(DB.comandas), c => c.items.length ? saldoDe(c) : 0) + sum(DB.turnos.filter(t => t.estado === 'reservado' && t.fecha <= dayKey(Date.now()) && !cuentaDe(t)), t => t.precio - pagadoDe(t)))}</b></div>
@@ -2461,7 +2552,7 @@ repBody.cajas = () => {
       <div class="kpi"><span>Cierres con diferencia</span><b>${cerr.filter(c => c.diferencia !== 0).length}</b></div><div class="kpi"><span>Retirado a caja mayor</span><b>${money(sum(DB.movCaja.filter(m => m.tipo === 'retiro' && !m.anulado && lista.some(c => c.id === m.cajaId)), m => m.monto))}</b></div></div>
     <div class="tbl-wrap"><table><thead><tr><th>Apertura</th><th>Cierre</th><th>Responsable</th><th class="r">Inicial</th><th class="r">Esperado</th><th class="r">Contado</th><th class="r">Diferencia</th><th class="r">Retiro final</th><th class="r">Cambio</th><th>Nota</th></tr></thead><tbody>
     ${lista.map(c => `<tr><td class="num">${fechaHora(c.abierta)}</td><td class="num">${c.cerrada ? fechaHora(c.cerrada) : '<span class="pill warn">abierta</span>'}</td><td>${esc(c.responsable)}</td><td class="r num">${money(c.fondo)}</td><td class="r num">${c.cerrada ? money(c.esperado) : '—'}</td><td class="r num">${c.cerrada ? money(c.contado) : '—'}</td>
-      <td class="r num">${c.cerrada ? (c.diferencia === 0 ? '<span class="pill good">sin diferencia</span>' : `<span class="pill bad">${c.diferencia > 0 ? '+' : '−'}${money(Math.abs(c.diferencia))}</span>`) : '—'}</td><td class="r num">${c.cerrada ? money(c.retiroFinal) : '—'}</td><td class="r num">${c.cerrada ? money(c.dejado) : '—'}</td><td class="muted">${esc(c.nota || '')}</td></tr>`).join('') || '<tr><td colspan="10" class="muted" style="text-align:center;padding:20px">No hay cajas en ese período.</td></tr>'}</tbody></table></div>
+      <td class="r num">${c.cerrada ? (c.diferencia === 0 ? '<span class="pill good">sin diferencia</span>' : `<span class="pill bad">${c.diferencia > 0 ? '+' : '−'}${money(Math.abs(c.diferencia))}</span>`) : '—'}</td><td class="r num">${c.cerrada ? money(c.retiroFinal) : '—'}</td><td class="r num">${c.cerrada ? money(c.dejado) : '—'}</td><td class="muted">${esc(notaCierre(c))}</td></tr>`).join('') || '<tr><td colspan="10" class="muted" style="text-align:center;padding:20px">No hay cajas en ese período.</td></tr>'}</tbody></table></div>
     <div class="row" style="margin-top:12px"><button class="btn" data-act="exp-cajas">Exportar a Excel / CSV</button></div>`;
 };
 repBody.fiado = () => {
@@ -2504,7 +2595,7 @@ function rowsVentas() {
 function rowsCaja() { return [['Fecha', 'Hora', 'Tipo', 'Medio de pago', 'Monto', 'Detalle'], ...DB.caja.filter(e => dayKey(e.ts) >= UI.repDesde && dayKey(e.ts) <= UI.repHasta).map(e => [dayKey(e.ts), hhmm(e.ts), ({ cobro: 'Cobro', devolucion: 'Devolución', correccion: 'Corrección' })[e.tipo], e.nombre, e.monto, e.motivo])]; }
 function rowsLog() { return [['Fecha', 'Hora', 'Quién', 'Tipo', 'Referencia', 'Detalle'], ...DB.log.map(l => [dayKey(l.ts), hhmm(l.ts), l.usuario, l.tipo, l.ref, l.detalle])]; }
 function rowsOcup() { return [['Cancha', 'Turnos', 'Fijos', 'Lugares', 'Ocupación %', 'Mañana %', 'Tarde %', 'Noche %', 'Suspendidos', 'Cobrado'], ...ocupacion(UI.repDesde, UI.repHasta).map(o => [o.cancha.nombre, o.turnos, o.fijos, o.disp, Math.round(o.pct), ...['manana', 'tarde', 'noche'].map(f => o.fr[f][1] ? Math.round(o.fr[f][0] / o.fr[f][1] * 100) : ''), o.suspendidos, o.ingresos])]; }
-function rowsCajas() { return [['Apertura', 'Cierre', 'Responsable', 'Inicial', 'Esperado', 'Contado', 'Diferencia', 'Retiro final', 'Cambio', 'Nota'], ...DB.cajas.filter(c => dayKey(c.abierta) >= UI.repDesde && dayKey(c.abierta) <= UI.repHasta).map(c => [dayKey(c.abierta) + ' ' + hhmm(c.abierta), c.cerrada ? dayKey(c.cerrada) + ' ' + hhmm(c.cerrada) : 'abierta', c.responsable, c.fondo, c.esperado ?? '', c.contado ?? '', c.diferencia ?? '', c.retiroFinal ?? '', c.dejado ?? '', c.nota || ''])]; }
+function rowsCajas() { return [['Apertura', 'Cierre', 'Responsable', 'Inicial', 'Esperado', 'Contado', 'Diferencia', 'Retiro final', 'Cambio', 'Nota'], ...DB.cajas.filter(c => dayKey(c.abierta) >= UI.repDesde && dayKey(c.abierta) <= UI.repHasta).map(c => [dayKey(c.abierta) + ' ' + hhmm(c.abierta), c.cerrada ? dayKey(c.cerrada) + ' ' + hhmm(c.cerrada) : 'abierta', c.responsable, c.fondo, c.esperado ?? '', c.contado ?? '', c.diferencia ?? '', c.retiroFinal ?? '', c.dejado ?? '', notaCierre(c)])]; }
 function rowsFiado() { return [['Nombre', 'Tipo', 'Teléfono', 'Debe'], ...DB.clientes.filter(c => saldoCliente(c.id) > 0).map(c => [c.nombre, c.tipo, c.tel, saldoCliente(c.id)])]; }
 function rowsCompras() { return [['Producto', 'Stock', 'Mínimo', 'Vende por día', 'Paquetes a comprar', 'Unidades a comprar'], ...comprasSugeridas(UI.repCob).map(x => [x.p.nombre, x.p.stock, x.p.minimo, x.diario.toFixed(2), x.paq, x.unidades])]; }
 function rowsStock() { return [['Producto', 'Tipo', 'Stock', 'Mínimo'], ...DB.productos.filter(p => p.activo && p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => [p.nombre, TIPOS[p.tipo].n, p.stock, p.minimo])]; }
@@ -2596,6 +2687,7 @@ function tarjetasServidor() {
       <div class="l2"><span>Espacio libre en el disco</span><b>${mb(sa.espacio_libre)}</b></div>
       <div class="l2"><span>Excel y registro de hoy</span><b>${esc(dia)}</b></div>
       <div class="l2"><span>Versión del programa</span><b>${esc(sa.version)}</b></div></div></div>
+    <div class="card"><h2>Actualizaciones</h2><div class="stack"><p class="muted">Versión instalada: <b>${esc(sa.version)}</b>. El programa avisa solo cuando hay una nueva (si hay internet) y la baja <b>sólo si vos lo pedís</b>.</p><button class="btn" data-act="act-buscar" style="align-self:flex-start">Buscar actualización</button></div></div>
     <div class="card"><h2>Copias de seguridad</h2><div class="stack">
       <p class="muted">Se hace una copia sola al abrir el programa cada día y otra al cerrarlo. Última: <b>${esc(ult)}</b>.</p>
       <div class="row"><button class="btn primary" data-act="bk-crear">Hacer una copia ahora</button><button class="btn" data-act="abrir-carpeta" data-que="copias">Abrir carpeta de copias</button></div>
@@ -3174,6 +3266,24 @@ function eliminarProducto(id) {
 
 /* ---------- acciones de los botones ---------- */
 const A = {
+  'act-buscar': () => consultarActualizacion(true, true),
+  'act-ver': () => {
+    const a = ACTUALIZACION; if (!a || !a.hay) return;
+    modal({ title: 'Actualizar a la versión ' + a.version, wide: true,
+      body: `<p>Tenés la <b>${esc(a.actual)}</b>. Se baja el instalador de la nueva (${a.bytes ? (a.bytes / 1e6).toFixed(0) + ' MB' : 'unos 20 MB'}), el programa <b>se cierra solo y se vuelve a abrir en un minuto</b>. Tus datos no se tocan y antes se hace una copia de seguridad.</p>
+        <p class="muted">Qué cambió:</p><pre class="paper" style="max-height:220px">${esc(a.notas || 'Sin detalle.')}</pre>`,
+      actions: [{ label: 'Ahora no' }, { label: 'Actualizar ahora', kind: 'primary', onClick: () => {
+        modal({ title: 'Actualizando…', body: '<p>Descargando la versión nueva. No cierres nada: el programa se va a cerrar y abrir solo.</p>', actions: [] });
+        setTimeout(() => {
+          try { http('POST', '/api/actualizar', {}); document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;font:18px system-ui,sans-serif;text-align:center"><div><b>Actualizando…</b><br>El programa se abre solo en un momento.</div></div>'; }
+          catch (e) { closeModal(); toast(e.message, 'bad'); }
+        }, 80);
+        return false;
+      } }] });
+  },
+  'pagos-medio': d => modalPagosMedio(d.id),
+  'corr-tk': d => { const v = DB.ventas.find(x => x.nro === +d.nro && x.estado === 'ok'); if (v) corregirTicket(v.id); else toast('Ese ticket no se puede corregir', 'warn'); },
+  lapiz: d => { const abrir = () => modalPrecioItem(+d.i); if (DB.config.pedirPinAjuste) requirePin(abrir); else abrir(); },
   'hist-mas': () => { asegurarDesde(sumarDias(VENTANA_DESDE || dayKey(Date.now()), -30)); views.stock(); },
   'abrir-planilla': () => requirePin(() => { UI.view = 'admin'; UI.admTab = 'planilla'; UI.pl = null; render(); }),
   'pl-agregar': () => plAgregarFila(),
@@ -3572,6 +3682,8 @@ if (SERVIDOR) {
   setInterval(() => { if (!ESTADO_GUARDADO.ok) { try { guardarSync(); } catch (e) { /* sigue sin guardar: ya se ve en pantalla */ } } }, 8000);   // si falló un guardado, se reintenta solo
   window.addEventListener('beforeunload', e => { if (!ESTADO_GUARDADO.ok) { e.preventDefault(); e.returnValue = ''; } });
   setInterval(() => { try { const sa = http('GET', '/api/salud'); const antes = AVISOS_SIS.join('|'); AVISOS_SIS = sa.avisos || []; if (AVISOS_SIS.join('|') !== antes && !MODAL) pintarAvisosSistema(); } catch (e) { /* ya se nota en el estado de guardado */ } }, 60000);
+  setTimeout(() => consultarActualizacion(false, false), 30000);
+  setInterval(() => consultarActualizacion(false, false), 6 * 3600 * 1000);
   setTimeout(() => {
     try {
       const sa = http('GET', '/api/salud');

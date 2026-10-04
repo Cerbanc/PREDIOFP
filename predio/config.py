@@ -21,12 +21,14 @@ AJUSTES_POR_DEFECTO = {
         "puerto: puerto local del programa. copias_conservar_dias: cuántos días de copias de seguridad se guardan. "
         "ventana_completa: abrir la ventana ocupando toda la pantalla. "
         "ventana_dias: cuántos días de ventas, caja y stock se cargan en pantalla al abrir (lo anterior se pide al mirar reportes o tickets viejos; "
-        "siempre está guardado). 0 = cargar todo."
+        "siempre está guardado). 0 = cargar todo. "
+        "actualizaciones_repo: de dónde se bajan las versiones nuevas (usuario/repositorio de GitHub)."
     ),
     "puerto": 8765,
     "copias_conservar_dias": 30,
     "ventana_completa": True,
     "ventana_dias": 35,
+    "actualizaciones_repo": "Cerbanc/PREDIOFP",
 }
 
 
@@ -122,6 +124,7 @@ def leer_ajustes(rutas: Rutas) -> dict:
         ajustes["puerto"] = int(ajustes["puerto"])
         ajustes["copias_conservar_dias"] = max(1, int(ajustes["copias_conservar_dias"]))
         ajustes["ventana_dias"] = max(0, int(ajustes["ventana_dias"]))
+        ajustes["actualizaciones_repo"] = str(ajustes["actualizaciones_repo"]).strip()
     except (TypeError, ValueError):
         ajustes["puerto"] = AJUSTES_POR_DEFECTO["puerto"]
         ajustes["copias_conservar_dias"] = AJUSTES_POR_DEFECTO["copias_conservar_dias"]

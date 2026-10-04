@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
-from . import VERSION, planilla
+from . import VERSION, actualizador, planilla
 from .almacen import Almacen, ConflictoDeRevision, DatosInvalidos
 from .config import Rutas, leer_marca, ruta_logo
 from .copias import Copias, CopiaInvalida
@@ -210,6 +210,8 @@ class Manejador(BaseHTTPRequestHandler):
             ("GET", "/api/planilla/exportar.xlsx"): self.api_planilla_exportar,
             ("POST", "/api/planilla/leer"): self.api_planilla_leer,
             ("POST", "/api/cerrar"): self.api_cerrar,
+            ("GET", "/api/actualizacion"): self.api_actualizacion,
+            ("POST", "/api/actualizar"): self.api_actualizar,
         }
         if (metodo, ruta) in fijas:
             return fijas[(metodo, ruta)]
@@ -227,7 +229,8 @@ class Manejador(BaseHTTPRequestHandler):
         marca = leer_marca(app.rutas)
         marca["logo"] = bool(ruta_logo(app.rutas, marca))
         config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "marca": marca}, ensure_ascii=False).replace("<", "\\u003c")
-        html = app.html.replace("<!--PREDIO-CONFIG-->", f"<script>window.PREDIO={config};</script>")
+        icono = '<link rel="icon" href="/marca/logo">' if marca["logo"] else ""
+        html = app.html.replace("<!--PREDIO-CONFIG-->", f"{icono}<script>window.PREDIO={config};</script>")
         self._enviar(200, html.encode("utf-8"), "text/html; charset=utf-8", {"Content-Security-Policy": CSP})
 
     def _logo(self) -> None:
@@ -401,6 +404,32 @@ class Manejador(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, **planilla.leer_planilla(datos, nombre)})
         except planilla.PlanillaInvalida as e:
             raise Error(400, str(e)) from None
+
+    def api_actualizacion(self, q: dict) -> None:
+        """¿Hay una versión nueva? Se consulta a GitHub sólo si hace falta (se recuerda 6 horas, salvo que se pida de nuevo)."""
+        app = self.app
+        forzar = (q.get("forzar") or ["0"])[0] == "1"
+        previo = getattr(app, "_actualizacion", None)
+        if forzar or previo is None or time.time() - previo[0] > 6 * 3600:
+            previo = (time.time(), actualizador.buscar(str(app.ajustes.get("actualizaciones_repo") or "")))
+            app._actualizacion = previo      # type: ignore[attr-defined]
+        self._json(200, {"ok": True, **previo[1]})
+
+    def api_actualizar(self, q: dict) -> None:
+        """Baja el instalador, hace una copia de seguridad y pide cerrar el programa: el instalador se ejecuta cuando ya cerró."""
+        self._leer_cuerpo(10_000)
+        app = self.app
+        info = actualizador.buscar(str(app.ajustes.get("actualizaciones_repo") or ""))
+        if not info.get("hay"):
+            raise Error(400, info.get("error") or "Ya tenés la última versión.")
+        try:
+            ruta = actualizador.descargar(info, app.rutas.raiz / "actualizaciones")
+            app.copias.crear("seguridad_antes_de_actualizar")
+        except actualizador.ErrorActualizacion as e:
+            raise Error(502, str(e)) from None
+        app.instalador_pendiente = ruta                  # type: ignore[attr-defined]
+        self._json(200, {"ok": True, "version": info["version"]})
+        app.apagar.set()
 
     def api_cerrar(self, q: dict) -> None:
         self._leer_cuerpo(10_000)

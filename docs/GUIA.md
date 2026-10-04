@@ -11,7 +11,7 @@ Punto de venta para el predio (kiosco, pádel y buffet) que **funciona sin inter
    - **Caja del Predio (demostración)**: abre una copia aparte con datos de ejemplo, para mostrarla o practicar sin tocar nada real.
 4. Al abrirla por primera vez se crea la carpeta **`C:\Predio`**. Ahí vive todo (ver el punto 5).
 
-Para **actualizarla**: se instala la versión nueva encima. Los datos de `C:\Predio` no se tocan nunca; si la base necesita cambios, el programa hace una copia antes y los hace solo.
+Para **actualizarla**: el programa avisa solo (si hay internet) cuando hay una versión nueva, con un cartel arriba: **Ver qué cambió y actualizar**. Se baja el instalador completo (unos 20 MB) **una sola vez y sólo si lo pedís**, hace una copia de seguridad, se cierra y se vuelve a abrir solo. También está *Admin → Datos y seguridad → Buscar actualización*. Los datos de `C:\Predio` no se tocan nunca; si la base necesita cambios, el programa hace otra copia y los hace solo. No hace falta ser administrador de Windows. Las versiones se publican en GitHub como v1.1.0, v1.2.0…
 
 ## 2. El primer día: cargar productos y stock
 
@@ -38,7 +38,8 @@ Para **actualizarla**: se instala la versión nueva encima. Los datos de `C:\Pre
 
 ## 3. El día a día
 
-- **Caja → Abrir caja** al empezar (con el cambio inicial) y **Cerrar caja** al terminar: el sistema compara lo que debería haber con lo que contás y deja anotada la diferencia.
+- **Caja → Abrir caja** al empezar (con el cambio inicial) y **Cerrar caja** al terminar: el sistema te dice **cuánto debería haber** en el cajón y también en cada medio digital (Mercado Pago QR y transferencia, igual que el efectivo). Vos contás el efectivo y mirás en la app de Mercado Pago; si algo no da: en *Caja → revisar pagos* ves los pagos del turno y podés **corregir el ticket** que se cargó con otro medio (queda en el registro), o cargar un **movimiento** (ingreso, gasto, retiro) eligiendo el medio. Si no lo encontrás, registrás la **pérdida** a mano. El cierre es el análisis con lo que hay: si hay diferencia, dejás una nota.
+- **Lápiz de precio (✎)**: al lado del precio de cada ítem de la cuenta. Cambia el precio de **ese ítem sólo en esa venta** (ej.: las pelotas a $10.000 por una promo, o las papas a $3.400): pide el motivo (y el código de administración si está activado), el ítem queda marcado con \* en la cuenta y en el ticket, la diferencia suma al total de **Descuentos otorgados** del día y todo queda en el registro de cambios. El precio del producto no cambia.
 - **Vender**, **Mesas**, **Barra**: igual que en la demostración. Los pagos parciales, el cobro por separado, el fiado y las devoluciones están en esas pantallas.
 - Abajo a la izquierda ves **«Guardado a las 15:42»**. Si alguna vez dice en rojo *NO SE ESTÁ GUARDANDO*, no cierres la ventana: el programa reintenta solo y avisa qué pasa (casi siempre es el disco lleno).
 - **Carpeta de hoy** (botón abajo a la izquierda) abre la carpeta del día con el Excel de lo vendido y el registro de cambios, **ya hechos**, sin exportar nada.
@@ -70,7 +71,7 @@ Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el 
 
 **Mirar la base desde otro programa:** instalá *DB Browser for SQLite* (gratis), abrí `predio.db` con *Abrir en modo sólo lectura* y mirá las vistas que empiezan con `v_` (`v_ventas`, `v_venta_items`, `v_productos`, `v_libro_caja`, `v_cambios`…): ya vienen ordenadas en columnas.
 
-**Nombre y logo (los fijos del negocio):** en `C:\Predio\personalizar\`. Abrí `marca.json` con el Bloc de notas y cambiá el nombre; copiá tu logo en esa carpeta con el nombre `logo.png`. Guardá y apretá **F5** en el programa: no hay que reinstalar nada, y las actualizaciones no tocan esa carpeta.
+**Logo:** un PNG cuadrado de **256 × 256 px** (fondo transparente) llamado `logo.png`; en pantalla se ve a 34 px y también se usa como ícono de la ventana. **Nombre (fijo del negocio):** en `C:\Predio\personalizar\`. Abrí `marca.json` con el Bloc de notas y cambiá el nombre; copiá tu logo en esa carpeta con el nombre `logo.png`. Guardá y apretá **F5** en el programa: no hay que reinstalar nada, y las actualizaciones no tocan esa carpeta.
 
 ## 6. Copias de seguridad
 

@@ -340,3 +340,17 @@ def test_los_telefonos_no_van_en_el_resumen(almacen):
     guardar(almacen, [op("clientes", "cl1", {"id": "cl1", "nombre": "Juan", "tel": "11 5555-0505", "tipo": "cliente"})])
     guardar(almacen, [op("clientes", "cl1", {"id": "cl1", "nombre": "Juan", "tel": "11 9999-0000", "tipo": "cliente"})])
     assert not any("5555" in e["resumen"] or "9999" in e["resumen"] for e in entradas(almacen))
+
+
+def test_caja_con_medios_digitales_y_perdida_en_el_registro(almacen):
+    cargar_base(almacen)
+    caja = {"id": "cx1", "abierta": _ahora() - 3_600_000, "fondo": 1000, "responsable": "Marcos", "cerrada": None}
+    guardar(almacen, [op("cajas", "cx1", caja)])
+    mov = {"id": "mc1", "ts": _ahora(), "cajaId": "cx1", "tipo": "perdida", "metodoId": "mp2", "concepto": "Diferencia sin explicar", "proveedor": "", "monto": 300, "nota": ""}
+    guardar(almacen, [op("movCaja", "mc1", mov)])
+    assert "PÉRDIDA registrada en MP · QR: $ 300" in entradas(almacen)[-1]["resumen"] and entradas(almacen)[-1]["importante"] == 1
+    cerrada = {**caja, "cerrada": _ahora(), "esperado": 1000, "contado": 1000, "diferencia": 0, "retiroFinal": 0, "dejado": 1000,
+               "digital": [{"metodoId": "mp2", "nombre": "MP · QR", "esperado": 5000, "informado": 4700, "diferencia": -300}]}
+    guardar(almacen, [op("cajas", "cx1", cerrada)])
+    t = entradas(almacen)[-1]["resumen"]
+    assert "Medios digitales: MP · QR debía $ 5.000 · faltan $ 300" in t

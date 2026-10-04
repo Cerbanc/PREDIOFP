@@ -49,6 +49,67 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.ok(t2.some(t => /pasó de «ok» a «anulada»/.test(t)), JSON.stringify(t2));
   assert.ok((await audit('Anulación')).length >= 1, 'el stock devuelto también queda anotado');
 
+  // ---- 2b. lápiz: cambiar el precio de UN ítem sólo en esa venta
+  await page.locator('[data-act=nav][data-v=venta]').click();
+  await page.locator('select[data-in=dest]').selectOption('M');
+  await tile('Coca').click(); await tile('Coca').click(); await tile('Pancho').click();
+  await page.locator('[data-act=lapiz][data-i="0"]').click();
+  if (await page.locator('#pin').count()) { await page.locator('#pin').fill('1234'); await page.locator('#mact-1').click(); }   // pide el código salvo que ya se haya desbloqueado hace poco
+  await page.locator('#pi-precio').fill('1800'); await page.locator('#pi-motivo').selectOption('Promoción');
+  await page.locator('.modal footer button', { hasText: 'Guardar precio' }).click();
+  assert.ok(/\*/.test(await page.locator('.line').first().innerText()), 'el ítem quedó marcado con *');
+  assert.strictEqual(await ev(() => totalItems(__pos.DB.comandas.M.items)), 3600 + 3500, 'sólo cambia ese ítem: 2 x 1800 + el pancho a lista');
+  assert.strictEqual(await ev(() => __pos.DB.productos[0].precio), 2200, 'el precio del producto no se tocó');
+  await tile('Coca').click();                                                                 // otra Coca: va aparte, a precio de lista
+  assert.strictEqual(await ev(() => __pos.DB.comandas.M.items.filter(i => i.prodId === 'p1').length), 2);
+  await page.locator('[data-act=dec][data-i="2"]').click();                                   // se saca la Coca extra (la de lista)
+  await page.locator('[data-act=cobrar]').click();
+  await page.locator('[data-act=pg-pct][data-i="0"][data-v="100"]').click();
+  await page.locator('#mact-2').click();
+  await page.waitForFunction(() => __pos.DB.ventas.length === 2);
+  const v2 = await ev(() => { const v = __pos.DB.ventas[1]; return { total: v.total, di: v.descuentoItems, l: v.items[0].precioLista, mp: v.items[0].motivoPrecio, txt: ticketTexto(v) }; });
+  assert.deepStrictEqual([v2.total, v2.di, v2.l, v2.mp], [7100, 800, 2200, 'Promoción'], JSON.stringify(v2));
+  assert.ok(/Coca-Cola 500 ml \*/.test(v2.txt) && /lista \$2\.200 c\/u/.test(v2.txt), 'el ticket marca el precio modificado');
+  await page.keyboard.press('Escape');
+  const t2b = await audit('precio');
+  assert.ok(t2b.some(t => /PRECIO de Coca-Cola 500 ml cambiado a \$ 1\.800 c\/u/.test(t)) && t2b.some(t => /PRECIO MODIFICADO en Coca-Cola/.test(t)), JSON.stringify(t2b));
+  await page.locator('[data-act=nav][data-v=reportes]').click();
+  assert.ok(/descuentos otorgados[\s\S]*800/i.test(await page.locator('.kpis').innerText()), 'el total de descuentos del día incluye la diferencia');
+
+  // ---- 2c. Mercado Pago se lee como el efectivo: cuánto debería haber, pérdida y cierre
+  await page.locator('[data-act=nav][data-v=venta]').click();
+  await page.locator('select[data-in=dest]').selectOption('M');
+  await tile('Coca').click();
+  await page.locator('[data-act=cobrar]').click();
+  await page.locator('[data-act=pg-del][data-i="0"]').click();
+  await page.locator('[data-act=pg-add]', { hasText: 'QR' }).click();
+  await page.locator('[data-act=pg-pct][data-i="0"][data-v="100"]').click();
+  await page.locator('#mact-2').click();
+  await page.waitForFunction(() => __pos.DB.ventas.length === 3);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-act=nav][data-v=caja]').click();
+  const qrId = await ev(() => DB.metodos.find(m => /QR/.test(m.nombre)).id);
+  assert.strictEqual(await ev(id => saldoDigital(cajaAbierta(), id), qrId), 2200, 'la caja dice cuánto debería haber en el QR');
+  assert.ok(/QR[\s\S]*2\.200/.test(await page.locator('#main').innerText()));
+  await page.locator('[data-act=pagos-medio]').first().click();                                // lista de pagos para revisar
+  assert.ok(/Ticket #3/.test(await page.locator('.modal').innerText()) && await page.locator('.modal [data-act=corr-tk]').count() === 1);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-act=mv-new][data-t=perdida]').click();                              // pérdida manual en el QR
+  await page.locator('#mv-med').selectOption(qrId); await page.locator('#mv-conc').fill('Diferencia sin explicar'); await page.locator('#mv-monto').fill('200');
+  await page.locator('#mact-1').click();
+  assert.strictEqual(await ev(id => saldoDigital(cajaAbierta(), id), qrId), 2000, 'la pérdida baja lo que debería haber');
+  await page.locator('[data-act=caja-cerrar]').click();
+  await page.locator('#cc-contado').fill('1000'); await page.locator('#cc-dejado').fill('1000');
+  await page.locator('#cd-0').fill('1900');                                                      // la app de Mercado Pago dice otra cosa
+  assert.ok(/faltan\s+\$\s?100/.test(await page.locator('#cd-r-0').innerText()) && await page.locator('#mact-1').isDisabled(), 'con diferencia hace falta una nota');
+  await page.locator('#cc-nota').fill('Revisé los pagos y no la encontré');
+  await page.locator('#mact-1').click();
+  await page.waitForFunction(() => !cajaAbierta());
+  const dg = await ev(() => DB.cajas[DB.cajas.length - 1].digital.map(d => [d.nombre, d.esperado, d.informado, d.diferencia]));
+  assert.deepStrictEqual(dg.find(x => /QR/.test(x[0])), ['MP · QR', 2000, 1900, -100]);
+  assert.ok((await audit('Medios digitales')).some(t => /MP · QR debía \$ 2\.000 · faltan \$ 100/.test(t)));
+  assert.ok((await audit('PÉRDIDA')).length >= 1);
+
   // ---- 3. producto con foto: la imagen pasa a ser un archivo de la carpeta imagenes
   await page.locator('[data-act=nav][data-v=admin]').click();
   await page.locator('[data-act=adm-tab][data-v=productos]').click();

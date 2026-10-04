@@ -14,7 +14,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from . import NOMBRE, VERSION
+from . import NOMBRE, VERSION, actualizador
 from .almacen import Almacen
 from .config import Rutas, carpeta_por_defecto, carpeta_recursos, leer_ajustes, preparar_log_tecnico
 from .copias import Copias
@@ -273,6 +273,14 @@ def main(argv: list[str] | None = None) -> int:
     log.info("Cerrando...")
     servidor.parar()
     cerrar_aplicacion(app)
+    ruta_instalador = getattr(app, "instalador_pendiente", None)
+    if ruta_instalador is not None:                   # actualización pedida desde la pantalla: ya se cerró todo, ahora se instala encima
+        candado.close()
+        try:
+            actualizador.lanzar_instalador(ruta_instalador)
+        except OSError:
+            log.exception("No se pudo ejecutar el instalador")
+            mostrar_error(f"No se pudo ejecutar el instalador. Está en {ruta_instalador}: abrilo a mano.")
     if proceso is not None and proceso.poll() is None:      # si se cerró desde el botón del programa, se cierra también la ventana
         proceso.terminate()
         try:

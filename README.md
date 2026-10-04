@@ -74,6 +74,10 @@ El flujo `windows.yml` corre en `windows-latest`: pruebas → `pyinstaller packa
 
 Los datos van en `C:\Predio` (o `PREDIO_DATOS`) y **no** en Documentos, porque ahí OneDrive suele sincronizar y no debe sincronizar una base abierta. El instalador nunca los toca.
 
+## Actualizaciones
+
+`predio/actualizador.py` consulta `releases/latest` del repositorio indicado en `configuracion.json` (`actualizaciones_repo`), compara versiones, baja el instalador (verifica tamaño y SHA-256 de GitHub, sólo hosts de GitHub), hace una copia, cierra el programa y recién ahí ejecuta el instalador en modo silencioso (que vuelve a abrir el programa). El instalador es por usuario (sin administrador). Se publica una versión subiendo la etiqueta `vX.Y.Z` (debe coincidir con `predio/__init__.py`). **Si el repositorio es privado**, la consulta anónima no ve las versiones: hay que hacerlo público o crear un repositorio público sólo para versiones y definir el secreto `RELEASES_TOKEN` y la variable `RELEASES_REPO` (el flujo publica ahí también) y apuntar `actualizaciones_repo` a ese repositorio.
+
 ## Qué falta (a propósito)
 
 Turnos desde el celular (planilla en la nube), panel remoto de sólo lectura, espejo en Google Sheets, lectura real de remitos con IA, impresora de tickets. El diseño ya los contempla: la API de lectura, las vistas `v_*` y el número de revisión (`rev`) sirven para sincronizar.

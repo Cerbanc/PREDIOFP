@@ -1,4 +1,4 @@
-; Instalador de Windows (Inno Setup). El programa se instala en Archivos de programa;
+; Instalador de Windows (Inno Setup). Se instala para el usuario actual (sin pedir administrador, así las actualizaciones no se traban);
 ; los DATOS viven en C:\Predio y el instalador NUNCA los toca (ni al actualizar ni al desinstalar).
 #define Nombre "Caja del Predio"
 #ifndef Version
@@ -17,7 +17,7 @@ OutputBaseFilename=Instalar-Caja-del-Predio-{#Version}
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\Predio.exe
 SetupIconFile=predio.ico
@@ -43,6 +43,9 @@ Name: "{group}\Carpeta de datos (C:\Predio)"; Filename: "{sys}\explorer.exe"; Pa
 
 [Run]
 Filename: "{app}\Predio.exe"; Description: "Abrir {#Nombre} ahora"; Flags: nowait postinstall skipifsilent
+
+; Tras una actualización automática (sin pantallas) se vuelve a abrir el programa solo
+Filename: "{app}\Predio.exe"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 ; Nada: los datos de C:\Predio se conservan siempre.

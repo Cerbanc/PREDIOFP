@@ -136,7 +136,9 @@ def datos_del_dia(con: sqlite3.Connection, dia: str) -> dict:
         "negocio": _unico(con, "negocio", "Predio"),
         "kpis": {
             "tickets": len(ok), "anulados": len(anuladas), "total_vendido": total,
-            "descuentos": sum(v.get("descuento") or 0 for v in ok),
+            "descuentos": sum((v.get("descuento") or 0) + (v.get("descuentoItems") or 0) for v in ok),
+            "descuentos_total": sum(v.get("descuento") or 0 for v in ok),
+            "descuentos_items": sum(v.get("descuentoItems") or 0 for v in ok),
             "ticket_promedio": round(total / len(ok)) if ok else 0,
             "cobrado_neto": sum(m["neto"] for m in por_medio),
             "cambios": len(cambios), "cambios_importantes": sum(1 for c in cambios if c["importante"]),
@@ -233,7 +235,9 @@ def _hoja_resumen(wb: Workbook, d: dict, generado: str) -> None:
     linea("Tickets cobrados", k["tickets"])
     linea("Tickets anulados", k["anulados"])
     linea("Total vendido", k["total_vendido"], formato=[2], negrita=True)
-    linea("Descuentos dados", k["descuentos"], formato=[2])
+    linea("Descuentos dados (total + ítems)", k["descuentos"], formato=[2], negrita=True)
+    linea("   · descuentos sobre el total", k["descuentos_total"], formato=[2])
+    linea("   · precios cambiados en ítems", k["descuentos_items"], formato=[2])
     linea("Ticket promedio", k["ticket_promedio"], formato=[2])
 
     titulo("Plata cobrada por medio de pago (incluye señas y pagos de deuda; no incluye fiado)")
@@ -255,10 +259,16 @@ def _hoja_resumen(wb: Workbook, d: dict, generado: str) -> None:
                   c.get("fondo"), c.get("esperado"), c.get("contado"), c.get("diferencia"), c.get("retiroFinal"), c.get("dejado"), formato=[4, 5, 6, 7, 8, 9])
     else:
         linea("No hubo caja abierta este día")
+    digs = [(c, x) for c in d["cajas"] for x in (c.get("digital") or [])]
+    if digs:
+        linea("Medios digitales (Mercado Pago)", "Debía haber", "Según la app", "Diferencia", negrita=True)
+        for c, x in digs:
+            linea(f"{x.get('nombre')} · caja de {c.get('responsable')}", x.get("esperado"), x.get("informado") if x.get("informado") is not None else "sin controlar", x.get("diferencia"), formato=[2, 3, 4])
     mc = d["movimientos_caja"]
     linea("Gastos", mc.get("gasto", 0), formato=[2])
     linea("Pagos a proveedores", mc.get("proveedor", 0), formato=[2])
     linea("Retiros a caja mayor", mc.get("retiro", 0), formato=[2])
+    linea("Pérdidas registradas", mc.get("perdida", 0), formato=[2])
     linea("Ingresos de efectivo", mc.get("ingreso", 0), formato=[2])
 
     titulo("Ventas por categoría (precio de lista, antes de descuentos)")
@@ -299,21 +309,21 @@ def construir_excel(d: dict, destino: Path) -> None:
     generado = hora_de(time.time() * 1000, True)
     _hoja_resumen(wb, d, generado)
     ventas = sorted(d["ventas"], key=lambda v: v.get("nro") or 0)
-    _hoja_tabla(wb, "Ventas", ["Nº", "Hora", "Estado", "Destino", "Cliente", "Subtotal", "Descuento", "Total", "Medios de pago", "Motivo del descuento", "Nota"],
+    _hoja_tabla(wb, "Ventas", ["Nº", "Hora", "Estado", "Destino", "Cliente", "Subtotal", "Descuento", "Total", "Medios de pago", "Motivo del descuento", "Nota", "Descuento por ítems"],
                 [[v.get("nro"), hora_de(v["ts"]), v.get("estado"), v.get("destino"), v.get("cliente") or "", v.get("subtotal"), v.get("descuento"), v.get("total"),
                   " + ".join(f"{p.get('nombre')} {plata(p.get('monto'))}" for p in v.get("pagos") or []),
-                  ((v.get("ajuste") or {}).get("motivo") or "") + (f" ({v['ajuste']['nota']})" if (v.get("ajuste") or {}).get("nota") else ""), v.get("nota") or ""]
-                 for v in ventas], plata_cols=(5, 6, 7))
+                  ((v.get("ajuste") or {}).get("motivo") or "") + (f" ({v['ajuste']['nota']})" if (v.get("ajuste") or {}).get("nota") else ""), v.get("nota") or "", v.get("descuentoItems") or 0]
+                 for v in ventas], plata_cols=(5, 6, 7, 11))
     filas = []
     for v in ventas:
         for it in v.get("items") or []:
             c, p = it.get("cant") or 0, it.get("precio") or 0
-            filas.append([v.get("nro"), hora_de(v["ts"]), v.get("estado"), it.get("nombre"), d["categorias"].get(it.get("catId"), ""), c, p, c * p, it.get("costo") or 0, it.get("nota") or ""])
-    _hoja_tabla(wb, "Detalle", ["Ticket", "Hora", "Estado", "Producto", "Categoría", "Cantidad", "Precio", "Subtotal", "Costo unitario", "Nota"], filas, plata_cols=(6, 7, 8))
+            filas.append([v.get("nro"), hora_de(v["ts"]), v.get("estado"), it.get("nombre"), d["categorias"].get(it.get("catId"), ""), c, p, c * p, it.get("costo") or 0, it.get("nota") or "", it.get("precioLista"), it.get("motivoPrecio") or ""])
+    _hoja_tabla(wb, "Detalle", ["Ticket", "Hora", "Estado", "Producto", "Categoría", "Cantidad", "Precio", "Subtotal", "Costo unitario", "Nota", "Precio de lista", "Motivo del precio"], filas, plata_cols=(6, 7, 8, 10))
     tipos = {"cobro": "Cobro", "devolucion": "Devolución", "correccion": "Corrección"}
     _hoja_tabla(wb, "Libro de caja", ["Hora", "Tipo", "Medio de pago", "Monto", "Motivo"],
                 [[hora_de(e["ts"]), tipos.get(e.get("tipo"), e.get("tipo")), e.get("nombre"), e.get("monto"), e.get("motivo")] for e in d["ledger"]], plata_cols=(3,))
-    nombres_mov = {"gasto": "Gasto", "proveedor": "Proveedor", "retiro": "Retiro a caja mayor", "ingreso": "Ingreso"}
+    nombres_mov = {"gasto": "Gasto", "proveedor": "Proveedor", "retiro": "Retiro a caja mayor", "ingreso": "Ingreso", "perdida": "Pérdida"}
     _hoja_tabla(wb, "Movimientos de caja", ["Hora", "Tipo", "Concepto", "Proveedor", "Monto", "Nota", "Anulado"],
                 [[hora_de(m["ts"]), nombres_mov.get(m.get("tipo"), m.get("tipo")), m.get("concepto"), m.get("proveedor") or "", m.get("monto"), m.get("nota") or "", "Sí" if m.get("anulado") else ""]
                  for m in d["mov_caja"]], plata_cols=(4,))
