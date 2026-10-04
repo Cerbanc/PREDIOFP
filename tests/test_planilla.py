@@ -81,3 +81,10 @@ def test_archivos_invalidos():
 @pytest.mark.parametrize("entrada,esperado", [("2200", 2200), ("$ 2.200", 2200), ("2.200,50", 2201), ("1,5", 2), (1500.4, 1500), (None, None), ("", None), ("abc", None), ("-5", -5), (True, 1)])
 def test_numero_ar(entrada, esperado):
     assert numero_ar(entrada) == esperado
+
+
+def test_stock_minimo_no_se_confunde_con_stock_en_ningun_orden():
+    for cab in (["Producto", "Stock actual", "Stock mínimo"], ["Producto", "Stock mínimo", "Stock actual"], ["Producto", "Stock", "Stock mínimo"]):
+        texto = ";".join(cab) + "\nCoca;36;6\n" if cab[1] != "Stock mínimo" else ";".join(cab) + "\nCoca;6;36\n"
+        f = leer_planilla(texto.encode(), "x.csv")["filas"][0]
+        assert (f["stock"], f["minimo"]) == (36, 6), cab

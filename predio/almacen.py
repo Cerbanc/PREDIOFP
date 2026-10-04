@@ -14,8 +14,6 @@ import logging
 import os
 import re
 import sqlite3
-import time
-from pathlib import Path
 from typing import Any
 
 from . import auditoria
@@ -274,7 +272,13 @@ class Almacen:
 
             self.db.poner_meta(con, "rev", rev1)
             self.db.poner_meta(con, "seq", seq)
-            entradas = auditoria.generar(con, cambios, formas)
+            try:
+                entradas = auditoria.generar(con, cambios, formas)
+            except Exception:      # noqa: BLE001 - un resumen que falla no puede frenar una venta
+                log.exception("Falló el resumen del registro de cambios; se anota una línea genérica")
+                entradas = [auditoria.Entrada(c, i, "baja" if d is None else ("alta" if a is None else "cambio"), True,
+                                              f"Cambio en {c} ({i}) que el programa no pudo resumir", a if isinstance(a, dict) else None, d if isinstance(d, dict) else None)
+                            for c, i, a, d in cambios if c not in auditoria.IGNORAR_COLECCIONES]
             dia_hoy = dia_de(ts)
             for e in entradas:
                 antes_j, despues_j = auditoria.serializar(e)

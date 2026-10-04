@@ -156,3 +156,51 @@ def test_texto_registro(con_datos):
     con.close()
     t = texto_registro(d)
     assert t.startswith("Registro de cambios") and "Marcos" in t
+
+
+def test_restaurar_no_borra_lo_anotado_en_el_registro(con_datos, rutas):
+    copias = Copias(con_datos.db, con_datos, rutas)
+    copia = copias.crear("manual")
+    con_datos.aplicar({"ops": [op("negocio", "_", "Cambio posterior")]}, "Marcos")
+    con_datos.aplicar({"ops": [borrar("productos", "p1")]}, "Marcos")
+    copias.restaurar(copia.name, "Marcos")
+    textos = [r[0] for r in con_datos.db.con.execute("SELECT resumen FROM auditoria ORDER BY id")]
+    assert any("Producto eliminado: Coca-Cola" in t for t in textos), "el borrado hecho después de la copia sigue en el registro"
+    assert any("Se restauró la copia" in t for t in textos)
+    ids = [r[0] for r in con_datos.db.con.execute("SELECT id FROM auditoria ORDER BY id")]
+    assert ids == sorted(set(ids))
+
+
+def test_texto_raro_en_el_excel_no_lo_rompe(con_datos, rutas):
+    from predio.util import ahora_ms, dia_de
+
+    ts = ahora_ms()
+    v = venta("v9", 9, ts - 1000, 500)
+    v["cliente"] = "=1+1"
+    v["nota"] = "con\x0bcaracter ilegal"
+    con_datos.aplicar({"ops": [op("ventas", "v9", v)]}, "Marcos")
+    ad = ArchivosDiarios(con_datos.db, rutas)
+    ad.generar_dia(dia_de(ts))
+    ws = load_workbook(ad.ruta_excel(dia_de(ts)))["Ventas"]
+    celdas = [c.value for f in ws.iter_rows(min_row=2) for c in f]
+    assert "=1+1" in celdas and any("caracter ilegal" in str(c) for c in celdas)
+
+
+def test_un_cambio_durante_la_escritura_no_se_pierde(con_datos, rutas):
+    from predio.util import ahora_ms, dia_de
+
+    dia = dia_de(ahora_ms())
+    ad = ArchivosDiarios(con_datos.db, rutas)
+    ad.marcar([dia])
+    original = ad.generar_dia
+
+    def lento(d):
+        ad.marcar([d])            # llega otra venta mientras se escribe
+        return original(d)
+
+    ad.generar_dia = lento
+    ad.escribir_ahora()
+    assert ad.pendientes() == [dia]
+    ad.generar_dia = original
+    ad.escribir_ahora()
+    assert ad.pendientes() == []

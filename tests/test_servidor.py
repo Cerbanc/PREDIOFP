@@ -183,9 +183,15 @@ def test_cerrar_pide_apagar(srv):
     assert srv.app.apagar.wait(3)
 
 
-def test_imagen_desde_link_rechaza_cosas_raras(srv):
-    assert pedir(srv, "POST", "/api/imagen-desde-link", {"url": "file:///etc/passwd"})[0] == 400
-    assert pedir(srv, "POST", "/api/imagen-desde-link", {"url": "ftp://x/y.png"})[0] == 400
+def test_ya_no_hay_descarga_de_imagenes_desde_links(srv):
+    assert pedir(srv, "POST", "/api/imagen-desde-link", {"url": "http://127.0.0.1/x.png"})[0] == 404
+
+
+def test_json_con_nan_se_rechaza(srv):
+    pedir(srv, "POST", "/api/guardar", {**base_inicial(), "base_rev": 0})
+    estado, r, _ = pedir(srv, "POST", "/api/guardar", b'{"base_rev": 1, "ops": [{"c": "negocio", "id": "_", "d": NaN}]}', cabeceras={"Content-Type": "application/json"})
+    assert estado == 400
+    assert json.loads(srv.app.almacen.estado_json())["db"]["negocio"] == "Predio Deportivo"
 
 
 def test_una_sola_copia_del_programa_por_carpeta_de_datos(srv, rutas):
@@ -216,3 +222,20 @@ def test_aviso_si_la_base_esta_vacia_pero_hay_copias(rutas):
         assert app2.almacen.esta_vacia() and any("copias de seguridad anteriores" in a for a in app2.avisos)
     finally:
         app_mod.cerrar_aplicacion(app2)
+
+
+def test_nombre_y_logo_salen_de_la_carpeta_personalizar(srv):
+    marca = srv.app.rutas.personalizar / "marca.json"
+    estado, html, _ = pedir(srv, "GET", "/", token=False, crudo=True)
+    assert "Predio Fútbol-Pádel".encode() in html and marca.exists() and '"logo": false' in html.decode()
+    assert pedir(srv, "GET", "/marca/logo", token=False)[0] == 404
+    marca.write_text('{"nombre": "Mi Club <b>", "logo": "logo.png"}', encoding="utf-8")
+    (srv.app.rutas.personalizar / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 20)
+    estado, html, _ = pedir(srv, "GET", "/", token=False, crudo=True)          # sin reiniciar nada
+    assert "Mi Club".encode() in html and b"<b>" not in html.split(b"window.PREDIO=")[1].split(b";</script>")[0] and '"logo": true' in html.decode()
+    estado, img, cab = pedir(srv, "GET", "/marca/logo", token=False, crudo=True)
+    assert estado == 200 and cab["Content-Type"] == "image/png" and img.startswith(b"\x89PNG")
+    marca.write_text('{"nombre": "X", "logo": "../datos/predio.db"}', encoding="utf-8")
+    assert pedir(srv, "GET", "/marca/logo", token=False)[0] == 404
+    marca.write_text("esto no es json", encoding="utf-8")
+    assert "Predio Fútbol-Pádel".encode() in pedir(srv, "GET", "/", token=False, crudo=True)[1]

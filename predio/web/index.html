@@ -61,6 +61,7 @@ p{margin:0}
 #app{display:grid;grid-template-columns:212px minmax(0,1fr);height:100%}
 .side{background:var(--side-bg);color:var(--side-fg);display:flex;flex-direction:column;padding:16px 12px;gap:6px;overflow:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.brand .logo{width:34px;height:34px;object-fit:contain;border-radius:8px;flex:none}
 .brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-style:normal;font-size:15px}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav button{display:flex;align-items:center;gap:10px;padding:10px 12px;border:0;background:transparent;color:inherit;border-radius:8px;font-weight:500;cursor:pointer;text-align:left;width:100%}
@@ -424,6 +425,8 @@ const UI = {
   editSalon: false, mesaEdit: null, admTab: 'productos', admQ: '', adminUntil: 0,
 };
 
+/* Nombre y logo del negocio: salen de C:\\Predio\\personalizar (no se editan desde el programa). Sin el programa, se usa el nombre guardado. */
+const nombreNegocio = () => (SERVIDOR && PREDIO.marca && PREDIO.marca.nombre) || (DB && DB.negocio) || 'Predio';
 function uid(prefix) { return prefix + (DB.seq++).toString(36); }
 
 /* Pedido al programa. Es sincrónico a propósito: una venta no se da por hecha hasta que quedó escrita en disco. */
@@ -544,6 +547,15 @@ function asegurarDesde(dia) {
   });
   VENTANA_DESDE = dia;
 }
+let VENTANA_BASE = null;
+function recortarVentana() {            // al volver a trabajar se suelta el historial viejo que se miró, para que cada venta siga rápida
+  if (!SERVIDOR || !VENTANA_BASE || !VENTANA_DESDE || VENTANA_DESDE >= VENTANA_BASE) return;
+  HISTORICAS.forEach(c => {
+    const m = SAVED[c];
+    DB[c] = DB[c].filter(x => { if (dayKey(x.ts) >= VENTANA_BASE) return true; if (m) m.delete(String(x.id)); return false; });
+  });
+  VENTANA_DESDE = VENTANA_BASE;
+}
 const textoGuardado = () => ESTADO_GUARDADO.ok ? (ESTADO_GUARDADO.ts ? 'Guardado a las ' + hhmm(ESTADO_GUARDADO.ts) : 'Todo guardado') : 'NO SE ESTÁ GUARDANDO: ' + ESTADO_GUARDADO.error;
 function pintarEstadoGuardado() {
   const el = document.getElementById('estado-guardado');
@@ -554,7 +566,7 @@ function pintarEstadoGuardado() {
 function cargar() {
   if (SERVIDOR) {
     const r = http('GET', '/api/estado');
-    REV = r.rev; VENTANA_DESDE = r.ventana || null;
+    REV = r.rev; VENTANA_DESDE = VENTANA_BASE = r.ventana || null;
     if (r.vacia) return null;
     SAVED = {}; FORMAS_OK = {};
     Object.keys(r.db).forEach(k => { FORMAS_OK[k] = true; SAVED[k] = registrosJSON(k, r.db[k]); });
@@ -889,7 +901,7 @@ function corregirVenta(id, o) {
 function anularVenta(id, map) {
   const v = DB.ventas.find(x => x.id === id);
   if (!v || v.estado !== 'ok') throw new Error('Ese ticket ya está anulado');
-  DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta').forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, permitirNegativo: true, motivo: `Anulación ticket #${v.nro}` }));
+  DB.movimientos.filter(m => m.ref === id && m.tipo === 'venta' && prod(m.prodId)).forEach(m => moverStock(m.prodId, -m.cant, 'anulacion', { ref: id, permitirNegativo: true, motivo: `Anulación ticket #${v.nro}` }));
   const devs = v.pagos.map((p, i) => {
     if (p.fiado) {
       DB.cc.push({ id: uid('cc'), ts: Date.now(), clienteId: p.clienteId, tipo: 'anulacion', monto: p.monto, ref: '#' + v.nro, nota: 'Ticket anulado' });
@@ -1649,7 +1661,7 @@ function ticketTexto(v) {
   const ctr = s => ' '.repeat(Math.max(0, Math.floor((W - s.length) / 2))) + s;
   const m = n => money(n).replace(/\s/g, '');
   const lr = (a, b) => a.slice(0, Math.max(1, W - b.length - 1)).padEnd(W - b.length) + b;
-  const L = [ctr(DB.negocio.toUpperCase()), ctr('Ticket no fiscal'), line,
+  const L = [ctr(nombreNegocio().toUpperCase()), ctr('Ticket no fiscal'), line,
     lr('Ticket Nº ' + String(v.nro).padStart(5, '0'), fechaHora(v.ts)), 'Destino: ' + v.destino];
   if (v.cliente) L.push('Cliente: ' + v.cliente);
   if (v.estado !== 'ok') L.push('*** ANULADO ***');
@@ -1721,17 +1733,26 @@ function render() {
   views[UI.view]();
   pintarAvisoCaja();
   pintarAvisoGuardado();
+  pintarAvisosSistema();
 }
 function pintarAvisoGuardado() {
   if (!SERVIDOR || ESTADO_GUARDADO.ok) return;
   $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-guardado" style="background:var(--bad-soft);color:var(--bad);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span><b>No se está guardando.</b> ${esc(ESTADO_GUARDADO.error)} No cierres la ventana: se reintenta solo.</span><button class="btn sm danger" data-act="reintentar-guardado">Reintentar ahora</button></div>`);
+}
+let AVISOS_SIS = [];
+function pintarAvisosSistema() {
+  const viejo = document.getElementById('aviso-sistema'); if (viejo) viejo.remove();
+  if (!SERVIDOR || !AVISOS_SIS.length) return;
+  $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-sistema" style="background:var(--bad-soft);color:var(--bad);margin-bottom:12px"><b>Aviso del programa:</b> ${AVISOS_SIS.map(esc).join(' · ')}</div>`);
 }
 function pintarAvisoCaja() {
   if (cajaAbierta() || UI.view === 'caja') return;
   $('#main').insertAdjacentHTML('afterbegin', '<div class="note warn" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span><b>La caja está cerrada.</b> Abrila para poder cobrar.</span><button class="btn sm primary" data-act="caja-abrir">Abrir caja</button></div>');
 }
 function renderSide() {
-  $('#brand-name').textContent = DB.negocio;
+  $('#brand-name').textContent = nombreNegocio();
+  const bi = $('.brand i'); if (bi && SERVIDOR && PREDIO.marca && PREDIO.marca.logo && !bi.dataset.logo) { bi.dataset.logo = 1; bi.outerHTML = '<img class="logo" alt="" src="/marca/logo?v=' + Date.now() + '">'; }
+  document.title = nombreNegocio();
   const ocup = Object.keys(DB.comandas).filter(k => k !== 'M' && DB.comandas[k].items.length).length;
   const turHoy = DB.turnos.filter(t => t.fecha === dayKey(Date.now()) && t.estado === 'reservado').length;
   const bajo = DB.productos.filter(p => p.activo && ['directo', 'insumo'].includes(p.tipo) && p.stock <= p.minimo).length;
@@ -1780,7 +1801,7 @@ function renderGrid() {
     if (r === Infinity) st = 'Sin control de stock';
     else if (r <= 0) { st = 'Sin stock'; cls = 'bad'; }
     else { st = (p.tipo === 'receta' ? 'Salen ' : 'Stock ') + r; if (r <= p.minimo) cls = 'warn'; }
-    return `<button class="tile ${p.img ? 'hasimg' : ''}" style="--h:${hueDe(p.catId)}" data-act="add" data-id="${p.id}">${p.img ? `<img class="th" src="${p.img}" alt="">` : ''}<b>${esc(p.nombre)}</b><span class="st ${cls}">${st}</span><span class="pr">${money(p.precio)}</span></button>`;
+    return `<button class="tile ${p.img ? 'hasimg' : ''}" style="--h:${hueDe(p.catId)}" data-act="add" data-id="${p.id}">${p.img ? `<img class="th" src="${esc(p.img)}" alt="">` : ''}<b>${esc(p.nombre)}</b><span class="st ${cls}">${st}</span><span class="pr">${money(p.precio)}</span></button>`;
   }).join('');
   $('#grid').innerHTML = html || (DB.productos.length ? '<p class="muted">No hay productos con ese filtro.</p>' : `<div class="card" style="grid-column:1/-1;max-width:560px"><h2>Todavía no hay productos</h2><p class="muted" style="margin-bottom:14px">Cargá los productos y el stock de una sola vez en la planilla: escribís directo en la tabla o pegás tu lista desde Excel.</p><button class="btn primary lg" data-act="abrir-planilla">Abrir la planilla de productos y stock</button></div>`);
 }
@@ -1870,7 +1891,7 @@ function textoEstadoTurno(t) {
   const pag = pagadoDe(t);
   if (t.estado === 'cobrado') return 'cobrado ✓';
   const kc = t.virtual ? null : cuentaDe(t);
-  if (kc) return 'en la cuenta de ' + lugarNombre(kc) + ' · debe ' + money(saldoDe(DB.comandas[kc]));
+  if (kc) return 'en la cuenta de ' + esc(lugarNombre(kc)) + ' · debe ' + money(saldoDe(DB.comandas[kc]));
   if (t.esFijo && !pag) return 'FIJO' + (t.tipoPrecio === 'comun' ? ' (precio común)' : '') + ' · ' + money(t.precio);
   return pag > 0 ? `seña ${money(pag)} · debe ${money(t.precio - pag)}` : 'sin pago · ' + money(t.precio);
 }
@@ -2508,7 +2529,7 @@ admBody.productos = () => {
   const list = DB.productos.filter(p => !q || norm(p.nombre).includes(q));
   $('#adm-body').innerHTML = `<div class="toolbar"><input class="in" id="admq" data-in="admq" placeholder="Buscar producto…" value="${esc(UI.admQ)}"><span class="row" style="margin-left:auto"><button class="btn" data-act="prod-imp">Planilla: cargar muchos a la vez</button><button class="btn primary" data-act="prod-new">+ Nuevo producto</button></span></div>
     <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th class="r">Precio</th><th class="r">Costo</th><th class="r">Margen</th><th>Empaque</th><th></th></tr></thead><tbody>
-    ${list.map(p => `<tr style="${p.activo ? '' : 'opacity:.55'}"><td>${p.img ? `<img class="th-s" src="${p.img}" alt="">` : ''}<b>${esc(p.nombre)}</b> ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" title="Abrir el link guardado">↗</a> ` : ''}${p.activo ? '' : '<span class="pill">oculto</span>'}${p.tipo === 'receta' ? `<br><small class="muted">${p.receta.map(r => r.cant + ' × ' + (prod(r.id) ? esc(prod(r.id).nombre) : '?')).join(' + ')}</small>` : ''}</td>
+    ${list.map(p => `<tr style="${p.activo ? '' : 'opacity:.55'}"><td>${p.img ? `<img class="th-s" src="${esc(p.img)}" alt="">` : ''}<b>${esc(p.nombre)}</b> ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" title="Abrir el link guardado">↗</a> ` : ''}${p.activo ? '' : '<span class="pill">oculto</span>'}${p.tipo === 'receta' ? `<br><small class="muted">${p.receta.map(r => r.cant + ' × ' + (prod(r.id) ? esc(prod(r.id).nombre) : '?')).join(' + ')}</small>` : ''}</td>
       <td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:6px"></span>${catDe(p.catId) ? esc(catDe(p.catId).nombre) : '—'}</td><td class="muted">${TIPOS[p.tipo].n}</td>
       <td class="r num">${p.tipo === 'insumo' ? '—' : money(p.precio)}</td><td class="r num">${costoUnit(p) ? money(costoUnit(p)) : '—'}</td><td class="r num">${costoUnit(p) && p.precio > 0 ? Math.round((p.precio - costoUnit(p)) / p.precio * 100) + '%' : '—'}</td><td class="muted">${p.paqueteUnidades > 1 ? esc(p.paqueteNombre || 'Paquete') + ' = ' + p.paqueteUnidades + ' u.' : '—'}</td>
       <td class="r"><div class="actions"><button class="btn sm" data-act="prod-edit" data-id="${p.id}">Editar</button><button class="btn sm ghost" data-act="prod-tog" data-id="${p.id}">${p.activo ? 'Ocultar' : 'Mostrar'}</button><button class="btn sm ghost" data-act="prod-del" data-id="${p.id}">Eliminar</button></div></td></tr>`).join('')}
@@ -2583,14 +2604,14 @@ function tarjetasServidor() {
 admBody.datos = () => {
   $('#adm-body').innerHTML = `<div class="cols">
     <div class="card"><h2>Datos del negocio</h2><div class="stack">
-      <label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>
+      ${SERVIDOR ? `<p class="muted">Nombre y logo: se cambian en la carpeta <b>C:\\Predio\\personalizar</b> (archivo marca.json y logo.png) y se ven con F5.</p>` : `<label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>`}
       <label class="fld">Código de administración<input class="in" id="newpin" type="password" inputmode="numeric" placeholder="Nuevo código"><small>Dejalo vacío para no cambiarlo. Es una traba para que nadie toque precios por error, no una clave de seguridad.</small></label>
       <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button>
       <label class="row" style="gap:8px;margin-top:6px"><input type="checkbox" data-in="cfg-pin" ${DB.config.pedirPinAjuste ? 'checked' : ''}> Pedir el código para dar descuentos o vender al costo</label>
       <label class="row" style="gap:8px"><input type="checkbox" data-in="cfg-turnos" ${DB.config.usarTurnos ? 'checked' : ''}> Usar el calendario de turnos (por ahora se carga a mano; más adelante se va a conectar con la planilla en la nube)</label></div></div>
-    <div class="card"><h2>WhatsApp (avisos de turnos)</h2><div class="stack"><p class="muted">El botón "Avisar por WhatsApp" abre el chat del cliente con este mensaje ya escrito. Vos lo mandás.</p>
+    ${DB.config.usarTurnos ? `<div class="card"><h2>WhatsApp (avisos de turnos)</h2><div class="stack"><p class="muted">El botón "Avisar por WhatsApp" abre el chat del cliente con este mensaje ya escrito. Vos lo mandás.</p>
       <label class="fld">Código de país<input class="in" data-in="cfg-wa-pais" inputmode="numeric" value="${esc(DB.config.paisWa)}"></label>
-      <label class="fld">Mensaje<textarea class="in" rows="3" data-in="cfg-wa-msg">${esc(DB.config.msgTurno)}</textarea><small>Podés usar {nombre}, {cancha}, {fecha} y {hora}.</small></label></div></div>
+      <label class="fld">Mensaje<textarea class="in" rows="3" data-in="cfg-wa-msg">${esc(DB.config.msgTurno)}</textarea><small>Podés usar {nombre}, {cancha}, {fecha} y {hora}.</small></label></div></div>` : ''}
     ${SERVIDOR ? tarjetasServidor() : `<div class="card"><h2>Copia de seguridad</h2><div class="stack"><p class="muted">En el programa instalado es un archivo de la base de datos que se copia solo todos los días. Acá podés ver y restaurar el contenido.</p>
       <div class="row"><button class="btn" data-act="bk-ver">Ver copia (JSON)</button><button class="btn" data-act="bk-rest">Restaurar copia</button></div></div></div>`}
     <div class="card"><h2>Probar la seguridad de los datos</h2><div class="stack"><p class="muted">Simula una falla en medio de una venta (se descuenta stock y justo después "se corta"). El sistema tiene que volver todo atrás.</p>
@@ -2885,7 +2906,7 @@ function plTecla(e) {
   else if (e.key === 'ArrowLeft' && (!txt || (el.selectionStart === 0 && el.selectionEnd === 0))) { if (!sel) { e.preventDefault(); plMover(el, 0, -1); } }
 }
 /* pegado desde Excel: varias celdas a la vez */
-const PL_RECONOCER = [['nombre', /^(producto|nombre|articulo|descripcion)/], ['categoria', /^(categoria|rubro)/], ['tipo', /^tipo/], ['precio', /^precio/], ['costo', /^costo/], ['stock', /^(stock|cantidad|existencia)/], ['minimo', /minimo/], ['unidades', /(unidades|por caja|por bulto|por paquete)/], ['paquete', /^(como viene|paquete|empaque|presentacion)/], ['receta', /^receta/], ['activo', /^(activo|visible)/]];
+const PL_RECONOCER = [['id', /^id\b/], ['nombre', /^(producto|nombre|articulo|descripcion)/], ['categoria', /^(categoria|rubro)/], ['tipo', /^tipo/], ['precio', /^precio/], ['costo', /^costo/], ['stock', /^(stock(?!.*min)|cantidad|existencia)/], ['minimo', /minimo/], ['unidades', /(unidades|por caja|por bulto|por paquete)/], ['paquete', /^(como viene|paquete|empaque|presentacion)/], ['receta', /^receta/], ['activo', /^(activo|visible)/]];
 function plValorCelda(c, t) {
   t = String(t ?? '').trim();
   const col = PL_COLS.find(x => x.c === c);
@@ -2902,15 +2923,16 @@ function plPegar(e) {
   const T = parsearTabla(txt, /\t/.test(txt) ? '\t' : '\u0000');
   if (!T.length) return;
   const P = UI.pl, filas = P.filas, actual = plFila(el);
-  const cab = T[0].map(h => norm(h).trim()), mapa = cab.map(h => { const r = PL_RECONOCER.find(([, re]) => re.test(h)); return r ? r[0] : null; });
+  const cab = T[0].map(h => norm(h).trim()), usadas = new Set(), mapa = cab.map(h => { const r = PL_RECONOCER.find(([k, re]) => !usadas.has(k) && re.test(h)); if (r) usadas.add(r[0]); return r ? r[0] : null; });
   const conTitulos = mapa.filter(Boolean).length >= 2 && mapa.includes('nombre');
   let nuevos = 0, cambios = 0;
   if (conTitulos) {
     T.slice(1).forEach(r => {
       const nom = String(r[mapa.indexOf('nombre')] ?? '').trim(); if (!nom) return;
-      let f = filas.find(x => norm(x.v.nombre).trim() === norm(nom).trim());
+      const idp = mapa.includes('id') ? String(r[mapa.indexOf('id')] ?? '').trim() : '';
+      let f = (idp && filas.find(x => x.id === idp)) || filas.find(x => norm(x.v.nombre).trim() === norm(nom).trim());
       if (f) cambios++; else { f = plFilaNueva(P.ultCat); filas.push(f); nuevos++; }
-      mapa.forEach((c, j) => { if (c && j < r.length && String(r[j] ?? '').trim() !== '') f.v[c] = plValorCelda(c, r[j]); });
+      mapa.forEach((c, j) => { if (c && c !== 'id' && j < r.length && String(r[j] ?? '').trim() !== '') f.v[c] = plValorCelda(c, r[j]); });
     });
   } else {
     let i0 = filas.indexOf(actual); const j0 = PL_COLS.findIndex(x => x.c === el.dataset.c);
@@ -3123,6 +3145,9 @@ function guardarProducto() {
   if (f.tipo === 'receta' && !f.receta.length) { toast('Agregá al menos un ingrediente', 'warn'); return false; }
   if (f.tipo === 'receta' && new Set(f.receta.map(r => r.id)).size !== f.receta.length) { toast('Un ingrediente está repetido', 'warn'); return false; }
   if (DB.productos.some(p => p.id !== UI.pfId && norm(p.nombre) === norm(f.nombre))) { toast('Ya existe un producto con ese nombre', 'warn'); return false; }
+  if (f.tipo !== 'insumo' && !(f.precio > 0)) { toast('Falta el precio de venta', 'warn'); return false; }
+  const usa = UI.pfId && !['directo', 'insumo'].includes(f.tipo) && DB.productos.find(x => (x.receta || []).some(r => r.id === UI.pfId));
+  if (usa) { toast(`No se puede: «${usa.nombre}» lo usa en su receta`, 'warn'); return false; }
   const r = tx(() => {
     const campos = { nombre: f.nombre, catId: f.catId, tipo: f.tipo, precio: f.tipo === 'insumo' ? 0 : f.precio, minimo: ['directo', 'insumo'].includes(f.tipo) ? f.minimo : 0, paqueteNombre: f.paqueteNombre, paqueteUnidades: f.paqueteUnidades || 1, img: f.img || '', link: f.link || '', costo: f.tipo === 'receta' ? 0 : (f.costo || 0), receta: f.tipo === 'receta' ? f.receta : [] };
     if (UI.pfId) {
@@ -3175,7 +3200,7 @@ const A = {
   'aud-mas': () => { audCargar(); admBody.auditoria(); },
   'aud-det': d => audDetalle(+d.id),
   'reintentar-guardado': () => { persist(); render(); },
-  nav: d => { UI.view = d.v; UI.editSalon = false; render(); },
+  nav: d => { if (d.v === 'venta' || d.v === 'mesas' || d.v === 'caja') recortarVentana(); UI.view = d.v; UI.editSalon = false; render(); },
   tema: () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const nx = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = nx;
@@ -3396,7 +3421,7 @@ const A = {
       const r = tx(() => { DB.ventas = []; DB.movimientos = []; DB.caja = []; DB.turnos = []; logPush('sistema', '', 'Se borraron ventas, turnos, movimientos de stock y de caja'); DB.contadores.venta = 0; DB.comandas = { M: { items: [] } }; });
       if (r.ok) { toast('Historial borrado'); render(); }
     };
-    const msg = 'Se borran tickets, turnos, movimientos de stock y movimientos de caja. Los productos y su stock actual se mantienen.' + (SERVIDOR ? ' Antes se hace una copia de seguridad (se puede volver atrás desde Datos y seguridad) y el borrado queda anotado.' : '');
+    const msg = 'Se borran: tickets, libro de caja, aperturas y cierres de caja, movimientos de efectivo, movimientos de stock, turnos, deudas de clientes (fiado) y las cuentas abiertas. Se conservan: productos con su stock actual, clientes, categorías, medios de pago, mesas y ajustes.' + (SERVIDOR ? ' Antes se hace una copia de seguridad (se puede volver atrás desde Datos y seguridad) y el borrado queda anotado.' : '');
     if (SERVIDOR) confirmarEscribiendo('Borrar ventas e historial', msg, 'BORRAR', borrar); else ask('Borrar ventas e historial', msg, 'Borrar', borrar, true);
   },
   'reset-demo': () => ask('Volver a datos de ejemplo', 'Se pierde todo lo que cargaste y se vuelven a cargar los datos de ejemplo.', 'Restablecer', () => { seed(); normalizar(); persist(); UI.com = 'M'; toast('Datos de ejemplo cargados'); render(); }, true),
@@ -3528,7 +3553,11 @@ document.addEventListener('pointerup', () => {
 
 /* ---------- arranque ---------- */
 try { const t = localStorage.getItem('predio_pos_theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* sin memoria */ }
-DB = cargar();
+try { DB = cargar(); }
+catch (e) {
+  document.body.insertAdjacentHTML('beforeend', `<div class="scrim" style="z-index:300"><div class="modal"><header><h3>No se pudo abrir la base de datos</h3></header><div class="mbody"><p>${esc(e.message)}</p><p class="muted">Cerrá y volvé a abrir el programa. Si sigue igual, avisá a soporte: los datos y las copias de seguridad siguen en la carpeta C:\\Predio.</p></div><footer><button class="btn primary" onclick="location.reload()">Reintentar</button></footer></div></div>`);
+  throw e;
+}
 if (!DB) {                     // primera vez: base nueva (vacía) o, en la demostración, con datos de ejemplo
   ORIGEN = 'Sistema';
   try { if (SERVIDOR && PREDIO.modo !== 'demo') crearBase(); else seed(); guardarSync(); }
@@ -3542,9 +3571,11 @@ setInterval(() => { if (!MODAL && revisarTurnos()) render(); }, 30000);
 if (SERVIDOR) {
   setInterval(() => { if (!ESTADO_GUARDADO.ok) { try { guardarSync(); } catch (e) { /* sigue sin guardar: ya se ve en pantalla */ } } }, 8000);   // si falló un guardado, se reintenta solo
   window.addEventListener('beforeunload', e => { if (!ESTADO_GUARDADO.ok) { e.preventDefault(); e.returnValue = ''; } });
+  setInterval(() => { try { const sa = http('GET', '/api/salud'); const antes = AVISOS_SIS.join('|'); AVISOS_SIS = sa.avisos || []; if (AVISOS_SIS.join('|') !== antes && !MODAL) pintarAvisosSistema(); } catch (e) { /* ya se nota en el estado de guardado */ } }, 60000);
   setTimeout(() => {
     try {
       const sa = http('GET', '/api/salud');
+      AVISOS_SIS = sa.avisos || []; pintarAvisosSistema();
       if (sa.avisos && sa.avisos.length) modal({ title: 'Aviso importante', body: sa.avisos.map(x => `<p>${esc(x)}</p>`).join(''), actions: [{ label: 'Entendido', kind: 'primary' }] });
     } catch (e) { /* si falla, ya se vio en pantalla */ }
   }, 600);

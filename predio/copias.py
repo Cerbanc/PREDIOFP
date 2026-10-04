@@ -131,10 +131,15 @@ class Copias:
             self.crear("seguridad_antes_de_restaurar")
             with self.db.lock:
                 rev_antes = self.almacen.rev()
+                tope = src.execute("SELECT COALESCE(MAX(id), 0) FROM auditoria").fetchone()[0]
+                # el registro de cambios no se pierde al restaurar: lo anotado después de la copia se vuelve a poner
+                perdidas = self.db.con.execute("SELECT * FROM auditoria WHERE id > ? ORDER BY id", (tope,)).fetchall()
                 src.backup(self.db.con)
                 self.db._configurar()
                 self.db.migrar()
                 with self.db.transaccion() as con:
+                    for f in perdidas:
+                        con.execute("INSERT INTO auditoria (id, ts, dia, usuario, coleccion, ref, accion, importante, resumen, antes, despues, rev) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", tuple(f))
                     rev_copia = int(self.db.meta("rev", "0", con) or 0)
                     self.db.poner_meta(con, "rev", max(rev_antes, rev_copia) + 1)
             self.almacen.registrar_evento(usuario, f"Se restauró la copia de seguridad {nombre}", True, "sistema", nombre)

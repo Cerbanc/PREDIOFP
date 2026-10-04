@@ -37,6 +37,16 @@ const TOTAL = +process.env.TOTAL_VENTAS, EN_VENTANA = +process.env.EN_VENTANA;
   // ---- 2. cargar un Excel por la pantalla
   await ev(() => { UI.view = 'admin'; UI.adminUntil = Date.now() + 300000; UI.admTab = 'planilla'; UI.pl = null; render(); });
   await page.waitForSelector('#pl-body');
+  // pegar con títulos: "Stock mínimo" no puede pisar al stock, y la columna ID une con el producto aunque cambie el nombre
+  await page.locator('#pl-body [data-c=nombre]').first().focus();
+  await page.evaluate(() => {
+    const dt = new DataTransfer(); const id = UI.pl.filas.find(f => f.v.nombre === 'Coca-Cola 500 ml').id;
+    dt.setData('text/plain', `ID\tProducto\tStock actual\tStock mínimo\n${id}\tCoca 500 renombrada\t33\t7`);
+    document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  const pg = await ev(() => { const f = UI.pl.filas.find(x => x.v.nombre === 'Coca 500 renombrada'); return f && { stock: f.v.stock, min: f.v.minimo, id: !!f.id, n: UI.pl.filas.filter(x => x.v.nombre.startsWith('Coca')).length }; });
+  assert.deepStrictEqual(pg, { stock: '33', min: '7', id: true, n: 1 }, 'el pegado con ID renombra sin duplicar: ' + JSON.stringify(pg));
+  await ev(() => { UI.pl = null; views.admin(); });
   await page.locator('#pl-file').setInputFiles(XLSX_PATH);
   await page.waitForFunction(() => /Se leyeron/.test(document.body.innerText));
   const nombres = await page.locator('#pl-body [data-c=nombre]').evaluateAll(els => els.map(e => e.value).filter(Boolean));

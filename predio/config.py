@@ -67,6 +67,10 @@ class Rutas:
         return self.raiz / "logs_tecnicos"
 
     @property
+    def personalizar(self) -> Path:
+        return self.raiz / "personalizar"
+
+    @property
     def perfil_navegador(self) -> Path:
         return self.datos / "perfil_ventana"
 
@@ -75,7 +79,7 @@ class Rutas:
         return self.raiz / "configuracion.json"
 
     def crear(self) -> "Rutas":
-        for p in (self.raiz, self.datos, self.dias, self.copias, self.imagenes, self.planillas, self.exportaciones, self.tecnicos):
+        for p in (self.raiz, self.personalizar, self.datos, self.dias, self.copias, self.imagenes, self.planillas, self.exportaciones, self.tecnicos):
             p.mkdir(parents=True, exist_ok=True)
         return self
 
@@ -151,3 +155,47 @@ def carpeta_recursos() -> Path:
     if base:
         return Path(base) / "predio"
     return Path(__file__).resolve().parent
+
+
+MARCA_POR_DEFECTO = {"nombre": "Predio Fútbol-Pádel", "logo": "logo.png"}
+LEEME_PERSONALIZAR = """PERSONALIZAR EL PROGRAMA
+========================
+
+marca.json  -> el nombre que aparece arriba a la izquierda y en los tickets, y el nombre del archivo del logo.
+logo.png    -> el logo (PNG, JPG o WEBP; cuadrado o apaisado, idealmente de 200 px de alto o más).
+
+Para ver un cambio: guardá el archivo y en el programa apretá F5 (no hace falta cerrar nada ni reinstalar).
+Este archivo y el logo NO se tocan al actualizar el programa.
+Si borrás marca.json, se vuelve a crear con los valores de fábrica.
+"""
+
+
+def leer_marca(rutas: Rutas) -> dict:
+    """Nombre y logo del negocio. Se leen de C:\\Predio\\personalizar cada vez que se abre la pantalla."""
+    marca = dict(MARCA_POR_DEFECTO)
+    ruta = rutas.personalizar / "marca.json"
+    try:
+        rutas.personalizar.mkdir(parents=True, exist_ok=True)
+        if ruta.exists():
+            leido = json.loads(ruta.read_text(encoding="utf-8-sig"))
+            if isinstance(leido, dict):
+                if isinstance(leido.get("nombre"), str) and leido["nombre"].strip():
+                    marca["nombre"] = leido["nombre"].strip()[:60]
+                if isinstance(leido.get("logo"), str):
+                    marca["logo"] = leido["logo"].strip()
+        else:
+            ruta.write_text(json.dumps(MARCA_POR_DEFECTO, indent=2, ensure_ascii=False), encoding="utf-8")
+        leeme = rutas.personalizar / "LEEME.txt"
+        if not leeme.exists():
+            leeme.write_text(LEEME_PERSONALIZAR, encoding="utf-8")
+    except (OSError, ValueError):
+        pass
+    return marca
+
+
+def ruta_logo(rutas: Rutas, marca: dict) -> Path | None:
+    nombre = Path(marca.get("logo") or "").name           # sólo el nombre: nunca rutas
+    if not nombre or Path(nombre).suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
+        return None
+    p = rutas.personalizar / nombre
+    return p if p.is_file() else None

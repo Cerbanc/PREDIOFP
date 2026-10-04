@@ -126,6 +126,8 @@ class Contexto:
         return f"Turno {self.cancha(t.get('canchaId'))} {hm(t.get('ini'))}"
 
     def valor(self, campo: str, v: Any) -> str:
+        if campo == "tel":                      # los teléfonos no van en frases que terminan en archivos de texto o Excel
+            return "cambiado" if v else "vacío"
         if campo in IDS_A_NOMBRE:
             return self.nombre(IDS_A_NOMBRE[campo], v, "ninguno")
         if campo in DINERO and isinstance(v, (int, float)):
@@ -293,9 +295,7 @@ def _mov_stock(ctx, col, id_, a, d):
 def _clave_item(it: dict, ctx: Contexto) -> tuple[tuple, str]:
     if it.get("turnoId"):
         return ("T", it["turnoId"]), ctx.turno_texto(it["turnoId"])
-    nota = it.get("nota") or ""
-    nombre = ctx.producto(it.get("prodId")) + (f" ({nota})" if nota else "")
-    return ("P", it.get("prodId"), nota), nombre
+    return ("P", it.get("prodId")), ctx.producto(it.get("prodId"))
 
 
 def _mapa_items(items: list | None, ctx: Contexto) -> dict:

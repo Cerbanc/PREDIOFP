@@ -21,12 +21,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .config import Rutas
 from .db import BaseDeDatos
-from .util import dia_de, es_dia, hm, hora_de, plata
+from .util import es_dia, hm, hora_de, plata
 
 log = logging.getLogger("predio.diario")
 
@@ -155,8 +156,23 @@ def datos_del_dia(con: sqlite3.Connection, dia: str) -> dict:
 
 # ------------------------------------------------------------------ escritura de archivos
 
+def _san(v):
+    return ILLEGAL_CHARACTERS_RE.sub("", v) if isinstance(v, str) else v
+
+
+def _limpiar_hoja(ws) -> None:
+    """Quita caracteres que Excel no admite (los que vienen de Word o PDF) y evita que un texto que empieza con = se tome por fórmula."""
+    for fila in ws.iter_rows():
+        for c in fila:
+            if isinstance(c.value, str):
+                v = ILLEGAL_CHARACTERS_RE.sub("", c.value)
+                c.value = v
+                if v.startswith(("=", "+", "-", "@")) and c.data_type != "s":
+                    c.data_type = "s"
+
+
 def _escribir_atomico(destino: Path, escribir) -> None:
-    tmp = destino.with_name(destino.name + ".tmp")
+    tmp = destino.with_name(f".{destino.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     escribir(tmp)
     try:
         os.replace(tmp, destino)
@@ -172,7 +188,7 @@ def _hoja_tabla(wb: Workbook, nombre: str, columnas: list[str], filas: list[list
     for c in ws[1]:
         c.font, c.fill, c.alignment = NEGRITA_BLANCA, VERDE, Alignment(vertical="center", wrap_text=True)
     for f in filas:
-        ws.append(f)
+        ws.append([_san(x) for x in f])
     for i in plata_cols:
         for celdas in ws.iter_rows(min_row=2, min_col=i + 1, max_col=i + 1):
             for c in celdas:
@@ -193,7 +209,7 @@ def _hoja_resumen(wb: Workbook, d: dict, generado: str) -> None:
     fila = [1]
 
     def linea(*valores, negrita=False, relleno=None, formato=None):
-        ws.append(list(valores))
+        ws.append([_san(x) for x in valores])
         r = fila[0]
         for c in ws[r]:
             if negrita:
@@ -308,6 +324,8 @@ def construir_excel(d: dict, destino: Path) -> None:
                  for t in sorted(d["turnos"], key=lambda t: t.get("ini") or 0)], plata_cols=(3,))
     _hoja_tabla(wb, "Cambios", ["Hora", "Quién", "Importante", "Qué pasó", "Dato", "Acción"],
                 [[hora_de(c["ts"], True), c["usuario"], "SÍ" if c["importante"] else "", c["resumen"], c["coleccion"], c["accion"]] for c in d["cambios"]])
+    for ws in wb.worksheets:
+        _limpiar_hoja(ws)
     wb.save(destino)
 
 
@@ -332,7 +350,7 @@ class ArchivosDiarios:
     def __init__(self, db: BaseDeDatos, rutas: Rutas):
         self.db, self.rutas = db, rutas
         self._cond = threading.Condition()
-        self._pendientes: dict[str, float] = {}      # día -> no antes de
+        self._pendientes: dict[str, int] = {}        # día -> versión pedida (si llega otro cambio mientras se escribe, queda pendiente)
         self._primera_marca = 0.0
         self._ultima_marca = 0.0
         self._hilo: threading.Thread | None = None
@@ -360,7 +378,7 @@ class ArchivosDiarios:
         with self._cond:
             for d in dias:
                 if es_dia(d):
-                    self._pendientes.setdefault(d, 0.0)
+                    self._pendientes[d] = self._pendientes.get(d, 0) + 1
             if not self._primera_marca:
                 self._primera_marca = ahora
             self._ultima_marca = ahora
@@ -381,12 +399,13 @@ class ArchivosDiarios:
 
     def escribir_ahora(self) -> None:
         with self._cond:
-            dias = list(self._pendientes)
-        for d in dias:
+            dias = dict(self._pendientes)
+        for d, version in dias.items():
             try:
                 self.generar_dia(d)
                 with self._cond:
-                    self._pendientes.pop(d, None)
+                    if self._pendientes.get(d) == version:      # si mientras tanto llegó otro cambio, el día sigue pendiente
+                        self._pendientes.pop(d, None)
             except ArchivoEnUso as e:
                 self.ultimo_error = str(e)
             except Exception as e:  # noqa: BLE001 - un error acá nunca debe frenar la caja

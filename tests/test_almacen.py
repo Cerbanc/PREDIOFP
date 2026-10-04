@@ -311,3 +311,32 @@ def test_las_altas_no_duplican_el_registro_en_la_auditoria(almacen):
     # pero lo que se borra sí queda entero
     guardar(almacen, [borrar("ventas", "v1")])
     assert json.loads(entradas(almacen)[-1]["antes"])["nro"] == 1
+
+
+def test_un_error_en_el_resumen_no_frena_el_guardado(almacen, monkeypatch):
+    cargar_base(almacen)
+    from predio import auditoria
+
+    def roto(*a, **k):
+        raise RuntimeError("bug futuro")
+
+    monkeypatch.setattr(auditoria, "generar", roto)
+    r = guardar(almacen, [op("ventas", "v9", _venta_en(0, 9))])
+    assert r["cambios"] == 1
+    assert [v["id"] for v in estado(almacen)["db"]["ventas"]] == ["v9"]
+    assert "no pudo resumir" in entradas(almacen)[-1]["resumen"]
+
+
+def test_cambiar_la_nota_de_un_item_no_es_sacarlo(almacen):
+    cargar_base(almacen)
+    guardar(almacen, [op("comandas", "m1", {"ts": 1, "items": [{"prodId": "p1", "cant": 1, "nota": ""}]})])
+    n = len(entradas(almacen))
+    guardar(almacen, [op("comandas", "m1", {"ts": 1, "items": [{"prodId": "p1", "cant": 1, "nota": "bien frío"}]})])
+    assert len(entradas(almacen)) == n
+
+
+def test_los_telefonos_no_van_en_el_resumen(almacen):
+    cargar_base(almacen)
+    guardar(almacen, [op("clientes", "cl1", {"id": "cl1", "nombre": "Juan", "tel": "11 5555-0505", "tipo": "cliente"})])
+    guardar(almacen, [op("clientes", "cl1", {"id": "cl1", "nombre": "Juan", "tel": "11 9999-0000", "tipo": "cliente"})])
+    assert not any("5555" in e["resumen"] or "9999" in e["resumen"] for e in entradas(almacen))

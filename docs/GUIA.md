@@ -61,6 +61,7 @@ C:\Predio\
   copias\                   Copias de seguridad de la base (se hacen solas, ver punto 6)
   imagenes\                 Fotos de los productos
   planillas\                Las planillas de productos que bajaste o subiste
+  personalizar\             marca.json (el nombre del negocio) y logo.png: se cambian con el Bloc de notas y se ven con F5
   configuracion.json        Ajustes que se pueden cambiar con el Bloc de notas
   LEEME.txt                 Resumen de esta carpeta
 ```
@@ -68,6 +69,8 @@ C:\Predio\
 Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el Excel del día está abierto en la PC, Windows no deja actualizarlo: se reintenta solo apenas lo cerrás.
 
 **Mirar la base desde otro programa:** instalá *DB Browser for SQLite* (gratis), abrí `predio.db` con *Abrir en modo sólo lectura* y mirá las vistas que empiezan con `v_` (`v_ventas`, `v_venta_items`, `v_productos`, `v_libro_caja`, `v_cambios`…): ya vienen ordenadas en columnas.
+
+**Nombre y logo (los fijos del negocio):** en `C:\Predio\personalizar\`. Abrí `marca.json` con el Bloc de notas y cambiá el nombre; copiá tu logo en esa carpeta con el nombre `logo.png`. Guardá y apretá **F5** en el programa: no hay que reinstalar nada, y las actualizaciones no tocan esa carpeta.
 
 ## 6. Copias de seguridad
 
@@ -82,7 +85,7 @@ Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el 
 - **El código de administración** es una traba para que nadie toque precios o tickets por error; no es una clave de seguridad contra alguien con la PC en la mano.
 - **Una sola PC**: la base está en esa PC. Dos ventanas abiertas a la vez no se pisan (la vieja avisa y se recarga), pero no es para usar desde dos computadoras.
 - **Años de datos**: el programa carga en pantalla los últimos 35 días de ventas, caja y stock para ser rápido; lo anterior se trae solo cuando mirás tickets o reportes de fechas viejas. Todo sigue guardado.
-- **Empezar a usar en serio después de probar**: *Admin → Datos y seguridad → Restablecer → Borrar ventas e historial* (hace una copia antes, pide escribir BORRAR y deja los productos con su stock).
+- **Empezar a usar en serio después de probar**: *Admin → Datos y seguridad → Restablecer → Borrar ventas e historial* (hace una copia antes y pide escribir BORRAR; borra tickets, caja, movimientos de stock, turnos, deudas de clientes y cuentas abiertas, y deja productos con su stock, clientes, categorías, mesas y medios de pago).
 
 ## 8. Lo que todavía no está
 

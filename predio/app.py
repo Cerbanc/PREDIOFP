@@ -123,12 +123,10 @@ def crear_aplicacion(rutas: Rutas, ajustes: dict, modo: str = "real") -> Aplicac
 
 
 def preparar_pagina(app: Aplicacion) -> None:
-    config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "negocio": NOMBRE}, ensure_ascii=False)
-    marcador = "<!--PREDIO-CONFIG-->"
     base = (carpeta_recursos() / "web" / "index.html").read_text(encoding="utf-8")
-    if marcador not in base:
+    if "<!--PREDIO-CONFIG-->" not in base:
         raise RuntimeError("La pantalla no tiene el marcador de configuración")
-    app.html = base.replace(marcador, f"<script>window.PREDIO={config};</script>")
+    app.html = base
 
 
 def tareas_de_inicio(app: Aplicacion, espera: float = 20.0) -> None:
@@ -248,6 +246,8 @@ def main(argv: list[str] | None = None) -> int:
         log.exception("No se pudo iniciar el programa")
         mostrar_error(f"No se pudo iniciar el programa.\n\n{e}\n\nLos detalles quedaron en {rutas.tecnicos / 'predio.log'}")
         return 1
+    if os.name == "nt" and not args.datos and not os.environ.get("PREDIO_DATOS") and str(raiz).upper() != (os.environ.get("SystemDrive", "C:") + "\\Predio").upper():
+        app.avisos.append(f"Los datos se están guardando en {raiz} porque no se pudo usar C:\\Predio. Si antes usabas C:\\Predio, cerrá el programa y revisá los permisos de esa carpeta.")
     app.diario.iniciar()
     servidor.iniciar()
     espera = float(os.environ.get("PREDIO_ESPERA_INICIO", "20"))

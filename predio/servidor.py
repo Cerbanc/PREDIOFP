@@ -6,7 +6,6 @@ abierta en el mismo navegador no puede tocar los datos.
 """
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
@@ -28,7 +27,7 @@ from typing import Any, Callable
 
 from . import VERSION, planilla
 from .almacen import Almacen, ConflictoDeRevision, DatosInvalidos
-from .config import Rutas
+from .config import Rutas, leer_marca, ruta_logo
 from .copias import Copias, CopiaInvalida
 from .db import BaseDeDatos
 from .diario import ArchivosDiarios, datos_del_dia
@@ -70,6 +69,10 @@ def abrir_carpeta(ruta: Path) -> None:
         subprocess.Popen(["open", str(ruta)])
     else:
         subprocess.Popen(["xdg-open", str(ruta)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _rechazar_constante(nombre: str):
+    raise ValueError(f"valor no permitido: {nombre}")
 
 
 class Error(Exception):
@@ -129,7 +132,7 @@ class Manejador(BaseHTTPRequestHandler):
 
     def _leer_json(self) -> dict:
         try:
-            v = json.loads(self._leer_cuerpo(MAX_JSON) or b"{}")
+            v = json.loads(self._leer_cuerpo(MAX_JSON) or b"{}", parse_constant=_rechazar_constante)
         except ValueError:
             raise Error(400, "El pedido no es un JSON válido") from None
         if not isinstance(v, dict):
@@ -160,6 +163,8 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._enviar(204, b"", "image/x-icon")
             if metodo == "GET" and ruta == "/api/ping":
                 return self._json(200, {"app": "predio", "version": VERSION, "datos": str(app.rutas.raiz), "modo": app.modo})
+            if metodo == "GET" and ruta == "/marca/logo":
+                return self._logo()
             if metodo == "GET" and ruta.startswith("/img/"):
                 return self._imagen(ruta[5:])
             if not ruta.startswith("/api/"):
@@ -204,7 +209,6 @@ class Manejador(BaseHTTPRequestHandler):
             ("GET", "/api/planilla/plantilla.xlsx"): self.api_planilla_plantilla,
             ("GET", "/api/planilla/exportar.xlsx"): self.api_planilla_exportar,
             ("POST", "/api/planilla/leer"): self.api_planilla_leer,
-            ("POST", "/api/imagen-desde-link"): self.api_imagen_link,
             ("POST", "/api/cerrar"): self.api_cerrar,
         }
         if (metodo, ruta) in fijas:
@@ -219,7 +223,20 @@ class Manejador(BaseHTTPRequestHandler):
 
     # ---- páginas y archivos ----
     def _pagina(self) -> None:
-        self._enviar(200, self.app.html.encode("utf-8"), "text/html; charset=utf-8", {"Content-Security-Policy": CSP})
+        app = self.app
+        marca = leer_marca(app.rutas)
+        marca["logo"] = bool(ruta_logo(app.rutas, marca))
+        config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "marca": marca}, ensure_ascii=False).replace("<", "\\u003c")
+        html = app.html.replace("<!--PREDIO-CONFIG-->", f"<script>window.PREDIO={config};</script>")
+        self._enviar(200, html.encode("utf-8"), "text/html; charset=utf-8", {"Content-Security-Policy": CSP})
+
+    def _logo(self) -> None:
+        app = self.app
+        ruta = ruta_logo(app.rutas, leer_marca(app.rutas))
+        if not ruta or ruta.stat().st_size > 5_000_000:
+            raise Error(404, "No hay logo")
+        tipo = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}[ruta.suffix.lower()]
+        self._enviar(200, ruta.read_bytes(), tipo, {"Cache-Control": "no-cache"})
 
     def _imagen(self, nombre: str) -> None:
         if not IMAGEN.match(nombre):
@@ -384,24 +401,6 @@ class Manejador(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, **planilla.leer_planilla(datos, nombre)})
         except planilla.PlanillaInvalida as e:
             raise Error(400, str(e)) from None
-
-    # ---- imágenes ----
-    def api_imagen_link(self, q: dict) -> None:
-        url = str(self._leer_json().get("url") or "").strip()
-        if not re.match(r"^https?://", url, re.I):
-            raise Error(400, "El link tiene que empezar con http:// o https://")
-        pedido = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (CajaPredio)"})
-        try:
-            with urllib.request.urlopen(pedido, timeout=10) as r:       # noqa: S310 - el usuario eligió el link
-                tipo = (r.headers.get_content_type() or "").lower()
-                crudo = r.read(6_000_001)
-        except (urllib.error.URLError, TimeoutError, OSError):
-            raise Error(502, "No se pudo descargar. ¿Hay internet? Podés guardar la imagen y subirla desde la PC.") from None
-        if tipo not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
-            raise Error(400, "Ese link no es una imagen (JPG, PNG, WEBP o GIF)")
-        if len(crudo) > 6_000_000:
-            raise Error(400, "La imagen es demasiado grande")
-        self._json(200, {"ok": True, "dataUrl": f"data:{tipo};base64," + base64.b64encode(crudo).decode()})
 
     def api_cerrar(self, q: dict) -> None:
         self._leer_cuerpo(10_000)
