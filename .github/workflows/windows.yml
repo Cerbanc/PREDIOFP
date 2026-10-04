@@ -5,6 +5,11 @@ name: Programa para Windows
 # y cuando cambia el código del programa en la rama de trabajo.
 on:
   workflow_dispatch:
+    inputs:
+      publicar:
+        description: 'Publicar esta versión (crea la versión vX.Y.Z en GitHub con el instalador)'
+        type: boolean
+        default: false
   push:
     tags: ['v*']
     branches: ['claude/pos-offline-python-sqlite-5t9te7']
@@ -57,10 +62,18 @@ jobs:
             dist/Instalar-Caja-del-Predio-*.exe
             dist/Caja-del-Predio-*-portable.zip
           if-no-files-found: error
+      - name: Versión del programa
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (python -c "from predio import VERSION; print(VERSION)").Trim()
+          "v=$v" >> $env:GITHUB_OUTPUT
       - name: Publicar la versión
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publicar
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.v }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             dist/Instalar-Caja-del-Predio-*.exe
@@ -68,9 +81,9 @@ jobs:
       # Si el repositorio del código es privado, el actualizador no puede leerlo sin clave. Opción: un repositorio público
       # sólo para las versiones (sin código). Se activa creando el secreto RELEASES_TOKEN y la variable RELEASES_REPO (usuario/repo).
       - name: Publicar también en el repositorio público de versiones
-        if: startsWith(github.ref, 'refs/tags/v') && env.RELEASES_TOKEN != '' && vars.RELEASES_REPO != ''
+        if: (startsWith(github.ref, 'refs/tags/v') || inputs.publicar) && env.RELEASES_TOKEN != '' && vars.RELEASES_REPO != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" (Get-ChildItem dist/Instalar-Caja-del-Predio-*.exe).FullName (Get-ChildItem dist/Caja-del-Predio-*-portable.zip).FullName --repo "${{ vars.RELEASES_REPO }}" --title "${{ github.ref_name }}" --generate-notes
+          gh release create "v${{ steps.ver.outputs.v }}" (Get-ChildItem dist/Instalar-Caja-del-Predio-*.exe).FullName (Get-ChildItem dist/Caja-del-Predio-*-portable.zip).FullName --repo "${{ vars.RELEASES_REPO }}" --title "v${{ steps.ver.outputs.v }}" --generate-notes
