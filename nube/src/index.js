@@ -5,6 +5,7 @@ import PAGINA_TURNOS from "./pagina_turnos.html";
 import { manejarTurnos } from "./turnos.js";
 import { manejarSync } from "./sync.js";
 import { manejarReportes } from "./reportes.js";
+import { manejarPwa } from "./pwa.js";
 
 const enc = new TextEncoder();
 const sha = async (t) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(t)))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -23,6 +24,8 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const ruta = url.pathname;
+    const pwa = manejarPwa(req, ruta);          // manifest, íconos y sw.js de la app instalable: públicos, sin datos (van antes de la clave)
+    if (pwa) return pwa;
     const cfg = await claves(env).catch(() => ({}));
     if (!cfg.hash_pc || !cfg.hash_ver) return new Response("Falta configurar las claves.", { status: 503 });
 
@@ -55,14 +58,14 @@ export default {
         return new Response(null, { status: 303, headers: { location: String(f.get("volver")) === "/turnos" ? "/turnos" : "/", "set-cookie": `s=${sesion}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict` } });
       return new Response(null, { status: 303, headers: { location: (String(f.get("volver")) === "/turnos" ? "/turnos" : "/") + "?mal=1" } });
     }
-    if (ruta === "/salir") return new Response(null, { status: 303, headers: { location: url.searchParams.get("volver") === "/turnos" ? "/turnos" : "/", "set-cookie": "s=; Path=/; Max-Age=0" } });
+    if (ruta === "/salir") return new Response(null, { status: 303, headers: { location: url.searchParams.get("volver") === "/turnos" ? "/turnos" : "/", "set-cookie": "s=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict" } });
     const dentro = igual(cookie(req, "s"), sesion);
     // períodos (semana, mes, fechas) para la web y lista de días que tiene la nube para la PC
     const rep = await manejarReportes(req, env, ruta, url, { dentro, pc: async () => igual(await sha((req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "")), cfg.hash_pc) });
     if (rep) return rep;
     if (ruta === "/" || ruta === "/index.html" || ruta === "/turnos") {
       const mal = url.searchParams.get("mal") ? "1" : "0";
-      return new Response((ruta === "/turnos" ? PAGINA_TURNOS : PAGINA).replace("__DENTRO__", dentro ? "1" : "0").replace("__MAL__", mal), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...SEG, "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'" } });
+      return new Response((ruta === "/turnos" ? PAGINA_TURNOS : PAGINA).replace("__DENTRO__", dentro ? "1" : "0").replace("__MAL__", mal), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...SEG, "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; worker-src 'self'; img-src 'self' data:; form-action 'self'" } });
     }
     if (!dentro) return json({ error: "no autorizado" }, 401);
 

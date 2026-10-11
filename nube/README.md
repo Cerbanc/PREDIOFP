@@ -28,3 +28,11 @@ La página de reportes tiene las pestañas Día, Semana (lunes a domingo), Mes y
 - `GET /api/rango?desde=&hasta=[&ant_desde=&ant_hasta=]` (sesión de la web, sólo lectura): día por día, totales, mejor y peor día, desglose por medio, categoría, destino y producto, fiado, cierres de caja y, si se pide, los totales del período anterior para comparar. No trae el listado de cambios (es lo más pesado).
 - Un día **sin fila** en `dias` es un día que falta (la PC no lo subió): se marca "sin datos" y nunca se cuenta como cero. Un día con fila pero sin ventas ni caja es "sin movimiento".
 - `GET /api/subidos?desde=` (clave de la PC): qué días tiene la nube y con qué huella. El programa (`predio/nube.py`, `rellenar`) lo usa para subir los últimos 90 días que falten o sean distintos (a los 5 minutos de abrir y cada ~6 horas, de a 8 por vez). La huella va dentro del resumen (`resumen.huella`), así que no hace falta cambiar la tabla.
+
+## Web instalable en el celular (PWA)
+
+Reportes y Turnos se pueden instalar como app (ícono del Predio en la pantalla de inicio, sin barra del navegador). `src/pwa.js` sirve, **sin clave** (van antes del control de sesión en `src/index.js`, y no llevan ningún dato del negocio): `/manifest.webmanifest`, `/sw.js` (service worker mínimo: no guarda nada; sólo muestra «Sin conexión» si no hay internet) y los íconos (`/icono-192.png`, `/icono-512.png`, `/icono-maskable-512.png`, `/apple-touch-icon.png`, embebidos en base64 en `src/iconos.js`).
+
+El cartel «Instalar como app» es un script inline idéntico en las dos páginas (entre los comentarios `PWA-INICIO` y `PWA-FIN`, en el `<head>` y al final). Aparece sólo en celular o tablet táctil, después de entrar con la clave, y nunca si la web ya se abrió desde el ícono o si se cerró con la «x» (se recuerda en el celular). En Android/Chrome tiene el botón «Instalar»; en iPhone no existe ese botón, así que explica los pasos (Compartir, Agregar a pantalla de inicio). En iPhone la app instalada guarda sus datos aparte de Safari: hay que escribir la clave una vez dentro de la app.
+
+Para cambiar el logo: reemplazar `tools/isotipo.png` y correr `python nube/tools/hacer_iconos.py` (necesita Pillow, sólo para este script); regenera `src/iconos.js`. Pruebas: `tests/test_pwa.py` (levanta una nube local con wrangler y un celular simulado con Playwright; se saltea si faltan).
