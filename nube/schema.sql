@@ -14,16 +14,22 @@ CREATE TABLE IF NOT EXISTS canchas (
 CREATE TABLE IF NOT EXISTS fijos (
   id TEXT PRIMARY KEY, cancha_id TEXT NOT NULL, dow INTEGER NOT NULL, ini INTEGER NOT NULL,
   cliente TEXT NOT NULL DEFAULT '', tel TEXT NOT NULL DEFAULT '', nota TEXT NOT NULL DEFAULT '',
-  desde TEXT NOT NULL, hasta TEXT, modificado INTEGER NOT NULL DEFAULT 0
+  desde TEXT NOT NULL, hasta TEXT, modificado INTEGER NOT NULL DEFAULT 0,
+  -- quién cargó / cambió desde la web ('' = viene del programa de la PC, que no manda estas columnas)
+  creado INTEGER NOT NULL DEFAULT 0, creado_por TEXT NOT NULL DEFAULT '', modificado_por TEXT NOT NULL DEFAULT '', modificado_en INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS turnos (
   id TEXT PRIMARY KEY, cancha_id TEXT NOT NULL, fecha TEXT NOT NULL, ini INTEGER NOT NULL, fin INTEGER NOT NULL,
   cliente TEXT NOT NULL DEFAULT '', tel TEXT NOT NULL DEFAULT '', nota TEXT NOT NULL DEFAULT '',
   precio INTEGER NOT NULL, sena INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL DEFAULT 'reservado',
   tipo_precio TEXT NOT NULL DEFAULT 'comun', fijo_id TEXT, ocurrencia TEXT, creado INTEGER NOT NULL, modificado INTEGER NOT NULL,
-  bloqueado INTEGER NOT NULL DEFAULT 0          -- 1 = ya está en una cuenta o cobrado en la caja: desde la web no se toca
+  bloqueado INTEGER NOT NULL DEFAULT 0,         -- 1 = ya está en una cuenta o cobrado en la caja: desde la web no se toca
+  -- quién cargó / cambió desde la web ('' = viene del programa de la PC, que no manda estas columnas);
+  -- modificado_en = cuándo fue ese último cambio de la web (si `modificado` es mayor, después tocó la PC)
+  creado_por TEXT NOT NULL DEFAULT '', modificado_por TEXT NOT NULL DEFAULT '', modificado_en INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS turnos_fecha ON turnos (fecha, estado);
+CREATE INDEX IF NOT EXISTS turnos_ocurrencia ON turnos (ocurrencia);        -- para ver rápido qué ocurrencias de fijos ya están suspendidas o movidas
 CREATE TABLE IF NOT EXISTS registro_turnos (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, quien TEXT NOT NULL, accion TEXT NOT NULL, detalle TEXT NOT NULL
 );

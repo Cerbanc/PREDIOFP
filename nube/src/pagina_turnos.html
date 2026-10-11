@@ -5,187 +5,595 @@
 <script>try{var t=localStorage.getItem("tema");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <meta name="color-scheme" content="light dark">
 <style>
-:root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--acs:#e3f3ec;--bad:#b3261e;--warn:#9a6700;--info:#1d5fa8;--infos:#e4eefa;--good:#0a7a5a;--goods:#e3f3ec;--s2:#eef2f0}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}}
-:root[data-theme=dark]{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}
+:root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--acs:#e3f3ec;--bad:#b3261e;--warn:#9a6700;--info:#1d5fa8;--infos:#e4eefa;--good:#0a7a5a;--goods:#e3f3ec;--s2:#eef2f0;--wa:#0f7a43;--onac:#fff;--ahora:#d93025;--hoy:#fff6d6}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26;--wa:#17824a;--onac:#07130e;--ahora:#ff6b60;--hoy:#3a3414}}
+:root[data-theme=dark]{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26;--wa:#17824a;--onac:#07130e;--ahora:#ff6b60;--hoy:#3a3414}
 :root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
-main{max-width:1200px;margin:0 auto;padding:12px}
-h1{font-size:20px;margin:0}
-.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.top h1{flex:1}
-button,input,select,.btn{font:inherit;border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:9px 12px}
-button,.btn{cursor:pointer;text-decoration:none;display:inline-block}.pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dan{color:var(--bad)}
-.mu{color:var(--mu)}.est{font-size:14px;margin:4px 0 10px}
-.cal-wrap{overflow:auto;border:1px solid var(--ln);border-radius:14px;background:var(--card);max-height:calc(100vh - 200px);min-height:320px}
-.cal{display:grid}
-.chead{position:sticky;top:0;z-index:3;background:var(--s2);padding:8px 10px;border-bottom:1px solid var(--ln);border-left:1px solid var(--ln);display:flex;flex-direction:column;gap:1px;min-width:0}
-.chead small{color:var(--mu);font-size:11px}.chead.corner{left:0;z-index:5;border-left:0}
-.tcol{position:sticky;left:0;z-index:2;background:var(--card);border-right:1px solid var(--ln)}
-.tcol span{position:absolute;right:6px;font-size:11px;color:var(--mu);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+body.sinscroll{overflow:hidden}
+main{max-width:1200px;margin:0 auto;padding:12px 12px 84px}
+h1{font-size:20px;margin:0;line-height:1.15}h2{margin:0}
+button,input,select,.btn{font:inherit;border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:9px 12px;min-height:44px}
+button,.btn{cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}.pri{background:var(--ac);color:var(--onac);border-color:var(--ac)}.dan{color:var(--bad)}
+button:disabled{opacity:.6;cursor:default}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--ac) 60%,transparent);outline-offset:1px}
+.mu{color:var(--mu)}.est{font-size:14px;margin:2px 0 10px;min-height:20px}
+a{color:var(--ac)}
+/* barra de arriba */
+.top{display:flex;gap:6px;align-items:center;margin-bottom:2px}.top h1{flex:1;min-width:0}
+.top .btn,.top button{padding:6px 11px;font-size:15px}.top .salir{min-width:46px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;min-height:44px}
+.quien{font-size:13px;margin:0 0 8px}.quien a{display:inline-block;padding:13px 8px;margin:-13px -4px}
+.solo-pc,.nota-h{display:none}
+/* pestañas: abajo en el celular (se alcanzan con el pulgar), arriba en la compu */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1 1 0;min-width:0;border:0;border-radius:0;background:none;min-height:62px;flex-direction:column;gap:2px;font-size:12.5px;color:var(--mu);position:relative;padding:6px 2px}
+.tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected=true]{color:var(--ac);font-weight:600;box-shadow:inset 0 3px 0 var(--ac)}
+.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);min-width:19px;height:19px;border-radius:10px;background:var(--bad);color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.tabs .badge[hidden]{display:none}
+/* navegación por fechas */
+.nav{display:flex;gap:6px;align-items:center;margin-bottom:6px}.nav input{flex:1;min-width:0;text-align:center}.nav button{min-width:46px;padding:9px 10px}
+/* avisos y carga */
+#carga{position:fixed;top:0;left:0;right:0;height:3px;z-index:40;background:linear-gradient(90deg,transparent,var(--ac),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:corre 1s linear infinite}
+#carga[hidden]{display:none}@keyframes corre{from{background-position:-40% 0}to{background-position:140% 0}}
+.aviso{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:color-mix(in srgb,var(--bad) 12%,var(--card));border:1px solid color-mix(in srgb,var(--bad) 45%,var(--ln));color:var(--tx);border-radius:12px;padding:9px 12px;margin:0 0 10px;font-size:15px}
+.aviso[hidden]{display:none}
+.aviso.suave{background:var(--s2);border-color:var(--ln);color:var(--mu)}.aviso span{flex:1;min-width:160px}.aviso button{min-height:38px;padding:4px 12px}
+.espera{opacity:.5;transition:opacity .15s}
+#v-buscar,#v-recordatorios,#v-registro{max-width:760px}
+.vacio{text-align:center;padding:36px 16px;color:var(--mu)}.vacio b{display:block;color:var(--tx);font-size:17px;margin-bottom:4px}.vacio button{margin-top:12px}
+/* vista de día */
+.cal-wrap{overflow:auto;border:1px solid var(--ln);border-radius:14px;background:var(--card);max-height:calc(100dvh - 300px);min-height:320px;overscroll-behavior:contain}
+.cal{display:grid;position:relative}
+.chead{position:sticky;top:0;z-index:4;background:var(--s2);padding:8px 10px;border-bottom:1px solid var(--ln);border-left:1px solid var(--ln);display:flex;flex-direction:column;gap:1px;min-width:0}
+.chead b{font-size:14px;line-height:1.2}.chead{padding:7px 8px}.chead small{color:var(--mu);font-size:11.5px;line-height:1.25}.chead.corner{left:0;z-index:6;border-left:0}
+.tcol{position:sticky;left:0;z-index:3;background:var(--card);border-right:1px solid var(--ln)}
+.tcol span{position:absolute;right:6px;font-size:11.5px;color:var(--mu);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+.tcol span.ahora-t{background:var(--ahora);color:#fff;border-radius:6px;padding:0 4px;transform:translateY(-50%);z-index:2;font-weight:700}
 .ccol{position:relative;border-left:1px solid var(--ln);background-image:linear-gradient(var(--ln) 1px,transparent 1px);background-size:100% var(--hp)}
-.slot{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12px;cursor:pointer;border:1px dashed var(--ln);background:transparent;line-height:1.2}
-.slot b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slot span{color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.slot.free:hover{border-color:var(--ac);background:var(--acs)}
+.cerrada{position:absolute;left:0;right:0;background:repeating-linear-gradient(135deg,var(--s2),var(--s2) 5px,transparent 5px,transparent 10px);opacity:.9;pointer-events:none}
+.slot{position:absolute;left:3px;right:3px;border-radius:9px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12.5px;cursor:pointer;border:1px dashed var(--ln);background:transparent;line-height:1.2;min-height:0}
+.slot b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}.slot span{color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.free:hover,.slot.free:active{border-color:var(--ac);background:var(--acs)}
 .slot.res{border-style:solid}
 .slot.res.t-futbol{background:var(--goods);border-color:color-mix(in srgb,var(--good) 45%,var(--ln))}
 .slot.res.t-padel{background:var(--infos);border-color:color-mix(in srgb,var(--info) 50%,var(--ln))}
 .slot.res.fijo{border-left:5px solid var(--ac)}.slot.res.done{opacity:.7}
 .slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--s2),var(--s2) 6px,var(--card) 6px,var(--card) 12px)}
 .slot.past{opacity:.55}
-.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mu);font-size:13px;margin-top:10px}
-.fondo{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:20;padding:12px}
-.modal{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto}
-.modal h2{margin:0 0 8px;font-size:18px}.modal label{display:block;margin:8px 0;font-size:14px;color:var(--mu)}.modal input,.modal select{width:100%;margin-top:3px;color:var(--tx)}
-.acc{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
-.note{background:var(--s2);border-radius:10px;padding:8px 10px;font-size:14px;margin:8px 0}.err{color:var(--bad);font-size:14px;margin-top:8px}
+.ahora{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--ahora);z-index:2;pointer-events:none}
+.ahora::before{content:"";position:absolute;left:-1px;top:-6px;width:10px;height:10px;border-radius:50%;background:var(--ahora)}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;color:var(--mu);font-size:13px;margin-top:10px}
+/* vista de semana */
+.tira{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:12px}
+.dp{flex-direction:column;gap:1px;padding:6px 0;min-height:64px;border-radius:12px}.dp small{color:var(--mu);font-size:12px;text-transform:uppercase}.dp b{font-size:17px;line-height:1.1}
+.dp .n{min-width:26px;border-radius:999px;background:var(--ac);color:var(--onac);font-size:13px;font-weight:700;padding:0 6px;line-height:20px}.dp .n.cero{background:var(--s2);color:var(--mu)}
+.dp.hoy{border-color:var(--ac);background:var(--hoy)}.dp.pas{opacity:.65}
+.dias{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))}
+.dcard{display:block;text-align:left;border-radius:14px;padding:10px 12px;width:100%;font-size:inherit}
+.dcard.hoy{border-color:var(--ac);background:var(--hoy)}.dcard.pas{opacity:.7}
+.dh{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;flex-wrap:wrap}.dh b{font-size:17px;text-transform:capitalize}.dh .tot{margin-left:auto;font-weight:700}
+.dh .rel{font-size:12px;font-weight:700;color:var(--onac);background:var(--ac);border-radius:999px;padding:0 8px;line-height:19px}
+.cfila{display:block;margin-top:7px}.cfila .cn{display:flex;gap:8px;justify-content:space-between;font-size:13px;color:var(--mu)}.cfila .cn span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cfila .cn span:last-child{white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:28px;padding:0 6px;border-radius:8px;font-size:13px;font-variant-numeric:tabular-nums;border:1px solid var(--ln);color:var(--tx);background:transparent}
+.chip.ocu.t-futbol{background:var(--good);border-color:var(--good);color:var(--onac);font-weight:700}
+.chip.ocu.t-padel{background:var(--info);border-color:var(--info);color:var(--onac);font-weight:700}
+.chip.ocu.fijo{box-shadow:inset 0 -4px 0 rgba(0,0,0,.28)}.chip.ocu.raro{outline:2px dotted var(--warn);outline-offset:1px}
+.chip.blk{background:var(--s2);color:var(--mu);text-decoration:line-through;border-color:var(--ln)}
+.chip.lib{border-style:dashed;color:var(--mu)}.chip.pas{opacity:.5}.chip.ya{box-shadow:0 0 0 2px var(--ahora)}
+/* búsqueda */
+.busca{display:flex;gap:8px;margin-bottom:10px}.busca input{flex:1;min-width:0}
+.res{display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}.res h3{margin:10px 0 0;font-size:15px;color:var(--mu);font-weight:600}
+.fila{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border-radius:12px;padding:10px 12px;min-height:60px}
+.fila .f1{min-width:74px;text-align:center;line-height:1.2}.fila .f1 b{display:block;font-size:15px}.fila .f1 small{color:var(--mu);font-size:12px}
+.fila .f2{flex:1;min-width:0}.fila .f2 b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fila .f2 span{display:block;font-size:14px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila.pas{opacity:.65}.fila .tag{font-size:11.5px;font-weight:700;border-radius:999px;background:var(--acs);color:var(--ac);padding:0 8px;line-height:19px;white-space:nowrap}
+.sep{display:flex;align-items:center;gap:10px;color:var(--mu);font-size:13px;margin:6px 0}.sep::before,.sep::after{content:"";flex:1;border-top:1px solid var(--ln)}
+/* recordatorios */
+.rec{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}.rcard{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px}
+.rcard.listo{opacity:.62}.rtop{display:flex;gap:12px;align-items:flex-start}.rhora{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;min-width:62px}
+.rdat{flex:1;min-width:0}.rdat b{display:block;overflow-wrap:anywhere}.rdat span{display:block;font-size:14px;color:var(--mu)}
+.racc{display:flex;gap:8px;margin-top:10px}.racc .btn,.racc button{flex:1;min-height:48px}
+.wa{background:var(--wa);border-color:var(--wa);color:#fff;font-weight:700}.ok-envio{border-color:var(--ac);color:var(--ac);font-weight:700}.ok-envio.pend{background:var(--acs)}
+.avisotel{font-size:13px;color:var(--warn);margin-top:6px}
+.resumen{background:var(--s2);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:15px}.resumen b{font-size:17px}
+.sintel{margin-top:14px}.sintel .fila{min-height:52px}
+/* ventanas (en el celular suben desde abajo, para usarlas con una mano) */
+.fondo{position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.modal{overflow-wrap:anywhere;background:var(--card);border:1px solid var(--ln);border-radius:18px 18px 0 0;max-width:560px;width:100%;max-height:100%;display:flex;flex-direction:column;overflow:hidden;padding-bottom:env(safe-area-inset-bottom)}
+.mh{display:flex;align-items:center;gap:8px;padding:12px 8px 6px 16px}.mh h2{flex:1;font-size:18px;line-height:1.25}.mh .x{border:0;background:none;min-width:44px;font-size:20px;color:var(--mu)}
+.mb{padding:2px 16px 4px;overflow:auto;overscroll-behavior:contain}
+.modal label{display:block;margin:8px 0;font-size:14px;color:var(--mu)}.modal input,.modal select{width:100%;margin-top:3px;color:var(--tx);min-height:48px}
+.acc{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px 14px;border-top:1px solid var(--ln)}.acc button{flex:1 1 130px;min-height:50px}.acc .pri{flex-grow:2}
+.note{background:var(--s2);border-radius:10px;padding:8px 10px;font-size:14px;margin:8px 0}.err{color:var(--bad);font-size:14px;margin-top:8px;min-height:0}.err:empty{display:none}
+.quien-cargo{font-size:13px;color:var(--mu);margin-top:10px;line-height:1.5}
+.tipo{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.tipo label{margin:0;color:var(--tx);cursor:pointer}
+.tipo label{position:relative}.tipo input{position:absolute;opacity:0;pointer-events:none;width:1px;min-height:0;left:0;top:0}
+.tipo span{display:flex;flex-direction:column;justify-content:center;gap:2px;border:1px solid var(--ln);border-radius:12px;padding:8px 10px;min-height:58px;font-size:14px;line-height:1.25}
+.tipo input:checked+span{border-color:var(--ac);background:var(--acs);box-shadow:inset 0 0 0 1px var(--ac)}.tipo input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--ac) 60%,transparent)}.tipo small{color:var(--mu)}
 .centro{max-width:340px;margin:18vh auto;text-align:center}.centro input{width:100%;margin:12px 0}
-.reg{margin-top:16px}.reg table{width:100%;border-collapse:collapse;font-size:14px}.reg td{padding:6px 4px;border-bottom:1px solid var(--ln);vertical-align:top}
-.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ac);color:#fff;padding:10px 16px;border-radius:12px;z-index:30}
+.reg table{width:100%;border-collapse:collapse;font-size:14px}.reg td{padding:8px 4px;border-bottom:1px solid var(--ln);vertical-align:top}
+.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:var(--ac);color:var(--onac);padding:11px 18px;border-radius:12px;z-index:50;max-width:92vw;text-align:center}
+@media(min-width:820px){
+ main{padding:16px 16px 24px}h1{font-size:22px}.solo-pc{display:inline}.nota-h{display:block}
+ .tabs{position:static;border:0;background:none;gap:8px;padding:0;margin-bottom:12px}
+ .tabs button{flex:none;flex-direction:row;min-height:44px;padding:0 18px;border:1px solid var(--ln);border-radius:999px;font-size:15px;background:var(--card);color:var(--tx)}
+ .tabs button[aria-selected=true]{background:var(--ac);color:var(--onac);border-color:var(--ac);box-shadow:none}.tabs svg{width:20px;height:20px}.tabs .badge{position:static;margin-left:2px}
+ .cal-wrap{max-height:calc(100vh - 290px)}.nav input{flex:none;width:200px}.toast{bottom:24px}
+ .fondo{align-items:center;padding:16px}.modal{border-radius:16px;max-height:92vh}.tira{max-width:640px}
+}
+@media(max-width:380px){.top .btn,.top button{padding:6px 8px;font-size:14px}.tabs button{font-size:12px}.dp b{font-size:16px}}
+@media(max-width:359px){.top{flex-wrap:wrap}.top h1{flex:1 0 100%}.tabs button{font-size:11px;padding:6px 0}.nav input{padding:9px 4px;font-size:15px}.nav button{min-width:42px;padding:9px 8px}}
+@media(prefers-reduced-motion:reduce){#carga{animation:none}}
 </style></head><body><main>
+<div id="carga" hidden></div>
 <div id="login" class="centro" hidden><h1>Turnos del Predio</h1>
 <form method="post" action="/entrar"><input type="hidden" name="volver" value="/turnos"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
 <p class="dan" id="mal" hidden>Clave incorrecta</p></div>
 <div id="app" hidden>
-<div class="top"><h1>Turnos</h1><a class="btn" href="/">Reportes</a><button id="tema" title="Cambiar entre claro y oscuro">Claro / Oscuro</button><a class="mu" href="/salir">Salir</a></div>
-<div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><button id="btnreg" style="margin-left:auto">Registro de cambios</button></div>
-<div class="est mu"><span id="est"></span> · <span id="quien-txt"></span> <a href="#" id="quien-cambiar">cambiar</a></div>
-<div class="cal-wrap" id="cal"></div>
-<div class="legend"><span>Tocá un hueco libre para reservar.</span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos de Fútbol 5 (y al revés).</span></div>
-<div class="reg" id="reg" hidden></div>
+<div class="top"><h1>Turnos</h1>
+ <button id="btnreg" title="Quién cambió qué">Registro</button><a class="btn" href="/">Reportes</a><button id="tema" title="Cambiar entre claro y oscuro" aria-label="Cambiar entre claro y oscuro">◐<span class="solo-pc"> Claro / Oscuro</span></button><a class="mu salir" href="/salir">Salir</a></div>
+<div class="quien mu"><span id="quien-txt"></span> <a href="#" id="quien-cambiar">cambiar</a></div>
+<nav class="tabs" role="tablist" aria-label="Pantallas">
+ <button role="tab" data-v="dia" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Día</button>
+ <button role="tab" data-v="semana" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></svg>Semana</button>
+ <button role="tab" data-v="buscar" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>Buscar</button>
+ <button role="tab" data-v="recordatorios" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></svg>Recordatorios<span class="badge" id="badge" hidden></span></button>
+</nav>
+<div id="aviso" role="status" aria-live="polite" hidden></div>
+<section id="v-dia" hidden>
+ <div class="nav"><button id="ant" aria-label="Día anterior">←</button><input type="date" id="fecha" aria-label="Fecha"><button id="sig" aria-label="Día siguiente">→</button><button id="hoy">Hoy</button></div>
+ <div class="est mu" id="est"></div>
+ <div class="cal-wrap" id="cal"><p class="vacio">Cargando turnos…</p></div>
+ <div class="legend" id="leyenda"><span>Tocá un hueco libre para reservar.</span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos de Fútbol 5 (y al revés).</span></div>
+</section>
+<section id="v-semana" hidden>
+ <div class="nav"><button id="sant" aria-label="Semana anterior">←</button><input type="date" id="sfecha" aria-label="Fecha dentro de la semana"><button id="ssig" aria-label="Semana siguiente">→</button><button id="shoy">Hoy</button></div>
+ <div class="est mu" id="sest"></div>
+ <div id="sem"><p class="vacio">Cargando la semana…</p></div>
+ <div class="legend"><span>Tocá un día para abrirlo.</span><span>Casilla llena: ocupada · con borde punteado: libre · rayada: ocupa Fútbol 7/5.</span></div>
+</section>
+<section id="v-buscar" hidden>
+ <form class="busca" id="fbusca" role="search"><input type="search" id="q" placeholder="Nombre o teléfono" aria-label="Buscar por nombre o teléfono" autocomplete="off" enterkeyhint="search" maxlength="60"><button class="pri">Buscar</button></form>
+ <div class="res" id="res"><p class="vacio">Escribí un nombre o un teléfono.<br>Busca entre los turnos de los últimos 30 días en adelante y entre los fijos.</p></div>
+</section>
+<section id="v-recordatorios" hidden>
+ <div id="rec"><p class="vacio">Cargando los turnos de mañana…</p></div>
+</section>
+<section id="v-registro" hidden>
+ <div class="reg" id="reg"></div>
+</section>
 </div>
 <script>
 "use strict";
-const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1",HP=46;
+const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1",HP=52;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const money=n=>"$ "+Math.round(n||0).toLocaleString("es-AR");
+const money=n=>"$\u00a0"+Math.round(n||0).toLocaleString("es-AR");
 const pad=n=>String(n).padStart(2,"0"),hm=m=>pad(Math.floor(m/60)%24)+":"+pad(m%60);
+const hmCorta=m=>m%60?Math.floor(m/60)+":"+pad(m%60):String(Math.floor(m/60));      // 14 · 11:30 (para las casillas chicas)
 const hoyK=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const ahoraMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
 const sumar=(f,n)=>new Date(new Date(f+"T12:00:00Z").getTime()+n*864e5).toISOString().slice(0,10);
-const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"],DIAS3=["dom","lun","mar","mié","jue","vie","sáb"];
+const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const dow=f=>new Date(f+"T12:00:00Z").getUTCDay();
 const larga=f=>new Date(f+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+const diaMes=f=>`${+f.slice(8)} de ${MESES[+f.slice(5,7)-1]}`;
+const corta=f=>`${DIAS3[dow(f)]} ${+f.slice(8)}/${+f.slice(5,7)}`;
+const cuando=f=>{const h=hoyK();return f===h?"hoy":f===sumar(h,1)?"mañana":f===sumar(h,-1)?"ayer":""};
+const todosLosDow=d=>"todos los "+DIAS[d]+(d===0||d===6?"s":""),todosLos=f=>todosLosDow(dow(f));
+const lunesDe=f=>sumar(f,-((dow(f)+6)%7));
+const sello=ms=>{const d=new Date(ms);return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`};
 const F5=["f5a","f5b"],rel=(a,b)=>a.id===b.id||(a.clave==="f7"&&F5.includes(b.clave))||(b.clave==="f7"&&F5.includes(a.clave));
-let dia=hoyK(),D={canchas:[],turnos:[]};
-let quien="";try{quien=localStorage.getItem("quien")||""}catch{}
+const lee=k=>{try{return localStorage.getItem(k)}catch{return null}},guarda=(k,v)=>{try{localStorage.setItem(k,v)}catch{}};
+let vista=["dia","semana"].includes(lee("vista"))?lee("vista"):"dia",dia=hoyK();
+let D={canchas:[],turnos:[]},S=null,M=null,Mf="",hayDatos={dia:false,semana:false,recordatorios:false};
+let quien=lee("quien")||"";
 if($("#tema")){$("#tema").onclick=()=>{const r=document.documentElement,oscuro=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;const n=oscuro?"light":"dark";r.dataset.theme=n;try{localStorage.setItem("tema",n)}catch(e){}};}
-if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
-function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2500)}
+function toast(t){const e=document.createElement("div");e.className="toast";e.setAttribute("role","status");e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
+
+// ---- pedidos al servidor, con mensajes claros ----
+let enCurso=0;
+function cargando(n){enCurso=Math.max(0,enCurso+n);$("#carga").hidden=!enCurso}
 async function api(met,url,cuerpo){
-  const r=await fetch(url,{method:met,headers:{"content-type":"application/json"},body:cuerpo?JSON.stringify(cuerpo):undefined,cache:"no-store"});
-  if(r.status===401){location.reload();throw new Error("Sesión vencida")}
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Error");return j;
+  let r;
+  try{r=await fetch(url,{method:met,headers:{"content-type":"application/json"},body:cuerpo?JSON.stringify(cuerpo):undefined,cache:"no-store"})}
+  catch{throw Object.assign(new Error(navigator.onLine===false?"No hay internet en este celular. Revisá la conexión y probá de nuevo.":"No se pudo conectar con el servidor. Revisá tu internet y probá de nuevo."),{red:true})}
+  if(r.status===401){location.reload();throw new Error("Se venció la sesión. Volvé a entrar con la clave.")}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Object.assign(new Error(j.error||(r.status>=500?"El servidor tuvo un problema. Esperá unos segundos y probá de nuevo.":"No se pudo completar la acción.")),{status:r.status});
+  return j;
 }
+const contenedor={dia:"#cal",semana:"#sem",recordatorios:"#rec"},cargas={};
+async function pedir(clave,url,sil){      // si llegan dos respuestas desordenadas, sólo vale la del último pedido
+  const mi=cargas[clave]=(cargas[clave]||0)+1;
+  if(!sil){cargando(1);$(contenedor[clave]).classList.add("espera")}
+  try{const r=await api("GET",url);if(mi!==cargas[clave])return null;quitarAviso();return r}
+  catch(e){if(mi===cargas[clave])fallo(e,sil,clave);return null}
+  finally{if(!sil)cargando(-1);if(mi===cargas[clave])$(contenedor[clave]).classList.remove("espera")}
+}
+function quitarAviso(){const a=$("#aviso");a.hidden=true;a.innerHTML=""}
+function fallo(e,sil,clave){
+  const a=$("#aviso");
+  if(sil&&hayDatos[clave]){a.hidden=false;a.className="aviso suave";a.innerHTML=e.red?"<span>Sin conexión con el servidor: lo que ves puede estar desactualizado. Se actualiza solo cuando vuelva.</span>":`<span>No se pudo actualizar (${esc(e.message)}). Lo que ves puede estar desactualizado; se vuelve a intentar solo.</span>`;return}
+  if(!hayDatos[clave]){      // no hay nada bueno para mostrar: se explica en el lugar de la pantalla y se ofrece reintentar
+    quitarAviso();$(contenedor[clave]).innerHTML=`<p class="vacio"><b>No se pudieron cargar los turnos</b>${esc(e.message)}<br><button type="button" class="reint">Reintentar</button></p>`;
+    $(contenedor[clave]).querySelector(".reint").onclick=()=>cargar();return}
+  a.hidden=false;a.className="aviso";a.innerHTML=`<span>${esc(e.message)}</span><button type="button">Reintentar</button>`;a.querySelector("button").onclick=()=>cargar();
+}
+
+// ---- inicio ----
 function iniciar(){
-  const f=$("#fecha");f.value=dia;
-  f.onchange=()=>{dia=f.value||hoyK();cargar()};
-  const mover=n=>{dia=sumar(dia,n);f.value=dia;cargar()};
-  $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);$("#hoy").onclick=()=>{dia=hoyK();f.value=dia;cargar()};
-  $("#btnreg").onclick=registro;
+  const f=$("#fecha"),sf=$("#sfecha");f.value=sf.value=dia;
+  const ir=d=>{dia=d||hoyK();f.value=sf.value=dia;reposicion=true;hayDatos.dia=hayDatos.semana=false;cargar()};
+  f.onchange=()=>ir(f.value);sf.onchange=()=>ir(sf.value);
+  $("#ant").onclick=()=>ir(sumar(dia,-1));$("#sig").onclick=()=>ir(sumar(dia,1));$("#hoy").onclick=()=>ir(hoyK());
+  $("#sant").onclick=()=>ir(sumar(dia,-7));$("#ssig").onclick=()=>ir(sumar(dia,7));$("#shoy").onclick=()=>ir(hoyK());
+  $("#btnreg").onclick=()=>mostrar(vista==="registro"?(lee("vista")||"dia"):"registro");
+  document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>mostrar(b.dataset.v));
   $("#quien-cambiar").onclick=e=>{e.preventDefault();pedirNombre(false)};
+  $("#fbusca").onsubmit=e=>{e.preventDefault();buscar()};
+  let deb;$("#q").oninput=()=>{clearTimeout(deb);deb=setTimeout(buscar,320)};
   guardarQuien(quien);if(!quien)pedirNombre(true);
-  cargar();setInterval(()=>{if(!document.hidden&&!document.querySelector(".fondo"))cargar(true)},30000);
+  mostrar(vista);actualizarBadge();
+  // se refresca sola: cada 30 s, al volver a la pestaña y al recuperar internet
+  setInterval(()=>{if(!document.hidden&&!$(".fondo"))refrescar(true)},30000);
+  setInterval(marcarAhora,20000);
+  const volvio=()=>{if(!document.hidden)refrescar(false)};
+  document.addEventListener("visibilitychange",volvio);addEventListener("focus",volvio);addEventListener("pageshow",e=>{if(e.persisted)volvio()});addEventListener("online",volvio);
+  addEventListener("offline",()=>{const a=$("#aviso");a.hidden=false;a.className="aviso suave";a.innerHTML="<span>Sin internet en este celular. Lo que ves puede estar desactualizado.</span>"});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"){const m=[...document.querySelectorAll(".fondo")].pop();if(m&&!m.dataset.fijo)cerrar(m)}});
+  if(window.visualViewport){const aj=()=>{const v=visualViewport;document.querySelectorAll(".fondo").forEach(f=>{if(v.scale>1.01)return;f.style.top=v.offsetTop+"px";f.style.height=v.height+"px";f.style.bottom="auto"})};visualViewport.addEventListener("resize",aj);visualViewport.addEventListener("scroll",aj)}
 }
+let ultimaVuelta=0;
+function refrescar(sinLimite){      // vuelve a mirar lo que se está viendo, sin molestar (varios avisos juntos cuentan como uno)
+  if(!sinLimite&&Date.now()-ultimaVuelta<800)return;ultimaVuelta=Date.now();
+  if(vista==="dia"||vista==="semana"||vista==="recordatorios")cargar(true);
+  if(vista!=="recordatorios")actualizarBadge();
+  if(vista==="buscar"&&$("#q").value.trim().length>=2)buscar(true);
+}
+function mostrar(v,sinCarga){
+  vista=v;if(v==="dia"||v==="semana")guarda("vista",v);
+  for(const s of ["dia","semana","buscar","recordatorios","registro"])$("#v-"+s).hidden=s!==v;
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));
+  $("#btnreg").textContent=v==="registro"?"Volver":"Registro";
+  quitarAviso();reposicion=true;
+  if(v==="buscar"){const q=$("#q");q.focus();if(q.value.trim().length>=2)buscar()}
+  else if(v==="registro")registro();
+  else if(!sinCarga)cargar();
+}
+function cargar(sil){
+  if(vista==="dia")return cargarDia(sil);
+  if(vista==="semana")return cargarSemana(sil);
+  if(vista==="recordatorios")return cargarRec(sil);
+}
+const canchasConocidas=()=>D.canchas.length?D.canchas:S?S.canchas:M?M.canchas:[];
 const cancha=id=>D.canchas.find(c=>c.id===id);
-function ocupante(canchaId,ini,fin,ignorar){const c=cancha(canchaId);return D.turnos.find(t=>t.ini<fin&&ini<t.fin&&rel(c,cancha(t.cancha_id))&&t.id!==ignorar)}
-async function cargar(silencioso){
-  try{D=await api("GET","/api/turnos?fecha="+dia)}catch(e){if(!silencioso)$("#est").innerHTML='<span class="dan">'+esc(e.message)+'</span>';return}
-  pintar();
-}
-function textoEstado(t){
+// quién ocupa (o bloquea, por la regla de Fútbol 7 contra los dos de Fútbol 5) ese horario de esa cancha
+function ocup(cs,lista,canchaId,ini,fin,ignorar){const c=cs.find(x=>x.id===canchaId);return lista.find(t=>{const o=cs.find(x=>x.id===t.cancha_id);return t.ini<fin&&ini<t.fin&&o&&rel(c,o)&&t.id!==ignorar})}
+const ocupante=(canchaId,ini,fin,ignorar)=>ocup(D.canchas,D.turnos,canchaId,ini,fin,ignorar);
+function textoEstado(t){      // corto, para que entre en la grilla; el detalle completo está al tocar el turno
   if(t.estado==="cobrado")return "cobrado ✓";
-  if(t.bloqueado&&!t.sena)return "en la caja del local";
-  if(t.tipo_precio==="fijo"&&!t.sena)return "FIJO · "+money(t.precio);
-  return t.sena>0?`pagó ${money(t.sena)} · debe ${money(t.precio-t.sena)}`:"sin pago · "+money(t.precio);
+  if(t.bloqueado&&!t.sena)return "en la caja";
+  if(t.tipo_precio==="fijo"&&!t.sena)return "FIJO";
+  return t.sena>0?"debe "+money(t.precio-t.sena):"sin pago";
 }
-function pintar(){
-  const cs=D.canchas,hoy=hoyK(),n=new Date(),ahora=n.getHours()*60+n.getMinutes();
-  if(!cs.length){$("#cal").innerHTML='<p style="padding:12px">No hay canchas cargadas.</p>';return}
-  const ap=Math.min(...cs.map(c=>c.ap)),ci=Math.max(...cs.map(c=>c.ci)),H=(ci-ap)/60*HP;
+let reposicion=true,huellaDia="",huellaSem="",firmaPrev="";
+const sinHora=r=>JSON.stringify([r.canchas,r.turnos]);      // la respuesta trae la hora del servidor: no cuenta como cambio
+// cambia cada vez que una cancha pasa a otra casilla horaria (o de día): ahí hay que redibujar lo pasado/actual
+const firmaTiempo=()=>{const a=ahoraMin(),cs=vista==="semana"&&S?S.canchas:D.canchas;return hoyK()+"|"+cs.map(c=>Math.floor((a-c.ap)/c.dur)).join()};
+
+// ---- día ----
+async function cargarDia(sil){
+  const r=await pedir("dia","/api/turnos?fecha="+dia,sil);if(!r)return;
+  const h=sinHora(r);D=r;hayDatos.dia=true;
+  if(sil&&h===huellaDia&&!reposicion){marcarAhora();return}     // no cambió nada: no se vuelve a dibujar (no molesta si estás tocando)
+  huellaDia=h;pintarDia();
+}
+function pintarDia(){
+  const cs=D.canchas,ts=D.turnos,hoy=hoyK(),ahora=ahoraMin(),wrap=$("#cal");
+  if(!cs.length){wrap.innerHTML='<p class="vacio"><b>No hay canchas cargadas</b>Se cargan desde el programa de la PC del predio.</p>';$("#est").textContent="";return}
+  const fijos=ts.filter(t=>t.tipo_precio==="fijo"&&t.fijo_id).length;
+  $("#est").textContent=`${larga(dia)}${cuando(dia)?" ("+cuando(dia)+")":""} · ${ts.length} ${ts.length===1?"turno":"turnos"}${fijos?` (${fijos} ${fijos===1?"fijo":"fijos"})`:""}`;
+  // el eje cubre los horarios de las canchas y también cualquier turno que haya quedado fuera (por si se cambiaron los horarios)
+  const ap=Math.floor(Math.min(...cs.map(c=>c.ap),...ts.map(t=>t.ini))/60)*60,ci=Math.max(...cs.map(c=>c.ci),...ts.map(t=>t.fin)),H=(ci-ap)/60*HP;
   const horas=[];for(let m=ap;m<ci;m+=60)horas.push(m);
-  $("#est").textContent=`${larga(dia)} · ${D.turnos.length} turnos (${D.turnos.filter(t=>t.tipo_precio==="fijo"&&t.fijo_id).length} fijos)`;
-  const heads=cs.map(c=>`<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)} · fijo ${money(c.precio_fijo)}</small>${c.clave==="f7"?"<small>ocupa también las dos de Fútbol 5</small>":F5.includes(c.clave)?"<small>si se usa, no hay Fútbol 7</small>":""}</div>`).join("");
-  const cols=cs.map(c=>{let h="";for(let s=c.ap;s+c.dur<=c.ci;s+=c.dur){
-    const e=s+c.dur,top=(s-ap)/60*HP,alto=c.dur/60*HP,oc=ocupante(c.id,s,e),pasado=dia<hoy||(dia===hoy&&e<=ahora);
-    let cls,inner,act;
-    if(!oc){cls="free";inner=`<b>${hm(s)}</b><span>libre</span>`;act=`data-c="${c.id}" data-s="${s}"`}
-    else if(oc.cancha_id===c.id){cls="res t-"+c.deporte+(oc.fijo_id&&oc.tipo_precio==="fijo"?" fijo":"")+(oc.estado==="cobrado"?" done":"");inner=`<b>${hm(s)} · ${esc(oc.cliente||"Sin nombre")}</b><span>${textoEstado(oc)}</span>`;act=`data-t="${esc(oc.id)}"`}
-    else{cls="blk";inner=`<b>${hm(s)}</b><span>ocupada por ${esc(cancha(oc.cancha_id).nombre)}</span>`;act=`data-t="${esc(oc.id)}"`}
-    h+=`<button class="slot ${cls} ${pasado?"past":""}" style="top:${top}px;height:${alto}px" ${act}>${inner}</button>`}
+  const heads=cs.map(c=>`<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)}<span class="solo-pc"> · fijo ${money(c.precio_fijo)}</span></small>${c.clave==="f7"?'<small class="nota-h">ocupa también las dos de Fútbol 5</small>':F5.includes(c.clave)?'<small class="nota-h">si se usa, no hay Fútbol 7</small>':""}</div>`).join("");
+  const yTop=m=>(m-ap)/60*HP;
+  const cols=cs.map(c=>{
+    let h="";
+    if(c.ap>ap)h+=`<div class="cerrada" style="top:0;height:${yTop(c.ap)}px"></div>`;
+    if(c.ci<ci)h+=`<div class="cerrada" style="top:${yTop(c.ci)}px;height:${H-yTop(c.ci)}px"></div>`;
+    for(let s=c.ap;c.dur>0&&s+c.dur<=c.ci;s+=c.dur){
+      const e=s+c.dur,oc=ocupante(c.id,s,e),pasado=dia<hoy||(dia===hoy&&e<=ahora);
+      if(oc&&oc.cancha_id===c.id)continue;      // los turnos propios se dibujan abajo, con su propio horario
+      const estilo=`top:${yTop(s)+1}px;height:${c.dur/60*HP-2}px`;
+      if(!oc)h+=`<button class="slot free ${pasado?"past":""}" style="${estilo}" data-c="${esc(c.id)}" data-s="${s}" aria-label="Reservar ${esc(c.nombre)} ${hm(s)}"><b>${hm(s)}</b><span>libre</span></button>`;
+      else h+=`<button class="slot blk ${pasado?"past":""}" style="${estilo}" data-t="${esc(oc.id)}"><b>${hm(s)}</b><span>ocupada por ${esc(cancha(oc.cancha_id).nombre)}</span></button>`;
+    }
+    for(const t of ts.filter(x=>x.cancha_id===c.id)){
+      const pasado=dia<hoy||(dia===hoy&&t.fin<=ahora);
+      h+=`<button class="slot res t-${esc(c.deporte)}${t.fijo_id&&t.tipo_precio==="fijo"?" fijo":""}${t.estado==="cobrado"?" done":""} ${pasado?"past":""}" style="top:${yTop(t.ini)+1}px;height:${(t.fin-t.ini)/60*HP-2}px" data-t="${esc(t.id)}"><b>${hm(t.ini)} · ${esc(t.cliente||"Sin nombre")}</b><span>${esc(textoEstado(t))}</span></button>`;
+    }
+    if(dia===hoy&&ahora>=ap&&ahora<ci)h+=`<i class="ahora" style="top:${yTop(ahora)}px"></i>`;
     return `<div class="ccol" style="height:${H}px">${h}</div>`}).join("");
-  const wrap=$("#cal"),prev=wrap.scrollTop;
-  wrap.innerHTML=`<div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(130px,1fr));min-width:${54+cs.length*130}px;--hp:${HP}px"><div class="chead corner"></div>${heads}<div class="tcol" style="height:${H}px">${horas.map((m,i)=>`<span style="top:${i*HP}px">${hm(m)}</span>`).join("")}</div>${cols}</div>`;
-  wrap.scrollTop=prev||(dia===hoy?Math.max(0,((ahora-ap)/60-1)*HP):0);
+  const prevT=wrap.scrollTop,prevL=wrap.scrollLeft;
+  const marca=dia===hoy&&ahora>=ap&&ahora<ci?`<span class="ahora-t" style="top:${yTop(ahora)}px">${hm(ahora)}</span>`:"";
+  wrap.innerHTML=`<div class="cal" style="grid-template-columns:48px repeat(${cs.length},minmax(128px,1fr));min-width:${48+cs.length*128}px;--hp:${HP}px"><div class="chead corner"></div>${heads}<div class="tcol" style="height:${H}px">${horas.map(m=>`<span style="top:${yTop(m)}px">${hm(m)}</span>`).join("")}${marca}</div>${cols}</div>`;
+  if(reposicion){      // al abrir un día: hoy se ubica un poco antes de la hora actual (lo que ya pasó queda arriba); los otros días, donde abren las canchas
+    wrap.scrollTop=dia===hoy?Math.max(0,yTop(ahora)-HP*.7):Math.max(0,yTop(Math.min(...cs.map(c=>c.ap)))-8);wrap.scrollLeft=0;reposicion=false;
+  }else{wrap.scrollTop=prevT;wrap.scrollLeft=prevL}
   wrap.querySelectorAll(".slot").forEach(b=>b.onclick=()=>b.dataset.c?nuevo(b.dataset.c,+b.dataset.s):ver(b.dataset.t));
+  firmaPrev=firmaTiempo();
 }
-function modal(titulo,cuerpo,acciones){
-  const f=document.createElement("div");f.className="fondo";
-  f.innerHTML=`<div class="modal"><h2>${titulo}</h2>${cuerpo}<div class="err" id="m-err"></div><div class="acc"></div></div>`;
+// mueve la raya roja de «ahora» (y redibuja cuando una casilla pasó a ser «pasada»)
+function marcarAhora(){
+  if(!DENTRO)return;
+  if(vista==="dia"&&D.canchas.length){
+    if(firmaTiempo()!==firmaPrev){pintarDia();return}
+    const cs=D.canchas,ts=D.turnos,ahora=ahoraMin(),ap=Math.floor(Math.min(...cs.map(c=>c.ap),...ts.map(t=>t.ini))/60)*60;
+    document.querySelectorAll(".ahora").forEach(e=>e.style.top=(ahora-ap)/60*HP+"px");
+    const t=document.querySelector(".ahora-t");if(t){t.style.top=(ahora-ap)/60*HP+"px";t.textContent=hm(ahora)}
+  }else if(vista==="semana"&&S&&huellaSem&&firmaTiempo()!==firmaPrev)pintarSemana();
+}
+
+// ---- semana ----
+async function cargarSemana(sil){
+  const r=await pedir("semana","/api/turnos/semana?desde="+lunesDe(dia),sil);if(!r)return;
+  const h=sinHora(r);S=r;hayDatos.semana=true;
+  if(sil&&h===huellaSem&&!reposicion)return;
+  huellaSem=h;reposicion=false;pintarSemana();
+}
+// las casillas de una cancha en un día: libres, ocupadas, bloqueadas por Fútbol 7/5, y turnos que quedaron fuera del horario actual
+function resumenCancha(cs,c,ts,f,hoy,ahora){
+  const items=[],usados=new Set();let libres=0;
+  for(let s=c.ap;c.dur>0&&s+c.dur<=c.ci;s+=c.dur){
+    const e=s+c.dur,oc=ocup(cs,ts,c.id,s,e),pas=f<hoy||(f===hoy&&e<=ahora),ya=f===hoy&&s<=ahora&&ahora<e;
+    if(!oc){items.push({s,k:"lib",pas,ya});if(!pas)libres++}
+    else if(oc.cancha_id===c.id){if(usados.has(oc.id))continue;usados.add(oc.id);items.push({s:oc.ini,k:"ocu",t:oc,pas,ya})}
+    else items.push({s,k:"blk",t:oc,pas,ya});
+  }
+  for(const t of ts)if(t.cancha_id===c.id&&!usados.has(t.id))items.push({s:t.ini,k:"ocu",t,raro:true,pas:f<hoy||(f===hoy&&t.fin<=ahora)});
+  items.sort((a,b)=>a.s-b.s);
+  return {items,libres,turnos:ts.filter(t=>t.cancha_id===c.id).length};
+}
+function pintarSemana(){
+  const hoy=hoyK(),ahora=ahoraMin(),cs=S.canchas,dias=[...Array(7)].map((_,i)=>sumar(S.desde,i)),box=$("#sem");
+  const mismoMes=S.desde.slice(5,7)===dias[6].slice(5,7);
+  $("#sest").textContent=`Semana del ${mismoMes?+S.desde.slice(8):diaMes(S.desde)} al ${diaMes(dias[6])} · ${S.turnos.length} ${S.turnos.length===1?"turno":"turnos"}`;
+  if(!cs.length){box.innerHTML='<p class="vacio"><b>No hay canchas cargadas</b>Se cargan desde el programa de la PC del predio.</p>';return}
+  const cuenta=f=>S.turnos.filter(t=>t.fecha===f).length;
+  const nombre=id=>(cs.find(c=>c.id===id)||{nombre:"otra cancha"}).nombre;
+  const tira=dias.map(f=>`<button class="dp${f===hoy?" hoy":""}${f<hoy?" pas":""}" data-f="${f}" aria-label="${esc(larga(f))}: ${cuenta(f)} turnos"><small>${DIAS3[dow(f)]}</small><b>${+f.slice(8)}</b><span class="n${cuenta(f)?"":" cero"}">${cuenta(f)}</span></button>`).join("");
+  const cards=dias.map(f=>{
+    const ts=S.turnos.filter(t=>t.fecha===f),n=ts.length,r=cuando(f);
+    const filas=cs.map(c=>{
+      const x=resumenCancha(cs,c,ts,f,hoy,ahora);
+      const chips=x.items.map(i=>{
+        const t=i.t,tit=i.k==="lib"?`${c.nombre}, ${hm(i.s)}: libre`:i.k==="blk"?`${c.nombre}, ${hm(i.s)}: ocupada por ${nombre(t.cancha_id)}`:`${c.nombre}, ${hm(t.ini)}: ${t.cliente||"sin nombre"}`;
+        return `<span class="chip ${i.k}${i.k==="ocu"?" t-"+esc(c.deporte):""}${i.k==="ocu"&&t.tipo_precio==="fijo"&&t.fijo_id?" fijo":""}${i.raro?" raro":""}${i.pas?" pas":""}${i.ya?" ya":""}" title="${esc(tit)}">${hmCorta(i.s)}</span>`}).join("");
+      return `<span class="cfila"><span class="cn"><span>${esc(c.nombre)}</span><span>${x.turnos} ${x.turnos===1?"turno":"turnos"}${f>=hoy?` · ${x.libres} ${x.libres===1?"libre":"libres"}`:""}</span></span><span class="chips">${chips}</span></span>`}).join("");
+    return `<button class="dcard${f===hoy?" hoy":""}${f<hoy?" pas":""}" data-f="${f}" aria-label="Abrir ${esc(larga(f))}"><span class="dh"><b>${DIAS[dow(f)]} ${+f.slice(8)}</b>${r?`<span class="rel">${r}</span>`:""}<span class="tot ${n?"":"mu"}">${n?n+(n===1?" turno":" turnos"):"sin turnos"}</span></span>${filas}</button>`}).join("");
+  box.innerHTML=`<div class="tira">${tira}</div><div class="dias">${cards}</div>`;
+  box.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>irA(b.dataset.f));
+  firmaPrev=firmaTiempo();
+}
+// abre un día en la vista de día (y, si se pide, el detalle de un turno)
+async function irA(fecha,turnoId){
+  dia=fecha;$("#fecha").value=$("#sfecha").value=dia;huellaDia="";hayDatos.dia=false;
+  mostrar("dia",!!turnoId);
+  if(turnoId){await cargarDia();if(hayDatos.dia)ver(turnoId)}
+}
+
+// ---- búsqueda ----
+let bus=0;
+async function buscar(silencioso){
+  const q=$("#q").value.trim(),box=$("#res"),mi=++bus;
+  if(q.length<2){box.classList.remove("espera");box.innerHTML=`<p class="vacio">${q?"Escribí al menos 2 letras o números.":"Escribí un nombre o un teléfono.<br>Busca entre los turnos de los últimos 30 días en adelante y entre los fijos."}</p>`;return}
+  if(silencioso!==true&&!box.querySelector(".fila"))box.innerHTML='<p class="vacio">Buscando…</p>';
+  else if(silencioso!==true)box.classList.add("espera");
+  let r;
+  try{r=await api("GET","/api/turnos/buscar?q="+encodeURIComponent(q))}
+  catch(e){
+    if(mi===bus)box.classList.remove("espera");
+    if(mi!==bus||silencioso===true)return;
+    box.innerHTML=`<p class="vacio"><b>No se pudo buscar</b>${esc(e.message)}<br><button type="button" id="rebus">Probar de nuevo</button></p>`;
+    $("#rebus").onclick=()=>buscar();return;
+  }
+  if(mi!==bus)return;
+  box.classList.remove("espera");
+  const cs=canchasConocidas(),nom=id=>(cs.find(c=>c.id===id)||{nombre:id}).nombre,hoy=hoyK();
+  const fijos=r.fijos||[],ts=r.turnos||[];
+  if(!fijos.length&&!ts.length){box.innerHTML=`<p class="vacio"><b>No encontramos turnos con «${esc(q)}»</b>Probá con menos letras o con otra parte del nombre o del teléfono.</p>`;return}
+  let h="";
+  if(fijos.length){
+    h+=`<h3>Turnos fijos (${fijos.length})</h3>`+fijos.map(f=>{
+      const c=cs.find(x=>x.id===f.cancha_id);
+      return `<button class="fila" ${f.proxima?`data-fijo="${esc(f.id)}" data-f="${f.proxima}"`:"disabled"}><span class="f1"><b>${f.proxima?esc(corta(f.proxima)):"—"}</b><small>${f.proxima?(cuando(f.proxima)||"próximo"):"sin próximo"}</small></span><span class="f2"><b>${esc(f.cliente||"Sin nombre")}</b><span>${esc(nom(f.cancha_id))} · ${todosLosDow(f.dow)} ${hm(f.ini)}${c?" a "+hm(f.ini+c.dur):""}</span>${f.tel?`<span>${esc(f.tel)}</span>`:""}</span><span class="tag">FIJO</span></button>`}).join("");
+  }
+  if(ts.length){
+    h+=`<h3>Turnos (${ts.length})${r.truncado?" · se muestran los más cercanos a hoy":""}</h3>`;
+    const hayPasados=ts.some(x=>x.fecha<hoy);let marco=false;
+    for(const t of ts){
+      if(!marco&&hayPasados&&t.fecha>=hoy){marco=true;h+='<div class="sep" id="desdehoy">de hoy en adelante</div>'}
+      const pas=t.fecha<hoy;
+      h+=`<button class="fila${pas?" pas":""}" data-t="${esc(t.id)}" data-f="${t.fecha}"><span class="f1"><b>${esc(corta(t.fecha))}</b><small>${cuando(t.fecha)||(pas?"pasado":"")}</small></span><span class="f2"><b>${esc(t.cliente||"Sin nombre")}</b><span>${hm(t.ini)} a ${hm(t.fin)} · ${esc(nom(t.cancha_id))}</span>${t.tel?`<span>${esc(t.tel)}</span>`:""}</span>${t.fijo_id&&t.tipo_precio==="fijo"?'<span class="tag">FIJO</span>':""}</button>`;
+    }
+  }
+  box.innerHTML=h;
+  box.querySelectorAll(".fila[data-f]").forEach(b=>b.onclick=()=>irA(b.dataset.f,b.dataset.t||("F:"+b.dataset.fijo+":"+b.dataset.f)));
+  const sep=$("#desdehoy");if(silencioso!==true&&sep&&ts.findIndex(t=>t.fecha>=hoy)>2)sep.scrollIntoView({block:"start"});      // con muchos pasados, se baja hasta lo que viene
+}
+
+// ---- recordatorios de mañana ----
+const manana=()=>sumar(hoyK(),1);
+const claveEnv=f=>"enviados:"+f;
+function enviadosDe(f){try{const a=JSON.parse(lee(claveEnv(f))||"[]");return new Set(Array.isArray(a)?a:[])}catch{return new Set()}}
+function marcarEnviado(f,id,si){
+  const s=enviadosDe(f);si?s.add(id):s.delete(id);guarda(claveEnv(f),JSON.stringify([...s]));
+  try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k&&k.startsWith("enviados:")&&k.slice(9)<sumar(hoyK(),-7))localStorage.removeItem(k)}}catch{}      // se limpian los días viejos
+}
+// número para WhatsApp (Argentina): sin 0 ni 15, con 549 adelante
+function telWA(tel){
+  let d=String(tel||"").replace(/\D/g,"").replace(/^0+/,"");if(!d)return "";
+  if(d.startsWith("54")){if(!d.startsWith("549")&&d.length===12)d="549"+d.slice(2);return d}
+  if(d.length===12)for(const a of [2,3,4])if(d.slice(a,a+2)==="15"){d=d.slice(0,a)+d.slice(a+2);break}
+  return "549"+d;
+}
+const telCompleto=wa=>wa.replace(/^549?/,"").length>=10;
+const msjWA=(t,c)=>`Hola${t.cliente?" "+t.cliente:""}! Te recordamos tu turno de ${c.nombre} el ${larga(t.fecha)} a las ${hm(t.ini)}. ¡Te esperamos!`;
+const urlWA=(t,c)=>{const wa=telWA(t.tel);return wa?`https://wa.me/${wa}?text=${encodeURIComponent(msjWA(t,c))}`:""};
+async function cargarRec(sil){
+  const f=manana();
+  if(!sil&&M&&Mf===f)pintarRec();      // mientras llega lo nuevo, se ve lo último que había
+  const r=await pedir("recordatorios","/api/turnos?fecha="+f,sil);if(!r)return;
+  M=r;Mf=f;hayDatos.recordatorios=true;pintarRec();contarBadge();
+}
+function repartoRec(){      // los turnos de mañana, separados en con y sin teléfono
+  const cs=M.canchas,orden=id=>cs.findIndex(c=>c.id===id);
+  const ts=M.turnos.filter(t=>t.estado!=="cancelado").slice().sort((a,b)=>a.ini-b.ini||orden(a.cancha_id)-orden(b.cancha_id));
+  return {con:ts.filter(t=>/\d/.test(t.tel||"")),sin:ts.filter(t=>!/\d/.test(t.tel||"")),total:ts.length};
+}
+function pintarRec(){
+  const box=$("#rec"),f=Mf,{con,sin,total}=repartoRec(),env=enviadosDe(f),cs=M.canchas;
+  const hechos=con.filter(t=>env.has(t.id)).length;
+  let h=`<div class="resumen"><b>Mañana · ${esc(DIAS[dow(f)])} ${esc(diaMes(f))}</b><br>${total?`${total} ${total===1?"turno":"turnos"} · ${con.length} con teléfono${con.length?` · enviados ${hechos} de ${con.length}`:""}`:"No hay turnos mañana."}</div>`;
+  if(sin.length)h+=`<div class="note" id="sin-tel"><b>${sin.length} ${sin.length===1?"turno de mañana no tiene":"turnos de mañana no tienen"} teléfono</b>: no se les puede avisar. Tocá uno para cargarle el teléfono.</div>`;
+  if(total&&!con.length)h+='<p class="vacio">Ningún turno de mañana tiene teléfono cargado.</p>';
+  h+='<div class="rec">'+con.map(t=>{
+    const c=cs.find(x=>x.id===t.cancha_id)||{nombre:t.cancha_id},wa=telWA(t.tel),url=urlWA(t,c),listo=env.has(t.id);
+    return `<div class="rcard${listo?" listo":""}" data-id="${esc(t.id)}"><div class="rtop"><span class="rhora">${hm(t.ini)}</span><span class="rdat"><b>${esc(t.cliente||"Sin nombre")}${t.fijo_id&&t.tipo_precio==="fijo"?" · FIJO":""}</b><span>${esc(c.nombre)}</span><span>${esc(t.tel)}</span></span></div>${telCompleto(wa)?"":'<div class="avisotel">Revisá el número: parece incompleto (falta el código de área).</div>'}<div class="racc"><a class="btn wa" href="${esc(url)}" target="_blank" rel="noopener" data-wa>WhatsApp</a><button type="button" class="ok-envio" data-env="${esc(t.id)}" aria-pressed="${listo}">${listo?"✓ Enviado":"Marcar enviado"}</button></div></div>`}).join("")+"</div>";
+  if(sin.length)h+='<div class="sintel"><h3 style="font-size:15px;color:var(--mu);margin:0 0 6px">Sin teléfono</h3><div class="res">'+sin.map(t=>`<button class="fila" data-ver="${esc(t.id)}"><span class="f1"><b>${hm(t.ini)}</b></span><span class="f2"><b>${esc(t.cliente||"Sin nombre")}</b><span>${esc((cs.find(c=>c.id===t.cancha_id)||{nombre:""}).nombre)}</span></span></button>`).join("")+"</div></div>";
+  box.innerHTML=h;
+  box.querySelectorAll("[data-env]").forEach(b=>b.onclick=()=>{const id=b.dataset.env;marcarEnviado(f,id,!enviadosDe(f).has(id));pintarRec();contarBadge()});
+  box.querySelectorAll("[data-wa]").forEach(a=>a.addEventListener("click",()=>{const b=a.closest(".rcard").querySelector("[data-env]");if(b&&b.getAttribute("aria-pressed")==="false")b.classList.add("pend")}));
+  box.querySelectorAll("[data-ver]").forEach(b=>b.onclick=()=>verDe(M,b.dataset.ver));
+}
+function contarBadge(){      // el numerito rojo de la pestaña: avisos de mañana que todavía no se mandaron
+  if(!M||Mf!==manana())return;const env=enviadosDe(Mf),n=repartoRec().con.filter(t=>!env.has(t.id)).length,b=$("#badge");
+  b.hidden=!n;b.textContent=n;b.setAttribute("aria-label",n+" avisos pendientes");
+}
+async function actualizarBadge(){
+  const f=manana();
+  try{const r=await api("GET","/api/turnos?fecha="+f);M=r;Mf=f;contarBadge();if(vista==="recordatorios"&&hayDatos.recordatorios)pintarRec()}catch{}
+}
+
+// ---- ventanas (en el celular suben desde abajo, para usarlas con una mano) ----
+function cerrar(f){f.remove();document.body.classList.toggle("sinscroll",!!$(".fondo"))}
+function modal(titulo,cuerpo,acciones,opc={}){
+  const f=document.createElement("div");f.className="fondo";f.setAttribute("role","dialog");f.setAttribute("aria-modal","true");if(opc.fijo)f.dataset.fijo="1";
+  f.innerHTML=`<div class="modal"><div class="mh"><h2>${titulo}</h2>${opc.fijo?"":'<button type="button" class="x" aria-label="Cerrar">✕</button>'}</div><div class="mb">${cuerpo}<div class="err" id="m-err" role="alert"></div></div><div class="acc"></div></div>`;
   const acc=f.querySelector(".acc");
-  acciones.forEach(a=>{const b=document.createElement("button");b.textContent=a.t;if(a.k)b.className=a.k;b.onclick=async()=>{
-    if(!a.f){f.remove();return}
-    b.disabled=true;try{const r=await a.f();if(r!==false)f.remove()}catch(e){f.querySelector("#m-err").textContent=e.message}b.disabled=false};acc.appendChild(b)});
-  f.addEventListener("click",e=>{if(e.target===f)f.remove()});
-  document.body.appendChild(f);return f;
+  if(!acciones.length)acciones=[{t:"Cerrar"}];
+  acciones.forEach(a=>{const b=document.createElement("button");b.type="button";b.textContent=a.t;if(a.k)b.className=a.k;
+    let armado=0;
+    b.onclick=async()=>{
+      if(!a.f){cerrar(f);return}
+      if(a.conf&&!armado){armado=setTimeout(()=>{armado=0;b.textContent=a.t},4500);b.textContent=a.conf;return}      // los botones peligrosos piden tocar dos veces
+      clearTimeout(armado);armado=0;
+      f.querySelector("#m-err").textContent="";b.disabled=true;
+      try{const r=await a.f();if(r!==false)cerrar(f)}catch(e){f.querySelector("#m-err").textContent=e.message;b.textContent=a.t}
+      b.disabled=false};
+    acc.appendChild(b)});
+  const x=f.querySelector(".x");if(x)x.onclick=()=>cerrar(f);
+  f.addEventListener("click",e=>{if(e.target===f&&!opc.fijo)cerrar(f)});
+  f.addEventListener("keydown",e=>{if(e.key==="Enter"&&opc.enter&&e.target.matches("input:not([type=radio])")){e.preventDefault();opc.enter(e.target)}});
+  document.body.appendChild(f);document.body.classList.add("sinscroll");
+  if(window.visualViewport&&visualViewport.scale<=1.01&&visualViewport.height<innerHeight-80){f.style.top=visualViewport.offsetTop+"px";f.style.height=visualViewport.height+"px";f.style.bottom="auto"}      // con el teclado abierto, la ventana queda arriba del teclado
+  f.querySelectorAll("input[type=text],input[type=tel],input:not([type])").forEach(i=>i.addEventListener("focus",()=>setTimeout(()=>i.scrollIntoView({block:"center",behavior:"smooth"}),250)));
+  return f;
 }
-const quienHtml=()=>"";
-function guardarQuien(q){quien=q.trim().slice(0,40);try{localStorage.setItem("quien",quien)}catch{}$("#quien-txt").textContent=quien?"Anotás como "+quien:""}
+function guardarQuien(q){quien=q.trim().slice(0,40);guarda("quien",quien);$("#quien-txt").textContent=quien?"Anotás como "+quien+" ·":""}
 function pedirNombre(obligatorio){
-  const f=modal("¿Cómo te llamás?",`<p class="mu">Se anota en cada turno que cargues o cambies. Se pregunta una sola vez en este celular.</p><label>Tu nombre<input id="nm" value="${esc(quien)}" maxlength="40" autocomplete="off"></label>`,
-   [...(obligatorio?[]:[{t:"Cancelar"}]),{t:"Guardar",k:"pri",f:()=>{const v=$("#nm").value.trim();if(!v)throw new Error("Escribí tu nombre");guardarQuien(v)}}]);
-  if(obligatorio)f.addEventListener("click",e=>{if(e.target===f)e.stopImmediatePropagation()},true);
-  setTimeout(()=>$("#nm").focus(),50);
+  const f=modal("¿Cómo te llamás?",`<p class="mu">Se anota en cada turno que cargues o cambies. Se pregunta una sola vez en este celular.</p><label>Tu nombre<input id="nm" value="${esc(quien)}" maxlength="40" autocomplete="off" enterkeyhint="done"></label>`,
+   [...(obligatorio?[]:[{t:"Cancelar"}]),{t:"Guardar",k:"pri",f:()=>{const v=$("#nm").value.trim();if(!v)throw new Error("Escribí tu nombre");guardarQuien(v)}}],{fijo:obligatorio,enter:()=>f.querySelector(".pri").click()});
+  $("#nm").focus();
 }
 function leerQuien(){if(!quien){pedirNombre(true);throw new Error("Primero decinos tu nombre")}return quien}
-async function enviar(cuerpo,ok){await api("POST","/api/turnos",{...cuerpo,quien:leerQuien()});toast(ok);await cargar()}
-function nuevo(cid,ini){
-  const c=cancha(cid),r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));
-  modal("Reservar · "+esc(c.nombre),`<p><b>${esc(larga(dia))}</b> · ${hm(ini)} a ${hm(ini+c.dur)} (${c.dur} min)</p>
-   ${r.length?`<div class="note">Al reservar, en ese horario también quedan ocupadas: <b>${r.map(x=>esc(x.nombre)).join(" y ")}</b>.</div>`:""}
-   <label>Tipo de turno<select id="tipo"><option value="comun">Común · ${money(c.precio)}</option><option value="fijo">FIJO, todos los ${DIAS[dow(dia)]} · ${money(c.precio_fijo)} por turno</option></select></label>
-   <label>A nombre de<input id="cli" placeholder="Ej: Los Pibes" autocomplete="off"></label>
-   <label>Teléfono<input id="tel" inputmode="tel" placeholder="Ej: 11 5555-1234"></label>
-   <label>Nota (opcional)<input id="nota"></label>
-   <div class="note">La seña y el cobro se hacen en la caja del local. Si te dieron una seña, anotala en la nota.</div>${quienHtml()}`,
-   [{t:"Cancelar"},{t:"Reservar",k:"pri",f:()=>enviar({accion:"crear",cancha:cid,fecha:dia,ini,fijo:$("#tipo").value==="fijo",cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Turno reservado")}]);
+async function enviar(cuerpo,ok){
+  try{await api("POST","/api/turnos",{...cuerpo,quien:leerQuien()})}
+  catch(e){if(e.status===409||e.status===400)cargar(true);throw e}      // si el horario se ocupó, se actualiza la pantalla de fondo
+  toast(ok);await cargar(true);actualizarBadge();
 }
-function ver(id){
-  const t=D.turnos.find(x=>x.id===id);if(!t){toast("Ese turno ya no existe");return cargar()}
-  const c=cancha(t.cancha_id),fijo=!!t.fijo_id,virtual=!!t.virtual,r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));
-  const dg=(t.tel||"").replace(/\D/g,"").replace(/^0+/,""),wa=dg?`https://wa.me/${dg.startsWith("54")?dg:"549"+dg}?text=${encodeURIComponent(`Hola ${t.cliente||""}! Te recordamos tu turno de ${c.nombre} el ${larga(t.fecha)} a las ${hm(t.ini)}. ¡Te esperamos!`)}`:"";
-  const acc=[{t:"Cerrar"}];
+
+// ---- reservar / ver / editar / reprogramar ----
+function nuevo(cid,ini){
+  const c=cancha(cid),r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x)),f=dia;
+  const reservar=()=>enviar({accion:"crear",cancha:cid,fecha:f,ini,fijo:document.querySelector("input[name=tipo]:checked").value==="fijo",cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Turno reservado");
+  const m=modal("Reservar · "+esc(c.nombre),`<p style="margin:0 0 6px"><b>${esc(larga(f))}</b> · ${hm(ini)} a ${hm(ini+c.dur)} (${c.dur} min)</p>
+   ${r.length?`<div class="note">Al reservar, en ese horario también quedan ocupadas: <b>${r.map(x=>esc(x.nombre)).join(" y ")}</b>.</div>`:""}
+   <label>A nombre de<input id="cli" placeholder="Ej: Los Pibes" autocomplete="off" enterkeyhint="next"></label>
+   <label>Teléfono<input id="tel" type="tel" inputmode="tel" placeholder="Ej: 11 5555-1234" autocomplete="off" enterkeyhint="next"></label>
+   <div class="tipo" role="radiogroup" aria-label="Tipo de turno"><label><input type="radio" name="tipo" value="comun" checked><span><b>Común</b><small>${money(c.precio)}</small></span></label><label><input type="radio" name="tipo" value="fijo"><span><b>FIJO</b><small>${todosLos(f)} · ${money(c.precio_fijo)}</small></span></label></div>
+   <label>Nota (opcional)<input id="nota" autocomplete="off" enterkeyhint="done"></label>
+   <div class="note">La seña y el cobro se hacen en la caja del local. Si te dieron una seña, anotala en la nota.</div>`,
+   [{t:"Cancelar"},{t:"Reservar",k:"pri",f:reservar}],{enter:i=>{if(i.id==="cli")$("#tel").focus();else if(i.id==="tel")$("#nota").focus();else m.querySelector(".pri").click()}});
+  $("#cli").focus();
+}
+function quienCargo(t){      // «Cargado por Ana el 13/10 20:15» y, si hubo otro cambio, quién lo hizo (la PC no anota nombres)
+  const pc=/-/.test(String(t.virtual?t.fijo_id:t.id)),cre=t.creado||0,web=t.modificado_en||0,mod=t.modificado||0,l=[];
+  if(t.creado_por)l.push(`Cargado por <b>${esc(t.creado_por)}</b> el ${sello(cre)}`);
+  else if(pc)l.push("Cargado en el programa de la PC"+(cre?" el "+sello(cre):""));
+  else if(cre)l.push("Cargado el "+sello(cre));
+  if(web&&mod>web)l.push("Último cambio desde el programa de la PC el "+sello(mod));
+  else if(web&&web>cre&&t.modificado_por)l.push(`Último cambio de <b>${esc(t.modificado_por)}</b> el ${sello(web)}`);
+  else if(!web&&cre&&mod>cre+1000)l.push((pc?"Último cambio desde el programa de la PC":"Último cambio")+" el "+sello(mod));
+  return l.length?`<div class="quien-cargo">${l.join("<br>")}</div>`:"";
+}
+function verDe(datos,id){const t=datos.turnos.find(x=>x.id===id);if(!t){toast("Ese turno ya no existe");return cargar(true)}verTurno(t,datos.canchas)}
+const ver=id=>verDe(D,id);
+function verTurno(t,cs){
+  const c=cs.find(x=>x.id===t.cancha_id);if(!c){toast("Esa cancha ya no existe");return}
+  const fijo=!!t.fijo_id,r=cs.filter(x=>x.id!==c.id&&rel(c,x));
+  const url=urlWA(t,c),acc=[];
   if(t.estado==="reservado"&&!t.bloqueado){
-    acc.push({t:fijo?"Suspender este día":"Cancelar turno",k:"dan",f:()=>enviar({accion:"cancelar",id:t.id},"Listo")});
-    acc.push({t:"Reprogramar",f:()=>{setTimeout(()=>mover(t),0)}});
-    if(fijo)acc.push({t:"Terminar el fijo",k:"dan",f:()=>enviar({accion:"terminar_fijo",fijo_id:t.fijo_id,desde:t.fecha},"Fijo terminado")});
-    acc.push({t:"Editar datos",k:"pri",f:()=>{setTimeout(()=>editar(t),0)}});
+    acc.push({t:fijo?"Suspender este día":"Cancelar turno",k:"dan",conf:fijo?"¿Suspender? Tocá de nuevo":"¿Cancelar? Tocá de nuevo",f:()=>enviar({accion:"cancelar",id:t.id},"Listo")});
+    acc.push({t:"Reprogramar",f:()=>{setTimeout(()=>mover(t,cs),0)}});
+    if(fijo)acc.push({t:"Terminar el fijo",k:"dan",conf:"¿Terminarlo? Tocá de nuevo",f:()=>enviar({accion:"terminar_fijo",fijo_id:t.fijo_id,desde:t.fecha},"Fijo terminado")});
+    acc.push({t:"Editar datos",k:"pri",f:()=>{setTimeout(()=>editar(t,c),0)}});
   }
-  modal(esc(c.nombre)+(fijo?" · FIJO":""),`<p><b>${esc(larga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
-   <p><span class="mu">A nombre de</span><br><b>${esc(t.cliente||"Sin nombre")}</b>${t.tel?"<br>"+esc(t.tel):""}${t.nota?'<br><span class="mu">'+esc(t.nota)+"</span>":""}</p>
-   ${wa?`<p><a class="btn" href="${wa}" target="_blank" rel="noopener">Avisar por WhatsApp</a></p>`:""}
+  modal(esc(c.nombre)+(fijo?" · FIJO":""),`<p style="margin:0 0 8px"><b>${esc(larga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
+   <p style="margin:0 0 8px"><span class="mu">A nombre de</span><br><b>${esc(t.cliente||"Sin nombre")}</b>${t.tel?"<br>"+esc(t.tel):""}${t.nota?'<br><span class="mu">'+esc(t.nota)+"</span>":""}</p>
+   ${url?`<p style="margin:0 0 8px"><a class="btn wa" style="width:100%" href="${esc(url)}" target="_blank" rel="noopener">Avisar por WhatsApp</a></p>`:""}
    <div class="note">Precio ${t.tipo_precio==="fijo"?"de fijo":"común"}: <b>${money(t.precio)}</b>${t.sena?` · pagó ${money(t.sena)} · saldo ${money(t.precio-t.sena)}`:""}</div>
    ${t.bloqueado||t.estado==="cobrado"?'<div class="note">Este turno ya está en una cuenta o con pagos en la caja del local: se cambia desde la PC del predio.</div>':""}
    ${r.length?`<div class="note">En este horario también están ocupadas: ${r.map(x=>esc(x.nombre)).join(" y ")}.</div>`:""}
-   ${quienHtml()}`,acc);
+   ${quienCargo(t)}`,acc);
 }
-function editar(t){
-  const c=cancha(t.cancha_id);
-  modal("Editar · "+esc(c.nombre),`<label>A nombre de<input id="cli" value="${esc(t.cliente)}"></label><label>Teléfono<input id="tel" value="${esc(t.tel)}" inputmode="tel"></label>
-   <label>Nota<input id="nota" value="${esc(t.nota)}"></label>${quienHtml()}
+function editar(t,c){
+  const m=modal("Editar · "+esc(c.nombre),`<label>A nombre de<input id="cli" value="${esc(t.cliente)}" autocomplete="off" enterkeyhint="next"></label><label>Teléfono<input id="tel" type="tel" value="${esc(t.tel)}" inputmode="tel" autocomplete="off" enterkeyhint="next"></label>
+   <label>Nota<input id="nota" value="${esc(t.nota)}" autocomplete="off" enterkeyhint="done"></label>
    ${t.fijo_id?'<div class="note">Cambia el nombre, teléfono y nota de este fijo en todas sus semanas.</div>':""}`,
-   [{t:"Cancelar"},{t:"Guardar",k:"pri",f:()=>enviar(t.fijo_id?{accion:"editar_fijo",fijo_id:t.fijo_id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value}:{accion:"editar",id:t.id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Guardado")}]);
+   [{t:"Cancelar"},{t:"Guardar",k:"pri",f:()=>enviar(t.fijo_id?{accion:"editar_fijo",fijo_id:t.fijo_id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value}:{accion:"editar",id:t.id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Guardado")}],
+   {enter:i=>{if(i.id==="cli")$("#tel").focus();else if(i.id==="tel")$("#nota").focus();else m.querySelector(".pri").click()}});
+  $("#cli").focus();
 }
-function mover(t){
+function mover(t,cs){      // la hora se elige de la lista de horarios de la cancha (nada de escribir una hora que no existe)
   modal("Reprogramar",`<label>Fecha<input type="date" id="rf" value="${t.fecha}"></label>
-   <label>Cancha<select id="rc">${D.canchas.map(c=>`<option value="${c.id}" ${c.id===t.cancha_id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
-   <label>Hora (de inicio)<input id="rh" type="time" step="1800" value="${hm(t.ini)}"></label>
-   <label>Precio<select id="rp"><option value="comun" ${t.tipo_precio!=="fijo"?"selected":""}>Común</option><option value="fijo" ${t.tipo_precio==="fijo"?"selected":""}>De fijo</option></select></label>${quienHtml()}`,
-   [{t:"Cancelar"},{t:"Mover",k:"pri",f:()=>{const [h,m]=$("#rh").value.split(":").map(Number);return enviar({accion:"mover",id:t.id,cancha:$("#rc").value,fecha:$("#rf").value,ini:h*60+m,tipo_precio:$("#rp").value},"Turno reprogramado")}}]);
+   <label>Cancha<select id="rc">${cs.map(c=>`<option value="${esc(c.id)}" ${c.id===t.cancha_id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
+   <label>Hora<select id="rh"></select></label>
+   <label>Precio<select id="rp"><option value="comun" ${t.tipo_precio!=="fijo"?"selected":""}>Común</option><option value="fijo" ${t.tipo_precio==="fijo"?"selected":""}>De fijo</option></select></label>`,
+   [{t:"Cancelar"},{t:"Mover",k:"pri",f:()=>{if(!$("#rf").value||!$("#rh").value)throw new Error("Elegí la fecha y la hora.");return enviar({accion:"mover",id:t.id,cancha:$("#rc").value,fecha:$("#rf").value,ini:+$("#rh").value,tipo_precio:$("#rp").value},"Turno reprogramado")}}]);
+  const llenar=()=>{
+    const c=cs.find(x=>x.id===$("#rc").value),op=[];
+    for(let s=c.ap;c.dur>0&&s+c.dur<=c.ci;s+=c.dur)op.push(s);
+    $("#rh").innerHTML=op.map(s=>`<option value="${s}">${hm(s)} a ${hm(s+c.dur)}</option>`).join("");
+    if(op.length)$("#rh").value=String(op.reduce((a,b)=>Math.abs(b-t.ini)<Math.abs(a-t.ini)?b:a));      // el horario más cercano al actual
+  };
+  $("#rc").onchange=llenar;llenar();
 }
+
+// ---- registro de cambios ----
 async function registro(){
-  const box=$("#reg");if(!box.hidden){box.hidden=true;return}
-  const {registro:r}=await api("GET","/api/turnos/registro");
-  box.hidden=false;box.innerHTML='<h2 style="font-size:16px">Registro de cambios (últimos 200)</h2><table>'+r.map(x=>`<tr><td class="mu" style="white-space:nowrap">${new Date(x.ts).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.quien)}</td><td>${esc(x.detalle)}</td></tr>`).join("")+"</table>";
-  box.scrollIntoView({behavior:"smooth"});
+  const box=$("#reg");box.innerHTML='<p class="vacio">Cargando…</p>';cargando(1);
+  try{
+    const {registro:r}=await api("GET","/api/turnos/registro");
+    box.innerHTML='<h2 style="font-size:17px;margin-bottom:6px">Registro de cambios (últimos 200)</h2>'+(r.length?'<table>'+r.map(x=>`<tr><td class="mu" style="white-space:nowrap">${new Date(x.ts).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.quien)}</td><td>${esc(x.detalle)}</td></tr>`).join("")+"</table>":'<p class="vacio">Todavía no hay cambios anotados.</p>');
+  }catch(e){box.innerHTML=`<p class="vacio"><b>No se pudo cargar el registro</b>${esc(e.message)}<br><button type="button" id="rereg">Probar de nuevo</button></p>`;$("#rereg").onclick=registro}
+  finally{cargando(-1)}
 }
+// ---- arranque (al final, cuando ya existe todo lo de arriba) ----
+if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
 </script></main></body></html>
