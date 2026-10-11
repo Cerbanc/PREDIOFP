@@ -10,7 +10,7 @@ a = Analysis(
     [os.path.join(raiz, 'predio_launcher.py')],
     pathex=[raiz],
     datas=[(os.path.join(raiz, 'predio', 'web'), os.path.join('predio', 'web'))],
-    hiddenimports=collect_submodules('openpyxl'),
+    hiddenimports=collect_submodules('openpyxl') + collect_submodules('predio'),     # predio.*: incluye los proveedores de remito que se cargan por nombre
     excludes=['tkinter', 'unittest', 'pydoc', 'test', 'distutils', 'setuptools', 'pip', 'numpy', 'pandas', 'matplotlib', 'PIL'],
     noarchive=False,
 )

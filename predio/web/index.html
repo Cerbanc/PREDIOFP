@@ -157,16 +157,18 @@ textarea.in{resize:vertical}
 .ab b{font-variant-numeric:tabular-nums;color:var(--good)}
 .ab button{border:0;background:transparent;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px}
 /* Carga de stock por foto de remito */
-.modal.xwide{width:min(1120px,100%)}
+.modal.wide.xwide{width:min(1120px,100%)}
 .rm-leyendo{display:flex;gap:14px;align-items:center;padding:18px 4px}
 .rm-spin{flex:none;width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:rm-giro .9s linear infinite}
 @keyframes rm-giro{to{transform:rotate(360deg)}}
+.rm-ruta{overflow-wrap:anywhere;word-break:break-all}
 .rm-pasos{margin:8px 0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
 .rm-tabla{display:flex;flex-direction:column}
-.rm-head,.rm-row{display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1.15fr) minmax(0,1.45fr) 118px;grid-template-areas:"c t p q e";gap:10px;align-items:center}
-.rm-head{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 6px;border-bottom:1px solid var(--line)}
-.rm-row{padding:9px 0;border-bottom:1px dashed var(--line)}
-.rm-row.off{opacity:.62}
+.rm-head,.rm-row{display:grid;grid-template-columns:26px minmax(120px,1fr) minmax(160px,1.1fr) 404px 128px;grid-template-areas:"c t p q e";gap:10px;align-items:center}
+.rm-head{font-size:12px;font-weight:700;color:var(--muted);padding:0 8px 6px;border-bottom:1px solid var(--line)}
+.rm-row{padding:9px 8px;border-bottom:1px dashed var(--line);border-radius:8px}
+.rm-row.w{background:var(--warn-soft)}
+.rm-row.r{background:var(--bad-soft)}
 .rm-ck{grid-area:c;width:20px;height:20px;accent-color:var(--accent)}
 .rm-t{grid-area:t;min-width:0}.rm-p{grid-area:p;min-width:0}.rm-q{grid-area:q}.rm-e{grid-area:e}
 .rm-t code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
@@ -175,13 +177,14 @@ textarea.in{resize:vertical}
 .rm-pick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rm-pick.vacio{border-color:var(--bad);color:var(--bad)}
 .rm-q{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.rm-q .in{width:auto;padding:7px 8px}
-.rm-q input{width:62px}.rm-q select{width:106px}
+.rm-q .in{padding:7px 8px}
+.rm-q input.in{width:64px}.rm-q select.in{width:112px}
 .rm-eq{white-space:nowrap}
 .rm-pop{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;padding:8px;gap:6px}
 .rm-opts{overflow:auto;display:flex;flex-direction:column}
 .rm-opt{display:flex;justify-content:space-between;gap:10px;border:0;background:transparent;padding:7px 8px;border-radius:6px;text-align:left;cursor:pointer}
 .rm-opt:hover,.rm-opt:focus{background:var(--accent-soft)}.rm-opt.sel{font-weight:700}
+.rm-vacio{padding:8px;color:var(--muted);font-size:13px}
 .rm-sec{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 8px 2px}
 .total-row b{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 
@@ -268,7 +271,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 
 @media (max-width:980px){
   .rm-head{display:none}
-  .rm-head,.rm-row{grid-template-columns:26px minmax(0,1fr) 118px;grid-template-areas:"c t e" ". p p" ". q q"}
+  .rm-head,.rm-row{grid-template-columns:26px minmax(0,1fr) 128px;grid-template-areas:"c t e" ". p p" ". q q"}
   .pos,main>.pos{grid-template-columns:1fr;flex:none}
   .grid{overflow:visible;flex:none}
   .pos-r{min-height:380px}
@@ -2322,7 +2325,7 @@ function rmSinClave(e) {
   const pasos = e.config_rota ? `<div class="note warn">${esc(e.error)}</div>` : `<p>Para leer la foto de un remito hace falta una <b>clave gratis de Google</b>. Se saca una sola vez y no cuesta nada:</p>
     <ol class="rm-pasos"><li>Entrá a <b>aistudio.google.com/apikey</b> con una cuenta de Gmail.</li>
     <li>Tocá <b>Crear clave de API</b> y copiala.</li>
-    <li>Abrí con el Bloc de notas el archivo <b>${archivo}</b>, buscá la línea <b>"gemini_clave"</b> y pegá la clave entre las comillas, sin espacios.</li>
+    <li>Abrí con el Bloc de notas el archivo <b class="rm-ruta">${archivo}</b>, buscá la línea <b>"gemini_clave"</b> y pegá la clave entre las comillas, sin espacios.</li>
     <li>Guardá el archivo y tocá <b>Ya la pegué</b>.</li></ol>`;
   modal({ title: 'Falta la clave de Google', onClose: rmCancelar,
     body: `${pasos}<p class="muted" style="font-size:12px">La foto del remito se manda a Google para que la lea; no se manda nada más. El plan gratis tiene un límite de lecturas por minuto y por día.</p>`,
@@ -2361,7 +2364,7 @@ async function rmLeer() {
   const R = UI.rm; if (!R || !R.archivo) { toast('Elegí primero la foto', 'warn'); return; }
   R.cancelado = false; R.ctrl = new AbortController();
   modal({ title: 'Leyendo el remito…', onClose: rmCancelar,
-    body: `<div class="rm-leyendo" id="rm-leyendo" role="status"><span class="rm-spin"></span><div><b>Leyendo el remito…</b><p class="muted">Puede tardar unos segundos. Mientras tanto la pantalla sigue andando.</p></div></div>`,
+    body: `<div class="rm-leyendo" id="rm-leyendo" role="status"><span class="rm-spin"></span><p class="muted">Puede tardar unos segundos. Mientras tanto la pantalla sigue andando.</p></div>`,
     actions: [{ label: 'Cancelar', onClick: rmCancelar }] });
   let blob, r, d;
   try { blob = await rmReducir(R.archivo); }
@@ -2417,7 +2420,7 @@ function rmFilaHtml(l, i) {
 }
 function rmPintarTabla() {
   const R = UI.rm; rmCerrarPop();
-  modal({ title: 'Revisá lo que leyó antes de cargar', wide: true, onClose: rmCancelar,
+  modal({ title: 'Revisá lo que leyó antes de cargar', wide: true, onClose: () => { rmCancelar(); toast('Se cerró la revisión del remito: no se cargó nada', 'warn'); },
     body: `${R.yaCargado ? `<div class="note warn" id="rm-dup"><b>Ojo:</b> este mismo remito ya se cargó hoy a las ${hhmm(R.yaCargado.ts)}. Si lo cargás de nuevo, el stock se suma dos veces.</div>` : ''}
       <p class="muted">A la izquierda, lo que dice el remito. <b>Verde</b>: el producto parece seguro. <b>Amarillo</b>: revisalo y tildá el renglón si está bien. <b>Rojo</b>: elegí el producto. Sólo se carga lo que queda tildado.</p>
       <div class="rm-tabla" id="rm-tabla"><div class="rm-head"><span></span><span>Dice el remito</span><span>Producto</span><span>Cantidad</span><span>Estado</span></div>${R.lineas.map(rmFilaHtml).join('')}</div>
@@ -2439,8 +2442,6 @@ function rmAvisos(l, p) {
 }
 function rmPintarFila(i) {
   const R = UI.rm, l = R.lineas[i], p = l.prodId ? prod(l.prodId) : null, u = rmUnidades(l), set = (id, f) => { const e = $('#' + id); if (e) f(e); };
-  const ok = !!(l.cargar && p && u > 0);
-  set('rm-r-' + i, e => e.classList.toggle('off', !ok));
   set('rm-p-' + i, b => { b.querySelector('span').textContent = p ? p.nombre : 'Elegí el producto'; b.classList.toggle('vacio', !p); });
   set('rm-ck-' + i, c => { c.checked = !!(l.cargar && p); c.disabled = !p; });
   set('rm-m-' + i, s => { s.value = l.pres; });
@@ -2450,6 +2451,7 @@ function rmPintarFila(i) {
   set('rm-s-' + i, s => {
     const [k, t] = !p ? ['bad', 'elegí el producto'] : l.confirmado ? ['good', l.estado === 'ninguno' ? 'elegido' : 'revisado'] : l.estado === 'seguro' ? ['good', 'seguro'] : ['warn', 'revisar'];
     s.className = 'pill ' + k; s.textContent = t;
+    const fila = $('#rm-r-' + i); if (fila) fila.className = 'rm-row' + (k === 'warn' ? ' w' : k === 'bad' ? ' r' : '');
   });
   set('rm-av-' + i, a => { const t = rmAvisos(l, p); a.textContent = t.join(' '); a.hidden = !t.length; });
 }
@@ -2457,7 +2459,7 @@ function rmResumen() {
   const R = UI.rm; let n = 0, u = 0, sin = 0;
   R.lineas.forEach(l => { const un = rmUnidades(l); if (l.cargar && l.prodId && un > 0) { n++; u += un; } else sin++; });
   const el = $('#rm-resumen');
-  if (el) el.innerHTML = n ? `Se van a cargar <b>${n}</b> renglón${n === 1 ? '' : 'es'} (<b>${u}</b> unidades).${sin ? ` <b>${sin}</b> quedan sin cargar: tildalos cuando los revises o elegí su producto.` : ''}` : 'Todavía no hay ningún renglón tildado para cargar.';
+  if (el) el.innerHTML = n ? `Se van a cargar <b>${n}</b> ${n === 1 ? 'renglón' : 'renglones'} (<b>${u}</b> unidades).${sin ? ` <b>${sin}</b> quedan sin cargar: tildalos cuando los revises o elegí su producto.` : ''}` : 'Todavía no hay ningún renglón tildado para cargar.';
   const b = $('#mact-1'); if (b) b.disabled = !n;
 }
 function rmCambio(el) {
@@ -2490,7 +2492,7 @@ function rmCargar(forzar) {
   const ref = 'remito:' + R.huella.slice(0, 16), total = sum(lista, x => x.u);
   const r = tx(() => lista.forEach(x => moverStock(x.l.prodId, x.u, 'ingreso', { ref, motivo: 'Remito (foto) · ' + x.l.texto.slice(0, 80) })));
   if (!r.ok) return false;
-  toast(`Se cargaron ${lista.length} renglón${lista.length === 1 ? '' : 'es'} al stock (${total} unidades)`);
+  toast(`Se cargaron ${lista.length} ${lista.length === 1 ? 'renglón' : 'renglones'} al stock (${total} unidades)`);
   UI.rm = null; render();
 }
 /* Menú para elegir el producto de un renglón: parecidos primero y búsqueda por nombre */
@@ -2515,10 +2517,10 @@ function rmFiltrarPop() {
     const par = l.cands.map(c => prod(c.id)).filter(Boolean);
     if (par.length) html += '<div class="rm-sec">Los más parecidos</div>' + par.map(p => op(p, true)).join('');
     html += '<div class="rm-sec">Todos los productos</div>' + todos.slice().sort(orden).slice(0, 80).map(p => op(p)).join('');
-    if (todos.length > 80) html += '<div class="rm-sec">Escribí arriba para buscar entre los demás</div>';
+    if (todos.length > 80) html += '<div class="rm-vacio">Escribí arriba para buscar entre los demás</div>';
   } else {
     const ws = q.split(/\s+/), hit = todos.filter(p => { const n = norm(p.nombre); return ws.every(w => n.includes(w)); }).sort((a, b) => (norm(a.nombre).startsWith(ws[0]) ? 0 : 1) - (norm(b.nombre).startsWith(ws[0]) ? 0 : 1) || orden(a, b));
-    html = hit.slice(0, 60).map(p => op(p)).join('') || '<div class="rm-sec">No hay productos con ese nombre</div>';
+    html = hit.slice(0, 60).map(p => op(p)).join('') || '<div class="rm-vacio">No hay productos con ese nombre</div>';
   }
   $('#rm-opts').innerHTML = html;
 }

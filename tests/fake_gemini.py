@@ -42,6 +42,10 @@ class GeminiFalso:
             def do_POST(self):          # noqa: N802
                 n = int(self.headers.get("Content-Length") or 0)
                 crudo = self.rfile.read(n)
+                if self.path == "/__forzar":        # para que una prueba con navegador (otro proceso) pueda pedir una respuesta puntual
+                    pedido = json.loads(crudo)
+                    falso.forzar(pedido.get("estado", 200), pedido.get("cuerpo", {}), pedido.get("demora", 0.0))
+                    return self._responder(200, {"ok": True})
                 try:
                     cuerpo = json.loads(crudo)
                 except ValueError:
@@ -58,11 +62,15 @@ class GeminiFalso:
                 else:
                     time.sleep(retardo)
                     estado, cuerpo_resp = 200, respuesta_gemini(falso.items)
+                self._responder(estado, cuerpo_resp)
+
+            def _responder(self, estado, cuerpo_resp):
                 datos = (cuerpo_resp if isinstance(cuerpo_resp, str) else json.dumps(cuerpo_resp)).encode("utf-8")
                 try:
                     self.send_response(estado)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(datos)))
+                    self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
                     self.wfile.write(datos)
                 except (BrokenPipeError, ConnectionResetError):
