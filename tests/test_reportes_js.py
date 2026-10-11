@@ -34,7 +34,7 @@ def caja(abierta, resp="Ana", cerrada=True, dif=0, digital=None, nota=""):
 def calcular(tmp_path, filas, desde, hasta, hoy):
     (tmp_path / "reportes.mjs").write_text((RAIZ / "nube" / "src" / "reportes.js").read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "prueba.mjs").write_text(PRUEBA, encoding="utf-8")
-    r = subprocess.run(["node", "prueba.mjs"], cwd=tmp_path, input=json.dumps({"filas": filas, "desde": desde, "hasta": hasta, "hoy": hoy}), capture_output=True, text=True, timeout=60)
+    r = subprocess.run(["node", "prueba.mjs"], cwd=tmp_path, input=json.dumps({"filas": filas, "desde": desde, "hasta": hasta, "hoy": hoy}), capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
@@ -158,7 +158,7 @@ def test_el_enganche_del_servidor(tmp_path):
     (tmp_path / "reportes.mjs").write_text((RAIZ / "nube" / "src" / "reportes.js").read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "manejador.mjs").write_text(MANEJADOR, encoding="utf-8")
     filas = [{"dia": "2026-10-01", "r": dict(dia(100, 1), huella="aaa")}, {"dia": "2026-10-02", "r": dict(dia(200, 2), huella="bbb")}, {"dia": "2026-10-03", "r": dict(dia(300, 3), huella="ccc")}]
-    r = subprocess.run(["node", "manejador.mjs", json.dumps(filas)], cwd=tmp_path, capture_output=True, text=True, timeout=60)
+    r = subprocess.run(["node", "manejador.mjs", json.dumps(filas)], cwd=tmp_path, capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
     o = json.loads(r.stdout)
     assert o["otra_ruta"] is None                                              # lo que no es de reportes sigue su camino

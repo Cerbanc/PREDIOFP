@@ -470,6 +470,7 @@ def test_sin_internet_y_demasiado_lenta(gemini, monkeypatch):
         remito.leer_remito(PNG, "image/png", CATALOGO, ajustes())
     assert e.value.codigo == "timeout" and "tardó demasiado" in e.value.mensaje
     gemini.parar()
+    monkeypatch.setattr(remito, "TIMEOUT", 10)      # en Windows un puerto cerrado tarda más de 0,3 s en rechazar la conexión
     with pytest.raises(remito.ErrorRemito) as e:
         remito.leer_remito(PNG, "image/png", CATALOGO, ajustes())
     assert e.value.codigo == "sin_internet" and "No hay internet" in e.value.mensaje
