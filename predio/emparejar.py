@@ -48,7 +48,7 @@ _MEDIDAS = {
 }
 _NUM = r"\d+(?:[.,]\d+)?"
 _UNID = "|".join(sorted(_MEDIDAS, key=len, reverse=True))
-_RE_MILES = re.compile(rf"(?<![\d.,])(\d{{1,3}})\.(\d{{3}})(?=\s*(?:ml|cc|cm3|g|gr|grs|gramos)\b)")
+_RE_MILES = re.compile(r"(?<![\d.,])(\d{1,3})\.(\d{3})(?=\s*(?:ml|cc|cm3|g|gr|grs|gramos)\b)")
 _RE_NXM_TAM = re.compile(rf"(?<![\d.,])(\d+)\s*x\s*({_NUM})\s*({_UNID})\b")
 _RE_TAM = re.compile(rf"(?<![\d.,])({_NUM})\s*({_UNID})\b")
 _RE_NXM = re.compile(r"(?<![\d.,])(\d+)\s*x\s*(\d+)(?![\d.,]\d)")
@@ -179,7 +179,7 @@ def _distancia(a: str, b: str, tope: int) -> int:
     return prev[lb]
 
 
-@lru_cache(maxsize=300_000)
+@lru_cache(maxsize=120_000)
 def parecido(a: str, b: str) -> float:
     """Qué tan parecidas son dos palabras (0 a 1). Tolera tipeos y abreviaturas, pero no confunde palabras cortas."""
     if a == b:
@@ -238,6 +238,14 @@ def _cobertura(A: list[str], B: list[str], pa: list[float], pb: list[float]) -> 
     return ca, cb
 
 
+def paquete_de(producto: dict) -> int:
+    """Unidades por paquete que declara un producto (1 si no declara nada o el dato es raro)."""
+    try:
+        return max(1, int(float(producto.get("paqueteUnidades") or 1)))
+    except (TypeError, ValueError, OverflowError):
+        return 1
+
+
 @dataclass
 class _Producto:
     id: str
@@ -258,13 +266,10 @@ class Catalogo:
             a = analizar(nombre)
             extra = analizar(str(p.get("paqueteNombre") or ""))
             a.paquetes |= extra.paquetes
-            try:
-                paq = int(p.get("paqueteUnidades") or 1)
-            except (TypeError, ValueError):
-                paq = 1
+            paq = paquete_de(p)
             if paq >= 2:
                 a.paquetes.add(paq)
-            self.productos.append(_Producto(pid, nombre, a, max(1, paq)))
+            self.productos.append(_Producto(pid, nombre, a, paq))
         df: dict[str, int] = {}
         for p in self.productos:
             for w in set(p.analisis.palabras):

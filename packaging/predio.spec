@@ -6,11 +6,17 @@ from PyInstaller.utils.hooks import collect_submodules
 raiz = os.path.abspath(os.path.join(SPECPATH, '..'))
 icono = os.path.join(SPECPATH, 'predio.ico')
 
+# Los proveedores de lectura de remitos (predio/remito_<nombre>.py) se cargan por nombre desde configuracion.json: hay que meterlos todos.
+try:
+    propios = collect_submodules('predio')
+except Exception:
+    propios = []
+
 a = Analysis(
     [os.path.join(raiz, 'predio_launcher.py')],
     pathex=[raiz],
     datas=[(os.path.join(raiz, 'predio', 'web'), os.path.join('predio', 'web'))],
-    hiddenimports=collect_submodules('openpyxl') + collect_submodules('predio'),     # predio.*: incluye los proveedores de remito que se cargan por nombre
+    hiddenimports=collect_submodules('openpyxl') + propios,
     excludes=['tkinter', 'unittest', 'pydoc', 'test', 'distutils', 'setuptools', 'pip', 'numpy', 'pandas', 'matplotlib', 'PIL'],
     noarchive=False,
 )

@@ -698,11 +698,11 @@ def test_endpoint_traduce_los_errores_de_google(srv, gemini):
 
 def test_endpoint_una_lectura_a_la_vez(srv, gemini):
     gemini.items = []
-    gemini.retardo = 0.8
+    gemini.retardo = 1.5
     resultados = []
     hilo = threading.Thread(target=lambda: resultados.append(leer_foto(srv)))
     hilo.start()
-    time.sleep(0.3)
+    time.sleep(0.5)
     estado, r, _ = leer_foto(srv)
     hilo.join()
     assert estado == 409 and r["codigo"] == "ocupado" and resultados[0][0] == 200

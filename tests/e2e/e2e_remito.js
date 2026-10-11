@@ -224,6 +224,18 @@ const FOTOS = process.env.FOTOS || '';
   await page.locator('.modal header h3', { hasText: 'No se encontraron renglones' }).waitFor();
   await page.locator('.modal footer button', { hasText: 'Cerrar' }).click();
 
+  // una foto que no se puede abrir, y un archivo que no es una foto
+  await abrir();
+  await page.locator('#foto-file').setInputFiles({ name: 'nota.txt', mimeType: 'text/plain', buffer: Buffer.from('hola') });
+  await page.locator('.toast', { hasText: 'Ese archivo no es una foto' }).waitFor();
+  assert.strictEqual(await page.locator('#mact-1').isDisabled(), true);
+  await page.locator('#foto-file').setInputFiles({ name: 'rota.png', mimeType: 'image/png', buffer: Buffer.from('esto no es una imagen de verdad') });
+  await page.locator('#mact-1').click();
+  await page.locator('#rm-error').waitFor();
+  assert.ok(/No se pudo abrir esa foto/.test(await page.locator('#rm-error').innerText()));
+  assert.strictEqual(await page.locator('.modal footer button', { hasText: 'Probar de nuevo' }).count(), 0, 'repetir con la misma foto rota no sirve');
+  await page.locator('.modal footer button', { hasText: 'Cerrar' }).click();
+
   // ---- 7. cancelar mientras lee: no aparece nada después
   await abrir(); await elegirFoto(); await forzar(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ items: [{ texto: 'GRIP', cantidad: 1, presentacion: 'unidad', unidades_por_presentacion: null, producto_id: null, confianza: 0, dudoso: false }] }) }] } }] }, 1.5);
   await page.locator('#mact-1').click();
@@ -254,6 +266,11 @@ const FOTOS = process.env.FOTOS || '';
   await page.locator('#rm-tabla').waitFor({ timeout: 15000 });
   assert.strictEqual(await page.locator('.rm-head').isHidden(), true);
   await foto('8-angosta');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await ev(() => { document.documentElement.dataset.theme = 'dark'; });                // modo oscuro: los colores de estado se siguen leyendo
+  await foto('9-oscuro');
+  await ev(() => { delete document.documentElement.dataset.theme; });
+  await page.setViewportSize({ width: 900, height: 700 });
   const ancho = await ev(() => { const m = document.querySelector('#modal-root .modal'); return [m.scrollWidth, m.clientWidth]; });
   assert.ok(ancho[0] <= ancho[1] + 1, 'sin scroll horizontal: ' + ancho);
   await page.keyboard.press('Escape');

@@ -29,7 +29,7 @@ import urllib.request
 from pathlib import Path
 
 from .config import Rutas, leer_ajustes
-from .emparejar import SEPARACION_SEGURO, Catalogo, analizar
+from .emparejar import SEPARACION_SEGURO, Catalogo, analizar, paquete_de
 
 log = logging.getLogger("predio.remito")
 
@@ -155,8 +155,8 @@ def lista_de_productos(productos: list[dict]) -> str:
     filas = []
     for p in productos[:MAX_PRODUCTOS_EN_PROMPT]:
         como = ""
-        if int(p.get("paqueteUnidades") or 1) > 1:
-            como = f"{str(p.get('paqueteNombre') or 'Paquete').strip()[:40]} ({int(p['paqueteUnidades'])} u.)"
+        if paquete_de(p) > 1:
+            como = f"{str(p.get('paqueteNombre') or 'Paquete').strip()[:40]} ({paquete_de(p)} u.)"
         nombre = re.sub(r"\s+", " ", str(p.get("nombre") or "")).strip()[:80]
         filas.append(f"{str(p['id'])[:40]} | {nombre} | {como}")
     return "\n".join(filas)
@@ -397,7 +397,7 @@ def combinar(item: dict, local: dict, cat: Catalogo) -> tuple[str, str | None, l
 def resolver(items: list[dict], productos: list[dict]) -> list[dict]:
     """Renglones de la IA -> renglones listos para la pantalla (candidatos, estado, sugerido y unidades)."""
     cat = Catalogo(productos)
-    paquete = {str(p["id"]): max(1, int(p.get("paqueteUnidades") or 1)) for p in productos}
+    paquete = {str(p["id"]): paquete_de(p) for p in productos}
     lineas = []
     for it in items:
         estado, sugerido, cands = combinar(it, cat.buscar(it["texto"]), cat)
