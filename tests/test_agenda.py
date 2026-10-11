@@ -643,7 +643,11 @@ def test_las_semillas_de_la_nube_y_su_migracion_dejan_los_mismos_horarios(tmp_pa
     viejo.executescript("""INSERT INTO canchas VALUES ('f5a','f5a','Fútbol 5 · Cancha 1','futbol',60,600,1440,31000,26000,1), ('f5b','f5b','Fútbol 5 · Cancha 2','futbol',60,600,1440,31000,26000,2),
         ('f7','f7','Fútbol 7 · Cancha completa','futbol',60,600,1440,50000,45000,3), ('padelT','padelT','Pádel · Techada','padel',90,480,1440,27000,23000,4),
         ('padelA','padelA','Pádel · Abierta','padel',90,480,1440,23000,20000,5);""")
-    viejo.executescript(sql_migracion)
+    for sentencia in [x.strip() for x in sql_migracion.split(";") if x.strip()]:      # las columnas de turnos web ya vienen en el schema: «duplicate column» es lo esperado
+        try:
+            viejo.execute(sentencia)
+        except sqlite3.OperationalError as e:
+            assert "duplicate column" in str(e), e
     assert {r[0]: tuple(r[1:]) for r in viejo.execute("SELECT id, nombre, dur, ap, ci FROM canchas")} == esperado
     assert {r[0]: (r[1], r[2]) for r in viejo.execute("SELECT id, precio, precio_fijo FROM canchas")}["padelT"] == (27000, 23000)
     assert {r[0]: (r[1], r[2]) for r in viejo.execute("SELECT id, precio, precio_fijo FROM canchas")}["f5a"] == (31000, 26000)
@@ -678,6 +682,12 @@ def test_un_guardado_que_no_toca_turnos_no_revisa_las_agendas_y_uno_que_si_las_r
     # un turno que cambia: se rehace la agenda de ese día y sólo esa
     rev = pedir(srv, "GET", "/api/estado")[1]["rev"]
     assert pedir(srv, "POST", "/api/guardar", {"base_rev": rev, "usuario": "Marcos", "ops": [turno("t1", "cn_f5a", 1140, "Segundo", fecha=hoy.isoformat())]})[0] == 200
-    assert esperar(lambda: llamadas == [hoy.isoformat()])
-    ws = load_workbook(diario.ruta_agenda(hoy.isoformat()))["Agenda"]
-    assert reservas(ws, mapa(ws)["F"]["19 Hs"])[0] == "Segundo"
+    assert esperar(lambda: llamadas == [hoy.isoformat()])      # la cuenta se anota al empezar a armar; el archivo se escribe un instante después
+
+    def nombre_en_la_agenda():
+        try:
+            ws = load_workbook(diario.ruta_agenda(hoy.isoformat()))["Agenda"]
+            return reservas(ws, mapa(ws)["F"]["19 Hs"])[0]
+        except Exception:      # noqa: BLE001 - el archivo puede estar a medio reemplazar
+            return None
+    assert esperar(lambda: nombre_en_la_agenda() == "Segundo")
