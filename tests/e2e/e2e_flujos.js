@@ -165,6 +165,41 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.waitForFunction(n => __pos.DB.productos.length === n - 1, antes);
   assert.ok((await audit('Producto')).some(t => /elimin|borr/i.test(t)), 'eliminar queda anotado');
 
+  // ---- 4d. turnos dentro del programa: se suman a la cancha, y al terminar la cuenta pasa a una mesa suelta
+  assert.ok(await ev(() => __pos.DB.config.usarTurnos), 'los turnos vienen activados');
+  assert.ok(await page.locator('[data-act=nav][data-v=turnos]').count(), 'el menú tiene Turnos');
+  await page.locator('[data-act=nav][data-v=turnos]').click();
+  await page.waitForTimeout(300);
+  assert.ok(await page.locator('.slot').count() > 5, 'se ve el calendario: ' + await ev(() => JSON.stringify([__pos.UI.view, __pos.DB.canchas.length, document.querySelector('#main').innerText.slice(0, 120)])));
+  await ev(() => { __pos.tx(() => { __pos.DB.mesas.push({ id: 'mfut1', nombre: 'FÚTBOL 1', tipo: 'futbol', x: 2, y: 3, w: 26, h: 20, rapido: false }); const c5 = __pos.DB.canchas.find(x => x.clave === 'f5a'); c5.lugarId = 'mfut1'; c5.ap = 0; }); });      // ap = 0: la prueba corre a cualquier hora del día
+  const tid = await ev(() => {
+    const c = __pos.DB.canchas.find(x => x.clave === 'f5a'), now = new Date(), min = now.getHours() * 60 + now.getMinutes();
+    const ini = Math.floor(min / 60) * 60;       // el turno de esta hora: ya empezó
+    let id; __pos.tx(() => { id = __pos.crearTurno({ canchaId: c.id, fecha: __pos.dayKey(Date.now()), ini, cliente: 'Los Pibes', tel: '', nota: '', pagos: [] }); });
+    return id;
+  });
+  await ev(() => { __pos.revisarTurnos(); });
+  const lugar = await ev(id => { const c = __pos.DB.canchas.find(x => x.clave === 'f5a'); const k = c.lugarId; return { k, tiene: __pos.DB.comandas[k] && __pos.DB.comandas[k].items.some(i => i.turnoId === id) }; }, tid);
+  assert.ok(lugar.tiene, 'el turno que empezó se sumó a la cuenta de la cancha');
+  await ev(k => { __pos.tx(() => { const c = __pos.DB.comandas[k]; c.items.push({ prodId: __pos.DB.productos[0].id, cant: 1, nota: '' }); c.turnoFin = Date.now() - 1000; }); }, lugar.k);
+  const ms0 = await ev(() => __pos.DB.mesas.length);
+  await ev(() => { __pos.revisarTurnos(); });
+  assert.strictEqual(await ev(() => __pos.DB.mesas.length), ms0 + 1, 'al terminar el turno con la cuenta abierta se abre una mesa suelta');
+  assert.ok(await ev(() => __pos.DB.mesas.some(m => m.temporal && /FÚTBOL 1/.test(m.nombre))), 'con el nombre de la cancha y la hora');
+  // un turno que llega de la nube (lo escribe la sincronización en el servidor) se suma a la pantalla sin recargar
+  const extra = await ev(() => {
+    const c = __pos.DB.canchas.find(x => x.clave === 'f5b');
+    const doc = { id: 'tnube1', canchaId: c.id, fecha: __pos.dayKey(Date.now() + 2 * 864e5), ini: 1200, fin: 1260, cliente: 'Del celular', tel: '', nota: '', precio: 28000, estado: 'reservado', pagos: [], ventaId: null, esFijo: false, fijoId: null, ocurrencia: null, clienteId: null, tipoPrecio: 'comun' };
+    return http('POST', '/api/guardar', { base_rev: null, usuario: 'Nube (celular)', ops: [{ c: 'turnos', id: 'tnube1', d: doc }], formas: {} }).ok;
+  });
+  assert.strictEqual(extra, true);
+  assert.ok(!(await ev(() => __pos.DB.turnos.some(t => t.id === 'tnube1'))), 'todavía no está en pantalla');
+  assert.ok(await ev(() => __pos.refrescarDesdeLaNube()), 'la pantalla detecta el cambio');
+  assert.ok(await ev(() => __pos.DB.turnos.some(t => t.id === 'tnube1' && t.cliente === 'Del celular')), 'y lo suma');
+  assert.ok(!(await ev(() => __pos.refrescarDesdeLaNube())), 'sin novedades no repinta');
+  await ev(() => { __pos.tx(() => { __pos.DB.config.pedirPinAjuste = !__pos.DB.config.pedirPinAjuste; }); });      // una venta/guardado cualquiera sigue andando después
+  await ev(() => { __pos.tx(() => { __pos.DB.config.pedirPinAjuste = !__pos.DB.config.pedirPinAjuste; }); });
+
   // ---- 5. borrar el historial: pide escribir BORRAR, hace copia y deja los productos
   await page.locator('[data-act=nav][data-v=admin]').click();
   await page.locator('[data-act=adm-entrar]').click();

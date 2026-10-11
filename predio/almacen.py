@@ -193,6 +193,32 @@ class Almacen:
         return doc
 
     # ---------------------------------------------------------------- escritura
+    @staticmethod
+    def _sin_choque(con, ops: list, base_rev: int, rev0: int) -> bool:
+        """La pantalla quedó una versión atrás (p. ej. la sincronización con la nube cargó turnos mientras tanto). Si lo que quiere
+        guardar no toca ningún registro que haya cambiado después, no hay riesgo de pisar nada. Una pantalla más NUEVA que la base
+        (la base se restauró de una copia) siempre choca."""
+        if base_rev > rev0:
+            return False
+        for op in ops:
+            if not isinstance(op, dict) or "c" not in op or "id" not in op:
+                return False
+            fila = con.execute("SELECT 1 FROM docs WHERE coleccion = ? AND id = ? AND rev > ?", (op["c"], str(op["id"]), base_rev)).fetchone()
+            if fila:
+                return False
+        return True
+
+    def cambios_desde(self, rev: int, colecciones: tuple[str, ...]) -> dict:
+        """Registros de `colecciones` que cambiaron después de la versión `rev` (para que la pantalla los sume sin recargar).
+        `otros` avisa si cambió algo más: en ese caso la pantalla no puede dar por buena la versión nueva."""
+        marcas = ",".join("?" for _ in colecciones)
+        with self.db.lock:
+            actual = int(self.db.meta("rev", "0") or 0)
+            docs = [{"c": r[0], "id": r[1], "d": json.loads(r[2])} for r in self.db.con.execute(
+                f"SELECT coleccion, id, data FROM docs WHERE rev > ? AND coleccion IN ({marcas}) ORDER BY seq", (rev, *colecciones))]
+            otros = self.db.con.execute(f"SELECT 1 FROM docs WHERE rev > ? AND coleccion NOT IN ({marcas}) LIMIT 1", (rev, *colecciones)).fetchone() is not None
+        return {"rev": actual, "docs": docs, "otros": otros}
+
     def aplicar(self, payload: dict, usuario: str = "Caja", base_rev: int | None = None) -> dict:
         ops = payload.get("ops") or []
         formas_nuevas = payload.get("formas") or {}
@@ -204,7 +230,7 @@ class Almacen:
         dias: set[str] = {dia_de(ts)}
         with self.db.transaccion() as con:
             rev0 = self.rev(con)
-            if base_rev is not None and int(base_rev) != rev0:
+            if base_rev is not None and int(base_rev) != rev0 and not self._sin_choque(con, ops, int(base_rev), rev0):
                 raise ConflictoDeRevision(rev0)
             formas = self.formas(con)
             hubo_formas = False

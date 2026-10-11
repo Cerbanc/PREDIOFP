@@ -204,6 +204,8 @@ class Manejador(BaseHTTPRequestHandler):
             ("GET", "/api/salud"): self.api_salud,
             ("GET", "/api/nube"): self.api_nube_estado,
             ("POST", "/api/nube/subir"): self.api_nube_subir,
+            ("POST", "/api/nube/sincronizar"): self.api_nube_sincronizar,
+            ("GET", "/api/cambios"): self.api_cambios,
             ("GET", "/api/auditoria"): self.api_auditoria,
             ("GET", "/api/copias"): self.api_copias,
             ("POST", "/api/copias/crear"): self.api_copia_crear,
@@ -287,8 +289,12 @@ class Manejador(BaseHTTPRequestHandler):
             raise Error(400, f"Pedido de guardado inválido: {e}") from None
         if res["cambios"]:
             self.app.diario.marcar(res["dias"])
-            if self.app.nube is not None and any(isinstance(o, dict) and o.get("c") == "cajas" for o in cuerpo.get("ops") or []):
-                self.app.nube.empujar()          # se abrió o cerró una caja: el reporte sube enseguida
+            if self.app.nube is not None:
+                cols = {o.get("c") for o in cuerpo.get("ops") or [] if isinstance(o, dict)}
+                if "cajas" in cols:
+                    self.app.nube.empujar()          # se abrió o cerró una caja: el reporte sube enseguida
+                if cols & {"turnos", "fijos", "canchas", "comandas"}:
+                    self.app.nube.turnos.empujar()   # cambió algo de los turnos: se sincroniza con la nube enseguida
         self._json(200, {"ok": True, "rev": res["rev"], "reemplazos": res["reemplazos"]})
 
     def api_latido(self, q: dict) -> None:
@@ -297,6 +303,22 @@ class Manejador(BaseHTTPRequestHandler):
 
     def api_nube_estado(self, q: dict) -> None:
         self._json(200, self.app.nube.estado())
+
+    def api_cambios(self, q: dict) -> None:
+        """Lo que cambió desde `rev` en turnos y canchas (cargado por la sincronización): la pantalla lo suma sin recargarse."""
+        try:
+            rev = int((q.get("rev") or ["0"])[0])
+        except ValueError:
+            raise Error(400, "Versión inválida") from None
+        self._json(200, self.app.almacen.cambios_desde(rev, ("turnos", "fijos", "canchas")))
+
+    def api_nube_sincronizar(self, q: dict) -> None:
+        self._leer_cuerpo(10_000)
+        nube = self.app.nube
+        if not nube.activa:
+            raise Error(400, "La nube no está configurada: faltan nube_url y nube_token en configuracion.json.")
+        ok = nube.turnos.sincronizar()
+        self._json(200, {"ok": ok, **nube.estado()})
 
     def api_nube_subir(self, q: dict) -> None:
         self._leer_cuerpo(10_000)

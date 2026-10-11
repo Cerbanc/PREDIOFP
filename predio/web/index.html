@@ -444,7 +444,7 @@ function http(metodo, ruta, cuerpo, cabeceras) {
   }
   Object.entries(cabeceras || {}).forEach(([k, v]) => x.setRequestHeader(k, v));
   try { x.send(datos); }
-  catch (e) { const er = new Error('No se pudo hablar con el programa (¿se cerró?). Lo último NO se guardó.'); er.red = true; throw er; }
+  catch (e) { const er = new Error('No se pudo hablar con el programa (¿se cerró?). Lo último NO se guardó.'); er.red = true; programaCaido(); throw er; }
   let r = null;
   try { r = JSON.parse(x.responseText); } catch (e) { /* la respuesta no era JSON */ }
   if (x.status >= 200 && x.status < 300 && !(r && r.ok === false)) return r;
@@ -452,6 +452,27 @@ function http(metodo, ruta, cuerpo, cabeceras) {
   er.estado = x.status; er.conflicto = !!(r && r.conflicto);
   if (x.status === 403 || er.conflicto) pantallaVieja(er.message);
   throw er;
+}
+/* Si el programa se cerró o se está actualizando, esta ventana queda sin servidor. En vez de seguir dando errores, espera y se reconecta sola:
+   apenas el programa vuelve a responder (aunque sea uno nuevo, con otra clave de sesión) se recarga la pantalla. */
+let CAIDO_DESDE = 0;
+function programaCaido() {
+  if (CAIDO_DESDE) return;
+  CAIDO_DESDE = Date.now();
+  const tapa = document.createElement('div');
+  tapa.id = 'programa-caido'; tapa.className = 'scrim'; tapa.style.zIndex = '400';
+  tapa.innerHTML = '<div class="modal"><header><h3>El programa no responde</h3></header><div class="mbody"><p id="pc-msg">Si se está actualizando o reiniciando, esperá: esta ventana se vuelve a conectar sola en unos segundos. Lo último que no llegó a guardarse no se aplicó.</p></div><footer><button class="btn" id="pc-cerrar">Cerrar esta ventana</button></footer></div>';
+  document.body.appendChild(tapa);
+  tapa.querySelector('#pc-cerrar').onclick = () => { window.close(); };
+  const reintentar = () => {
+    fetch('/', { cache: 'no-store' }).then(r => {
+      if (r.ok) { window.__recargando = true; location.reload(); } else setTimeout(reintentar, 2500);
+    }).catch(() => {
+      if (Date.now() - CAIDO_DESDE > 60000) { const m = document.getElementById('pc-msg'); if (m) m.textContent = 'El programa sigue sin responder. Cerrá esta ventana y abrí "Caja del Predio" desde el ícono del escritorio (los datos están a salvo).'; }
+      setTimeout(reintentar, 2500);
+    });
+  };
+  setTimeout(reintentar, 1500);
 }
 function pantallaVieja(msg) {
   if (document.getElementById('pantalla-vieja')) return;
@@ -587,8 +608,17 @@ function normalizar() {
   DB.caja = DB.caja || []; DB.canchas = DB.canchas || []; DB.turnos = DB.turnos || []; DB.fijos = DB.fijos || []; DB.log = DB.log || [];
   DB.config = DB.config || { pedirPinAjuste: true };
   if (DB.config.usarTurnos === undefined) DB.config.usarTurnos = true;
+  if (SERVIDOR && !DB.config.turnosActivados) { DB.config.usarTurnos = true; DB.config.turnosActivados = true; }     // desde la versión 1.5 los turnos están en el programa
   DB.config.paisWa = DB.config.paisWa || '54';
   DB.config.msgTurno = DB.config.msgTurno || 'Hola {nombre}! Te recordamos tu turno de {cancha} el {fecha} a las {hora}. ¡Te esperamos!';
+  if (SERVIDOR && !DB.canchas.length) {            // base sin canchas (p. ej. armada a mano): se cargan las del predio, con su lugar en el mapa si existe
+    const lugar = n => { const m = DB.mesas.find(x => norm(x.nombre) === norm(n)); return m ? m.id : null; };
+    const cat = n => { const c = DB.categorias.find(x => norm(x.nombre) === norm(n)); return c ? c.id : null; };
+    [['f5a', 'Fútbol 5 · Cancha 1', 'futbol', 60, 600, 28000, 24000, 'FÚTBOL 1'], ['f5b', 'Fútbol 5 · Cancha 2', 'futbol', 60, 600, 28000, 24000, 'FÚTBOL 2'],
+     ['f7', 'Fútbol 7 · Cancha completa', 'futbol', 60, 600, 48000, 42000, 'FÚTBOL 1'], ['padelT', 'Pádel · Techada', 'padel', 90, 480, 26000, 22000, 'PÁDEL 1'],
+     ['padelA', 'Pádel · Abierta', 'padel', 90, 480, 22000, 19000, 'PÁDEL 2']].forEach(([clave, nombre, deporte, dur, ap, precio, precioFijo, sitio]) =>
+      DB.canchas.push({ id: uid('cn'), clave, nombre, deporte, dur, ap, ci: 1440, precio, precioFijo, catId: cat(deporte === 'padel' ? 'Pádel' : 'Fútbol'), lugarId: lugar(sitio) }));
+  }
   DB.cajas = DB.cajas || []; DB.movCaja = DB.movCaja || []; DB.clientes = DB.clientes || []; DB.cc = DB.cc || [];
   DB.mesas.forEach(m => { m.tipo = m.tipo || 'mesa'; m.w = m.w || 14; m.h = m.h || 17; });
 }
@@ -1126,7 +1156,7 @@ function revisarTurnos() {
 
 /* ---------- base inicial: lo mínimo para empezar a trabajar (sin productos, ventas ni clientes) ---------- */
 function crearBase() {
-  const d = { v: 7, seq: 1, pin: '1234', negocio: 'Predio Deportivo', config: { pedirPinAjuste: true, usarTurnos: !SERVIDOR || PREDIO.modo === 'demo', paisWa: '54', msgTurno: 'Hola {nombre}! Te recordamos tu turno de {cancha} el {fecha} a las {hora}. ¡Te esperamos!' }, cajas: [], movCaja: [], clientes: [], cc: [], categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], fijos: [], log: [], contadores: { venta: 0 } };
+  const d = { v: 7, seq: 1, pin: '1234', negocio: 'Predio Deportivo', config: { pedirPinAjuste: true, usarTurnos: true, paisWa: '54', msgTurno: 'Hola {nombre}! Te recordamos tu turno de {cancha} el {fecha} a las {hora}. ¡Te esperamos!' }, cajas: [], movCaja: [], clientes: [], cc: [], categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], fijos: [], log: [], contadores: { venta: 0 } };
   DB = d;
   const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
   const met = (nombre, efectivo, fiado) => { const m = { id: uid('mp'), nombre, activo: true, efectivo: !!efectivo, fiado: !!fiado }; d.metodos.push(m); return m.id; };
@@ -1813,8 +1843,7 @@ function renderSide() {
   const aviso = SERVIDOR
     ? `${PREDIO.modo === 'demo' ? '<div class="demo-tag">Modo demostración: datos de ejemplo, separados de los reales.</div>' : ''}
        <div class="guardado ${ESTADO_GUARDADO.ok ? 'ok' : 'mal'}" id="estado-guardado">${esc(textoGuardado())}</div>
-       <button data-act="carpeta-dia" title="Abre la carpeta con el Excel y el registro de cambios de hoy">${ic('carpeta')}<b>Carpeta de hoy</b></button>
-       ${DB.config.usarTurnos ? '' : `<button data-act="nube-abrir" data-p="/turnos" title="Abre el calendario de turnos en la web (hace falta internet)">${ic('cal')}<b>Turnos (web)</b></button>`}`
+       <button data-act="carpeta-dia" title="Abre la carpeta con el Excel y el registro de cambios de hoy">${ic('carpeta')}<b>Carpeta de hoy</b></button>`
     : `<div class="demo-tag">Prototipo con datos de ejemplo. Se guarda sólo en este navegador.</div>
        ${STORAGE_OK ? '' : '<div class="demo-tag" style="background:var(--bad-soft);color:var(--bad)">Este navegador no deja guardar: al recargar se pierde todo.</div>'}`;
   $('#side-foot').innerHTML = aviso + `<button data-act="tema" aria-label="Cambiar entre modo claro y oscuro">${ic('tema')}<b>Claro / Oscuro</b></button>` +
@@ -1991,15 +2020,44 @@ views.turnos = () => {
   const dia = turnosDelDia(f);
   const heads = cs.map(c => `<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)} · fijo ${money(c.precioFijo)}</small>${c.clave === 'f7' ? '<small>ocupa también las dos de Fútbol 5</small>' : CLAVES_F5.includes(c.clave) ? '<small>si se usa, no hay Fútbol 7</small>' : ''}</div>`).join('');
   const cols = cs.map(c => `<div class="ccol" style="height:${H}px">${slotsDe(c).map(s => slotHTML(c, s, f, ap, hoy, ahora)).join('')}</div>`).join('');
-  $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos (${dia.filter(t => t.esFijo).length} fijos)</p></div>
+  $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos (${dia.filter(t => t.esFijo).length} fijos) ${sincroTexto()}</p></div>
     <div class="row"><button class="icon" data-act="tur-dia" data-d="-1" aria-label="Día anterior">‹</button><input class="in" style="width:auto" type="date" data-in="turf" value="${f}" aria-label="Fecha">
-      <button class="icon" data-act="tur-dia" data-d="1" aria-label="Día siguiente">›</button><button class="btn sm ghost" data-act="tur-hoy">Hoy</button></div></header>
+      <button class="icon" data-act="tur-dia" data-d="1" aria-label="Día siguiente">›</button><button class="btn sm ghost" data-act="tur-hoy">Hoy</button>${SERVIDOR ? '<button class="btn sm" data-act="tur-sync" title="Trae los turnos cargados desde el celular y sube los de acá">Sincronizar</button>' : ''}</div></header>${sincroProblemas()}
     <div class="cal-wrap" id="cal-wrap"><div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(150px,1fr));--hp:${HP}px">
       <div class="chead corner"></div>${heads}
       <div class="tcol" style="height:${H}px">${horas.map((m, i) => `<span style="top:${i * HP}px">${hm(m)}</span>`).join('')}</div>${cols}</div></div>
     <div class="legend"><span><span class="pill">libre</span> tocá para reservar</span><span><span class="pill good">fútbol</span></span><span><span class="pill" style="background:var(--info-soft);color:var(--info)">pádel</span></span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos canchas de Fútbol 5 (y al revés).</span></div>`;
   if (f === hoy) $('#cal-wrap').scrollTop = Math.max(0, ((ahora - ap) / 60 - 1) * HP);
 };
+/* Turnos cargados desde el celular: la nube los trae al programa (ver nube_turnos.py) y la pantalla los suma sin recargarse. */
+let NUBE_EST = null;
+function estadoNube() { try { NUBE_EST = http('GET', '/api/nube'); } catch (e) { /* sin estado */ } return NUBE_EST; }
+function sincroTexto() {
+  if (!SERVIDOR) return '';
+  const e = estadoNube(); if (!e || !e.activa) return '· <span class="muted">sin conexión con el celular (falta configurar la nube)</span>';
+  const t = e.turnos || {};
+  if (t.error && !t.ultima_ok) return '· <span style="color:var(--bad)">sin sincronizar</span>';
+  return t.ultima_ok ? '· sincronizado ' + (Date.now() - t.ultima_ok < 90000 ? 'recién' : 'a las ' + hhmm(t.ultima_ok)) + (t.error ? ' <span style="color:var(--bad)">(sin internet: se reintenta solo)</span>' : '') : '· sincronizando…';
+}
+function sincroProblemas() {
+  const t = NUBE_EST && NUBE_EST.turnos; if (!t || !(t.problemas || []).length) return '';
+  return `<div class="note" style="background:var(--bad-soft);color:var(--bad);margin-bottom:10px">${t.problemas.map(esc).join('<br>')}</div>`;
+}
+let REV_NUBE = 0;       // hasta qué versión de la base ya se sumaron a la pantalla los cambios de turnos que llegaron de la nube
+function refrescarDesdeLaNube() {
+  if (!SERVIDOR || MODAL || !ESTADO_GUARDADO.ok) return false;
+  let r; try { r = http('GET', '/api/cambios?rev=' + REV_NUBE); } catch (e) { return false; }
+  let hubo = false;
+  r.docs.forEach(d => {
+    const lista = DB[d.c]; if (!Array.isArray(lista)) return;
+    const txt = JSON.stringify(d.d), i = lista.findIndex(x => String(x.id) === d.id);
+    if (i >= 0) { if (JSON.stringify(lista[i]) === txt) return; lista[i] = d.d; } else lista.push(d.d);
+    (SAVED[d.c] || (SAVED[d.c] = new Map())).set(d.id, txt);      // ya está guardado: no es un cambio de esta pantalla
+    hubo = true;
+  });
+  REV_NUBE = r.rev;
+  return hubo;
+}
 function modalNuevoTurno(canchaId, ini) {
   const c = cancha(canchaId), f = UI.turFecha;
   const rel = DB.canchas.filter(x => x.id !== c.id && relacionadas(c, x));
@@ -2698,7 +2756,7 @@ function tarjetasServidor() {
       <div class="l2"><span>Espacio libre en el disco</span><b>${mb(sa.espacio_libre)}</b></div>
       <div class="l2"><span>Excel y registro de hoy</span><b>${esc(dia)}</b></div>
       <div class="l2"><span>Versión del programa</span><b>${esc(sa.version)}</b></div></div></div>
-    ${SERVIDOR ? `<div class="card"><h2>Reportes en la nube</h2><div class="stack"><p class="muted" id="nube-est">${textoNube(nb)}</p><div class="row"><button class="btn primary" data-act="nube-subir">Subir ahora</button><button class="btn" data-act="nube-abrir">Abrir la página de reportes</button><button class="btn" data-act="nube-abrir" data-p="/turnos">Abrir turnos</button></div></div></div>` : ''}
+    ${SERVIDOR ? `<div class="card"><h2>Reportes en la nube</h2><div class="stack"><p class="muted" id="nube-est">${textoNube(nb)}</p><div class="row"><button class="btn primary" data-act="nube-subir">Subir ahora</button><button class="btn" data-act="nube-abrir">Abrir la página de reportes</button><button class="btn" data-act="nube-abrir" data-p="/turnos">Abrir turnos (para el celular)</button></div></div></div>` : ''}
     <div class="card"><h2>Actualizaciones</h2><div class="stack"><p class="muted">Versión instalada: <b>${esc(sa.version)}</b>. El programa avisa solo cuando hay una nueva (si hay internet) y la baja <b>sólo si vos lo pedís</b>.</p><button class="btn" data-act="act-buscar" style="align-self:flex-start">Buscar actualización</button></div></div>
     <div class="card"><h2>Copias de seguridad</h2><div class="stack">
       <p class="muted">Se hace una copia sola al abrir el programa cada día y otra al cerrarlo. Última: <b>${esc(ult)}</b>.</p>
@@ -2712,7 +2770,7 @@ admBody.datos = () => {
       <label class="fld">Código de administración<input class="in" id="newpin" type="password" inputmode="numeric" placeholder="Nuevo código"><small>Dejalo vacío para no cambiarlo. Es una traba para que nadie toque precios por error, no una clave de seguridad.</small></label>
       <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button>
       <label class="row" style="gap:8px;margin-top:6px"><input type="checkbox" data-in="cfg-pin" ${DB.config.pedirPinAjuste ? 'checked' : ''}> Pedir el código para dar descuentos o vender al costo</label>
-      <label class="row" style="gap:8px"><input type="checkbox" data-in="cfg-turnos" ${DB.config.usarTurnos ? 'checked' : ''}> Usar el calendario de turnos (por ahora se carga a mano; más adelante se va a conectar con la planilla en la nube)</label></div></div>
+      <label class="row" style="gap:8px"><input type="checkbox" data-in="cfg-turnos" ${DB.config.usarTurnos ? 'checked' : ''}> Usar el calendario de turnos (se sincroniza con el celular si la nube está configurada)</label></div></div>
     ${DB.config.usarTurnos ? `<div class="card"><h2>WhatsApp (avisos de turnos)</h2><div class="stack"><p class="muted">El botón "Avisar por WhatsApp" abre el chat del cliente con este mensaje ya escrito. Vos lo mandás.</p>
       <label class="fld">Código de país<input class="in" data-in="cfg-wa-pais" inputmode="numeric" value="${esc(DB.config.paisWa)}"></label>
       <label class="fld">Mensaje<textarea class="in" rows="3" data-in="cfg-wa-msg">${esc(DB.config.msgTurno)}</textarea><small>Podés usar {nombre}, {cancha}, {fecha} y {hora}.</small></label></div></div>` : ''}
@@ -3285,6 +3343,13 @@ function eliminarProducto(id) {
 /* ---------- acciones de los botones ---------- */
 const A = {
   'act-buscar': () => consultarActualizacion(true, true),
+  'tur-sync': () => {
+    toast('Sincronizando con el celular…');
+    setTimeout(() => {
+      try { const r = http('POST', '/api/nube/sincronizar', {}); NUBE_EST = r; refrescarDesdeLaNube(); toast(r.ok ? 'Turnos al día' : 'No se pudo sincronizar: ' + ((r.turnos && r.turnos.error) || 'revisá la conexión'), r.ok ? 'ok' : 'warn'); views.turnos(); }
+      catch (e) { toast(e.message, 'warn'); }
+    }, 50);
+  },
   'nube-subir': () => {
     const el = $('#nube-est'); if (el) el.textContent = 'Subiendo…';
     setTimeout(() => {
@@ -3701,12 +3766,18 @@ if (!DB) {                     // primera vez: base nueva (vacía) o, en la demo
   finally { ORIGEN = null; }
 }
 normalizar();
+if (SERVIDOR) { ORIGEN = 'Sistema'; try { persist(); } finally { ORIGEN = null; } }      // deja guardado lo que normalizar() cambió (p. ej. activar los turnos)
 if (!DB.productos.length) UI.admTab = 'planilla';
 render();
 setInterval(() => { if (!MODAL && revisarTurnos()) render(); }, 30000);
 if (SERVIDOR) {
+  REV_NUBE = REV;
+  setInterval(() => { try { if (refrescarDesdeLaNube() && ['turnos', 'mesas', 'venta'].includes(UI.view) && !MODAL) { render(); } } catch (e) { /* se reintenta */ } }, 15000);
+}
+if (SERVIDOR) {
+  setInterval(() => { try { http('POST', '/api/latido', {}); } catch (e) { /* si el programa no responde, http() ya mostró el aviso y espera para reconectar */ } }, 20000);
   setInterval(() => { if (!ESTADO_GUARDADO.ok) { try { guardarSync(); } catch (e) { /* sigue sin guardar: ya se ve en pantalla */ } } }, 8000);   // si falló un guardado, se reintenta solo
-  window.addEventListener('beforeunload', e => { if (!ESTADO_GUARDADO.ok) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', e => { if (!ESTADO_GUARDADO.ok && !window.__recargando) { e.preventDefault(); e.returnValue = ''; } });
   setInterval(() => { try { const sa = http('GET', '/api/salud'); const antes = AVISOS_SIS.join('|'); AVISOS_SIS = sa.avisos || []; if (AVISOS_SIS.join('|') !== antes && !MODAL) pintarAvisosSistema(); } catch (e) { /* ya se nota en el estado de guardado */ } }, 60000);
   setTimeout(() => consultarActualizacion(false, false), 30000);
   setInterval(() => consultarActualizacion(false, false), 6 * 3600 * 1000);
@@ -3718,7 +3789,7 @@ if (SERVIDOR) {
     } catch (e) { /* si falla, ya se vio en pantalla */ }
   }, 600);
 }
-window.__pos = { get DB() { return DB; }, get REV() { return REV; }, UI, tx, http, guardarSync };
+window.__pos = { get DB() { return DB; }, get REV() { return REV; }, UI, tx, http, guardarSync, revisarTurnos, crearTurno, refrescarDesdeLaNube, cancha, dayKey };
 </script>
 </body>
 </html>

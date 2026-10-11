@@ -10,7 +10,10 @@ const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const txt = (v, n) => String(v ?? "").trim().slice(0, n);
 
+const BLOQ = "Este turno ya está en una cuenta o con pagos en la caja del local: se cambia desde la PC del predio.";
 class Err extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
+export const ocupacionDia = (env, fecha, cs) => ocupacion(env, fecha, cs);
+export { canchas as listarCanchas, ocupante, relacionadas };
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
 async function canchas(env) { return (await env.DB.prepare("SELECT * FROM canchas ORDER BY orden").all()).results; }
@@ -68,17 +71,16 @@ async function accion(env, b) {
         if (oc) throw new Err(`Choca con otro turno el ${f.slice(8)}/${f.slice(5, 7)}. Liberá ese horario antes de crear el fijo.`, 409);
       }
       const id = uid("fx");
-      await env.DB.prepare("INSERT INTO fijos (id, cancha_id, dow, ini, cliente, tel, nota, desde, hasta) VALUES (?,?,?,?,?,?,?,?,NULL)").bind(id, c.id, dow(b.fecha), ini, base.cliente, base.tel, base.nota, b.fecha).run();
+      await env.DB.prepare("INSERT INTO fijos (id, cancha_id, dow, ini, cliente, tel, nota, desde, hasta, modificado) VALUES (?,?,?,?,?,?,?,?,NULL,?)").bind(id, c.id, dow(b.fecha), ini, base.cliente, base.tel, base.nota, b.fecha, Date.now()).run();
       await anotar(env, quien, "fijo creado", `Turno FIJO: ${base.cliente || "sin nombre"}, ${c.nombre}, todos los ${DIAS[dow(b.fecha)]} a las ${hm(ini)} (desde el ${b.fecha})`);
       return { ok: true };
     }
-    const sena = Math.max(0, Math.round(Number(b.sena) || 0));
-    if (sena >= c.precio) throw new Err("La seña tiene que ser menor al precio");
+    const sena = 0;       // la seña se cobra en la caja de la PC; desde la web sólo se anota en la nota
     const oc = ocupante(cs, await ocupacion(env, b.fecha, cs), c.id, ini, ini + c.dur);
     if (oc) throw new Err(`Ese horario ya está ocupado por ${cancha(oc.cancha_id).nombre}${oc.cliente ? " (" + oc.cliente + ")" : ""}`, 409);
     const t = { id: uid("t"), cancha_id: c.id, fecha: b.fecha, ini, fin: ini + c.dur, ...base, precio: c.precio, sena, tipo_precio: "comun" };
     await insertarLibre(env, t, relIds(c));
-    await anotar(env, quien, "turno creado", `Reservado: ${desc(t, c)}${sena ? ", seña $" + sena : ""}`);
+    await anotar(env, quien, "turno creado", `Reservado: ${desc(t, c)}`);
     return { ok: true };
   }
 
@@ -95,6 +97,7 @@ async function accion(env, b) {
     }
     t = await env.DB.prepare("SELECT * FROM turnos WHERE id = ?").bind(b.id).first();
     if (!t || t.estado !== "reservado") throw new Err("Ese turno no se puede cancelar");
+    if (t.bloqueado) throw new Err(BLOQ);
     await env.DB.prepare("UPDATE turnos SET estado='cancelado', modificado=? WHERE id=?").bind(Date.now(), t.id).run();
     await anotar(env, quien, "turno cancelado", `Cancelado: ${desc(t, cancha(t.cancha_id))}${t.sena ? " (tenía seña $" + t.sena + ")" : ""}`);
     return { ok: true };
@@ -103,16 +106,16 @@ async function accion(env, b) {
   if (a === "editar") {
     const t = await env.DB.prepare("SELECT * FROM turnos WHERE id = ?").bind(b.id).first();
     if (!t || t.estado !== "reservado") throw new Err("Ese turno no se puede editar");
-    const n = { cliente: txt(b.cliente, 60), tel: txt(b.tel, 30), nota: txt(b.nota, 200), sena: Math.max(0, Math.round(Number(b.sena) || 0)) };
-    if (n.sena >= t.precio) throw new Err("La seña tiene que ser menor al precio");
-    await env.DB.prepare("UPDATE turnos SET cliente=?, tel=?, nota=?, sena=?, modificado=? WHERE id=?").bind(n.cliente, n.tel, n.nota, n.sena, Date.now(), t.id).run();
-    await anotar(env, quien, "turno editado", `Editado: ${desc(t, cancha(t.cancha_id))}. Antes: ${t.cliente || "sin nombre"}, tel ${t.tel || "-"}, seña $${t.sena}. Ahora: ${n.cliente || "sin nombre"}, tel ${n.tel || "-"}, seña $${n.sena}.`);
+    if (t.bloqueado) throw new Err(BLOQ);
+    const n = { cliente: txt(b.cliente, 60), tel: txt(b.tel, 30), nota: txt(b.nota, 200) };
+    await env.DB.prepare("UPDATE turnos SET cliente=?, tel=?, nota=?, modificado=? WHERE id=?").bind(n.cliente, n.tel, n.nota, Date.now(), t.id).run();
+    await anotar(env, quien, "turno editado", `Editado: ${desc(t, cancha(t.cancha_id))}. Antes: ${t.cliente || "sin nombre"}, tel ${t.tel || "-"}, nota ${t.nota || "-"}. Ahora: ${n.cliente || "sin nombre"}, tel ${n.tel || "-"}, nota ${n.nota || "-"}.`);
     return { ok: true };
   }
 
   if (a === "editar_fijo") {
     const f = await env.DB.prepare("SELECT * FROM fijos WHERE id = ?").bind(b.fijo_id).first(); if (!f) throw new Err("El fijo ya no existe");
-    await env.DB.prepare("UPDATE fijos SET cliente=?, tel=?, nota=? WHERE id=?").bind(txt(b.cliente, 60), txt(b.tel, 30), txt(b.nota, 200), f.id).run();
+    await env.DB.prepare("UPDATE fijos SET cliente=?, tel=?, nota=?, modificado=? WHERE id=?").bind(txt(b.cliente, 60), txt(b.tel, 30), txt(b.nota, 200), Date.now(), f.id).run();
     await anotar(env, quien, "fijo editado", `Fijo de ${f.cliente || "sin nombre"} → ${txt(b.cliente, 60) || "sin nombre"} (${cancha(f.cancha_id).nombre}, ${DIAS[f.dow]} ${hm(f.ini)})`);
     return { ok: true };
   }
@@ -120,7 +123,7 @@ async function accion(env, b) {
   if (a === "terminar_fijo") {
     const f = await env.DB.prepare("SELECT * FROM fijos WHERE id = ?").bind(b.fijo_id).first(); if (!f) throw new Err("El fijo ya no existe");
     if (!FECHA.test(b.desde || "")) throw new Err("Fecha inválida");
-    await env.DB.prepare("UPDATE fijos SET hasta=? WHERE id=?").bind(sumarDias(b.desde, -1), f.id).run();
+    await env.DB.prepare("UPDATE fijos SET hasta=?, modificado=? WHERE id=?").bind(sumarDias(b.desde, -1), Date.now(), f.id).run();
     await anotar(env, quien, "fijo terminado", `Fijo terminado: ${f.cliente || "sin nombre"}, ${cancha(f.cancha_id).nombre}, ${DIAS[f.dow]} ${hm(f.ini)}. Libre desde el ${b.desde}.`);
     return { ok: true };
   }
@@ -137,6 +140,7 @@ async function accion(env, b) {
     } else {
       t = await env.DB.prepare("SELECT * FROM turnos WHERE id = ?").bind(b.id).first();
       if (!t || t.estado !== "reservado") throw new Err("Ese turno no se puede mover");
+      if (t.bloqueado) throw new Err(BLOQ);
     }
     const tipo = b.tipo_precio === "fijo" || (b.tipo_precio !== "comun" && t.tipo_precio === "fijo") ? "fijo" : "comun";
     const precio = tipo === "fijo" ? c.precio_fijo : c.precio;

@@ -3,6 +3,7 @@
 import PAGINA from "./pagina.html";
 import PAGINA_TURNOS from "./pagina_turnos.html";
 import { manejarTurnos } from "./turnos.js";
+import { manejarSync } from "./sync.js";
 
 const enc = new TextEncoder();
 const sha = async (t) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(t)))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -36,6 +37,13 @@ export default {
       await env.DB.prepare("INSERT INTO dias (dia, resumen, xlsx, subido) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(dia) DO UPDATE SET resumen = ?2, xlsx = ?3, subido = ?4")
         .bind(p.dia, JSON.stringify(p.resumen), b64, Date.now()).run();
       return json({ ok: true });
+    }
+
+    // --- la PC sincroniza los turnos ---
+    if (ruta === "/api/sync") {
+      const t = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (!igual(await sha(t), cfg.hash_pc)) return json({ error: "clave incorrecta" }, 401);
+      try { return await manejarSync(req, env, url); } catch (e) { return json({ error: "error del servidor: " + (e && e.message) }, 500); }
     }
 
     // --- ver (sólo lectura): clave de acceso ---

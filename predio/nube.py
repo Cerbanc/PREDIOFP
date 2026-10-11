@@ -17,6 +17,7 @@ import urllib.request
 from pathlib import Path
 
 from .diario import construir_excel, datos_del_dia
+from .nube_turnos import SincroTurnos
 from .util import ahora_ms, dia_de
 
 log = logging.getLogger("predio.nube")
@@ -46,6 +47,24 @@ class SubidaNube:
         self._huellas: dict[str, str] = {}
         self.ultimo_error: str | None = None
         self.ultima_subida: float | None = None
+        self.turnos = SincroTurnos(app, self.llamar)
+
+    def llamar(self, metodo: str, ruta: str, cuerpo: dict | None) -> dict:
+        """Pedido a la nube con la clave de la PC. Devuelve el JSON; si falla, levanta la excepción."""
+        datos = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
+        req = urllib.request.Request(self.url + ruta, data=datos, method=metodo,
+                                     headers={"Authorization": "Bearer " + self.token, "Content-Type": "application/json", "User-Agent": "CajaDelPredio"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:           # noqa: S310 - la URL es https (o 127.0.0.1 en pruebas)
+                return json.loads(r.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            try:
+                detalle = json.loads(e.read().decode("utf-8")).get("error", "")
+            except (ValueError, OSError):
+                detalle = ""
+            raise RuntimeError(f"La nube respondió {e.code} {detalle}".strip()) from None
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            raise RuntimeError(f"No se pudo hablar con la nube: {e}") from None
 
     # ajustes
     @property
@@ -65,6 +84,7 @@ class SubidaNube:
             return
         self._hilo = threading.Thread(target=self._bucle, name="nube", daemon=True)
         self._hilo.start()
+        self.turnos.iniciar()
 
     def empujar(self) -> None:
         """Pide subir ya (por ejemplo, al cerrar la caja)."""
@@ -110,7 +130,8 @@ class SubidaNube:
         return ok
 
     def estado(self) -> dict:
-        return {"activa": self.activa, "url": self.url, "ultima_subida": int(self.ultima_subida * 1000) if self.ultima_subida else None, "error": self.ultimo_error}
+        return {"activa": self.activa, "url": self.url, "ultima_subida": int(self.ultima_subida * 1000) if self.ultima_subida else None, "error": self.ultimo_error,
+                "turnos": self.turnos.resumen()}
 
     def _enviar(self, pedido: dict) -> bool:
         cuerpo = json.dumps(pedido).encode("utf-8")

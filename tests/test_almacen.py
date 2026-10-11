@@ -354,3 +354,32 @@ def test_caja_con_medios_digitales_y_perdida_en_el_registro(almacen):
     guardar(almacen, [op("cajas", "cx1", cerrada)])
     t = entradas(almacen)[-1]["resumen"]
     assert "Medios digitales: MP · QR debía $ 5.000 · faltan $ 300" in t
+
+
+def test_una_pantalla_atrasada_no_choca_si_no_toca_lo_que_cambio(almacen):
+    from predio.almacen import ConflictoDeRevision
+    almacen.aplicar(base_inicial(), "Caja", 0)
+    rev = almacen.aplicar({"ops": [op("config", "_", {"pedirPinAjuste": False})]}, "Caja", None)["rev"]
+    almacen.aplicar({"ops": [op("clientes", "cl1", {"id": "cl1", "nombre": "Ana"})]}, "Nube", None)          # cambió otra cosa mientras tanto (sincronización)
+    r = almacen.aplicar({"ops": [op("negocio", "_", "Otro nombre")]}, "Caja", rev)                       # la pantalla sigue en `rev`: guarda algo distinto
+    assert r["cambios"] == 1
+    try:
+        almacen.aplicar({"ops": [op("clientes", "cl1", {"id": "cl1", "nombre": "Pisada"})]}, "Caja", rev)   # pero esto sí cambió después de su versión
+    except ConflictoDeRevision:
+        pass
+    else:
+        raise AssertionError("tenía que chocar: el cliente cambió después de la versión de esa pantalla")
+    try:
+        almacen.aplicar({"ops": [op("negocio", "_", "Futuro")]}, "Caja", r["rev"] + 50)                  # una pantalla más nueva que la base (copia restaurada) siempre choca
+    except ConflictoDeRevision:
+        pass
+    else:
+        raise AssertionError("una pantalla de una versión futura tiene que chocar")
+
+
+def test_cambios_desde_devuelve_sólo_lo_pedido(almacen):
+    almacen.aplicar(base_inicial(), "Caja", 0)
+    rev = almacen.aplicar({"ops": [op("config", "_", {"pedirPinAjuste": False})]}, "Caja", None)["rev"]
+    almacen.aplicar({"formas": {"turnos": "lista"}, "ops": [op("turnos", "t9", {"id": "t9", "estado": "reservado"}), op("negocio", "_", "Z")]}, "Nube", None)
+    c = almacen.cambios_desde(rev, ("turnos", "fijos"))
+    assert [d["id"] for d in c["docs"]] == ["t9"] and c["otros"] is True and c["rev"] > rev

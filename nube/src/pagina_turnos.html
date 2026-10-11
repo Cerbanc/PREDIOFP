@@ -87,8 +87,9 @@ async function cargar(silencioso){
 }
 function textoEstado(t){
   if(t.estado==="cobrado")return "cobrado ✓";
+  if(t.bloqueado&&!t.sena)return "en la caja del local";
   if(t.tipo_precio==="fijo"&&!t.sena)return "FIJO · "+money(t.precio);
-  return t.sena>0?`seña ${money(t.sena)} · debe ${money(t.precio-t.sena)}`:"sin pago · "+money(t.precio);
+  return t.sena>0?`pagó ${money(t.sena)} · debe ${money(t.precio-t.sena)}`:"sin pago · "+money(t.precio);
 }
 function pintar(){
   const cs=D.canchas,hoy=hoyK(),n=new Date(),ahora=n.getHours()*60+n.getMinutes();
@@ -131,16 +132,15 @@ function nuevo(cid,ini){
    <label>A nombre de<input id="cli" placeholder="Ej: Los Pibes" autocomplete="off"></label>
    <label>Teléfono<input id="tel" inputmode="tel" placeholder="Ej: 11 5555-1234"></label>
    <label>Nota (opcional)<input id="nota"></label>
-   <label id="sbox">Seña (opcional, $)<input id="sena" inputmode="numeric" placeholder="0"></label>${quienHtml()}`,
-   [{t:"Cancelar"},{t:"Reservar",k:"pri",f:()=>enviar({accion:"crear",cancha:cid,fecha:dia,ini,fijo:$("#tipo").value==="fijo",cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value,sena:$("#sena").value},"Turno reservado")}]);
-  $("#tipo").onchange=()=>{$("#sbox").hidden=$("#tipo").value==="fijo"};
+   <div class="note">La seña y el cobro se hacen en la caja del local. Si te dieron una seña, anotala en la nota.</div>${quienHtml()}`,
+   [{t:"Cancelar"},{t:"Reservar",k:"pri",f:()=>enviar({accion:"crear",cancha:cid,fecha:dia,ini,fijo:$("#tipo").value==="fijo",cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Turno reservado")}]);
 }
 function ver(id){
   const t=D.turnos.find(x=>x.id===id);if(!t){toast("Ese turno ya no existe");return cargar()}
   const c=cancha(t.cancha_id),fijo=!!t.fijo_id,virtual=!!t.virtual,r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));
   const dg=(t.tel||"").replace(/\D/g,"").replace(/^0+/,""),wa=dg?`https://wa.me/${dg.startsWith("54")?dg:"549"+dg}?text=${encodeURIComponent(`Hola ${t.cliente||""}! Te recordamos tu turno de ${c.nombre} el ${larga(t.fecha)} a las ${hm(t.ini)}. ¡Te esperamos!`)}`:"";
   const acc=[{t:"Cerrar"}];
-  if(t.estado==="reservado"){
+  if(t.estado==="reservado"&&!t.bloqueado){
     acc.push({t:fijo?"Suspender este día":"Cancelar turno",k:"dan",f:()=>enviar({accion:"cancelar",id:t.id},"Listo")});
     acc.push({t:"Reprogramar",f:()=>{setTimeout(()=>mover(t),0)}});
     if(fijo)acc.push({t:"Terminar el fijo",k:"dan",f:()=>enviar({accion:"terminar_fijo",fijo_id:t.fijo_id,desde:t.fecha},"Fijo terminado")});
@@ -149,16 +149,17 @@ function ver(id){
   modal(esc(c.nombre)+(fijo?" · FIJO":""),`<p><b>${esc(larga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
    <p><span class="mu">A nombre de</span><br><b>${esc(t.cliente||"Sin nombre")}</b>${t.tel?"<br>"+esc(t.tel):""}${t.nota?'<br><span class="mu">'+esc(t.nota)+"</span>":""}</p>
    ${wa?`<p><a class="btn" href="${wa}" target="_blank" rel="noopener">Avisar por WhatsApp</a></p>`:""}
-   <div class="note">Precio ${t.tipo_precio==="fijo"?"de fijo":"común"}: <b>${money(t.precio)}</b>${t.sena?` · seña ${money(t.sena)} · saldo ${money(t.precio-t.sena)}`:""}</div>
+   <div class="note">Precio ${t.tipo_precio==="fijo"?"de fijo":"común"}: <b>${money(t.precio)}</b>${t.sena?` · pagó ${money(t.sena)} · saldo ${money(t.precio-t.sena)}`:""}</div>
+   ${t.bloqueado||t.estado==="cobrado"?'<div class="note">Este turno ya está en una cuenta o con pagos en la caja del local: se cambia desde la PC del predio.</div>':""}
    ${r.length?`<div class="note">En este horario también están ocupadas: ${r.map(x=>esc(x.nombre)).join(" y ")}.</div>`:""}
    ${quienHtml()}`,acc);
 }
 function editar(t){
   const c=cancha(t.cancha_id);
   modal("Editar · "+esc(c.nombre),`<label>A nombre de<input id="cli" value="${esc(t.cliente)}"></label><label>Teléfono<input id="tel" value="${esc(t.tel)}" inputmode="tel"></label>
-   <label>Nota<input id="nota" value="${esc(t.nota)}"></label>${t.fijo_id?"":`<label>Seña ($)<input id="sena" inputmode="numeric" value="${t.sena||""}"></label>`}${quienHtml()}
+   <label>Nota<input id="nota" value="${esc(t.nota)}"></label>${quienHtml()}
    ${t.fijo_id?'<div class="note">Cambia el nombre, teléfono y nota de este fijo en todas sus semanas.</div>':""}`,
-   [{t:"Cancelar"},{t:"Guardar",k:"pri",f:()=>enviar(t.fijo_id?{accion:"editar_fijo",fijo_id:t.fijo_id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value}:{accion:"editar",id:t.id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value,sena:$("#sena").value},"Guardado")}]);
+   [{t:"Cancelar"},{t:"Guardar",k:"pri",f:()=>enviar(t.fijo_id?{accion:"editar_fijo",fijo_id:t.fijo_id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value}:{accion:"editar",id:t.id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value},"Guardado")}]);
 }
 function mover(t){
   modal("Reprogramar",`<label>Fecha<input type="date" id="rf" value="${t.fecha}"></label>
