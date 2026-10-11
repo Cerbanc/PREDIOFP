@@ -5,6 +5,9 @@ Se saltea sola si falta wrangler o node. Cada prueba usa sus propias fechas y no
 """
 import datetime as dt
 import json
+import os
+import shutil
+import subprocess
 import threading
 from types import SimpleNamespace
 from urllib.parse import quote
@@ -12,6 +15,8 @@ from urllib.parse import quote
 import pytest
 
 from conftest import base_inicial, op
+from pathlib import Path
+
 from nube_local import CLAVE_PC, RAIZ, NubeLocal, disponible
 from predio.nube import SubidaNube
 
@@ -135,6 +140,23 @@ def test_dos_fijos_a_la_vez_en_el_mismo_horario_uno_solo_gana(nube):
     assert sorted(res) == [200, 409, 409], res
     ocurrencias = [t for t in nube.turnos(f) if t["cancha_id"] == "padelA" and t["ini"] == H(13)]
     assert len(ocurrencias) == 1 and ocurrencias[0]["virtual"]
+
+
+def test_un_fijo_nuevo_no_se_pisa_con_otro_que_empieza_mas_adelante_pero_si_puede_tomar_la_posta(nube):
+    lejos = fecha(710)
+    assert nube.reservar("padelT", lejos, H(10), "Fijo Futuro", fijo=True, quien="Ana")[0] == 200
+    hoy_mismo_dia = (dt.date.fromisoformat(lejos) - dt.timedelta(days=7 * 30)).isoformat()      # el mismo día de la semana, siete meses antes
+    st, r = nube.reservar("padelT", hoy_mismo_dia, H(10), "Se pisaría", fijo=True, quien="Beto")
+    assert st == 409 and "Fijo Futuro" in r["error"] and "empieza el" in r["error"], r
+    # relevo: se termina un fijo y el que sigue toma el mismo horario desde esa fecha
+    a = fecha(720)
+    assert nube.reservar("f5a", a, H(18), "Fijo Saliente", fijo=True)[0] == 200
+    fijo_id = fila(nube, a, "Fijo Saliente")["fijo_id"]
+    corte = (dt.date.fromisoformat(a) + dt.timedelta(days=28)).isoformat()
+    assert nube.api("POST", "/api/turnos", {"accion": "terminar_fijo", "fijo_id": fijo_id, "desde": corte, "quien": "Ana"})[0] == 200
+    assert nube.reservar("f5a", corte, H(18), "Fijo Entrante", fijo=True)[0] == 200
+    assert fila(nube, corte, "Fijo Entrante")["virtual"] and not [t for t in nube.turnos(corte) if t["cliente"] == "Fijo Saliente"]
+    assert fila(nube, (dt.date.fromisoformat(corte) - dt.timedelta(days=7)).isoformat(), "Fijo Saliente")["virtual"]
 
 
 # ------------------------------------------------------------------ quién cargó y quién cambió
@@ -323,6 +345,29 @@ def test_la_sincronizacion_de_la_pc_no_conoce_las_columnas_nuevas_y_sigue_andand
     assert nube.api("POST", "/api/sync", {"turnos": []})[0] == 401 and nube.api("GET", "/api/sync?desde=0")[0] == 401      # sin la clave de la PC no se entra
 
 
+def test_un_fijo_movido_desde_la_pc_no_reaparece_en_su_dia_original(nube):
+    f = fecha(470)
+    dow_js = dt.date.fromisoformat(f).isoweekday() % 7
+    st, r = nube.api("POST", "/api/sync", {"fijos": [{"id": "pcf-mov", "cancha_id": "padelT", "dow": dow_js, "ini": H(10), "cliente": "Fijo Movido", "tel": "", "nota": "", "desde": f}]}, pc=True)
+    assert st == 200 and r["fijos"][0]["ok"]
+    sig = (dt.date.fromisoformat(f) + dt.timedelta(days=7)).isoformat()
+    assert [t["fecha"] for t in nube.turnos(f) if t["cliente"] == "Fijo Movido"] == [f]
+    # el programa de la PC pospuso la ocurrencia del día f al día siguiente: el turno real queda en otra `fecha` pero conserva la `ocurrencia`
+    manana = (dt.date.fromisoformat(f) + dt.timedelta(days=1)).isoformat()
+    mov = {"id": "pct-mov", "cancha_id": "padelT", "fecha": manana, "ini": H(10), "fin": H(11, 30), "cliente": "Fijo Movido", "tel": "", "nota": "", "precio": 22000, "sena": 0, "estado": "reservado",
+           "tipo_precio": "fijo", "fijo_id": "pcf-mov", "ocurrencia": f, "bloqueado": 0}
+    st, r = nube.api("POST", "/api/sync", {"turnos": [mov]}, pc=True)
+    assert st == 200 and r["turnos"][0]["ok"], r
+    assert [t for t in nube.turnos(f) if t["cliente"] == "Fijo Movido"] == [], "el día original ya no tiene el fijo (ni un fantasma)"
+    assert [(t["fecha"], t.get("virtual", False)) for t in nube.turnos(manana) if t["cliente"] == "Fijo Movido"] == [(manana, False)]
+    assert [t["fecha"] for t in nube.turnos(sig) if t["cliente"] == "Fijo Movido"] == [sig], "la semana siguiente sigue igual"
+    semana = nube.api("GET", f"/api/turnos/semana?desde={lunes(f)}")[1]["turnos"]
+    assert sorted(t["fecha"] for t in semana if t["cliente"] == "Fijo Movido") == sorted([manana] + ([sig] if lunes(sig) == lunes(f) else []))
+    # la búsqueda tampoco lo ofrece como próximo en el día que se salteó
+    prox = buscar(nube, "fijo movido")["fijos"][0]["proxima"]
+    assert prox == sig, prox
+
+
 def cancha_local(i, clave, nombre, dur=60, ap=840, ci=1380, deporte="futbol"):
     return op("canchas", i, {"id": i, "clave": clave, "nombre": nombre, "deporte": deporte, "dur": dur, "ap": ap, "ci": ci, "precio": 28000, "precioFijo": 24000, "lugarId": None})
 
@@ -418,3 +463,21 @@ def test_si_se_publica_antes_de_migrar_la_web_agrega_las_columnas_sola(tmp_path)
         assert n.api("GET", "/api/turnos/buscar?q=antes")[1]["fijos"][0]["cliente"] == "Fijo de antes"
     finally:
         n.parar()
+
+
+# ------------------------------------------------------------------ las pantallas, con un navegador real (celular y compu)
+
+PLAYWRIGHT = os.environ.get("PLAYWRIGHT_PATH") or "/opt/node22/lib/node_modules/playwright"
+ESCENARIOS = ["dia_semana", "reservar", "concurrencia", "buscar", "recordatorios", "refresco_errores", "registro_temas"]
+
+
+@pytest.mark.skipif(not shutil.which("node") or not Path(PLAYWRIGHT).exists(), reason="falta node o playwright")
+@pytest.mark.parametrize("escenario", ESCENARIOS)
+def test_pantalla_de_turnos_en_el_navegador(nube, escenario):
+    """Cada escenario (tests/e2e/turnos_web.js) usa sus propias fechas y nombres. Con E2E_FOTOS=/carpeta quedan las capturas."""
+    fotos = os.environ.get("E2E_FOTOS", "")
+    if fotos:
+        Path(fotos).mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, PORT=str(nube.puerto), ESCENARIO=escenario, PLAYWRIGHT_PATH=PLAYWRIGHT, FOTOS=fotos)
+    r = subprocess.run(["node", str(RAIZ / "tests" / "e2e" / "turnos_web.js")], env=env, capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr

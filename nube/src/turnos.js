@@ -26,6 +26,7 @@ const COLUMNAS_NUEVAS = [
 let columnasListas = null;
 function asegurarColumnas(env) {
   return (columnasListas ??= (async () => {
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS turnos_ocurrencia ON turnos (ocurrencia)").run();
     for (const tabla of ["turnos", "fijos"]) {
       const tiene = new Set((await env.DB.prepare(`PRAGMA table_info(${tabla})`).all()).results.map((r) => r.name));
       for (const [, col, def] of COLUMNAS_NUEVAS.filter((x) => x[0] === tabla)) {
@@ -47,7 +48,10 @@ async function ocupacionRango(env, desde, n, cs) {
   const reales = (await env.DB.prepare("SELECT * FROM turnos WHERE fecha >= ? AND fecha <= ?").bind(desde, hasta).all()).results;
   const fijos = (await env.DB.prepare("SELECT * FROM fijos WHERE desde <= ? AND (hasta IS NULL OR hasta >= ?)").bind(hasta, desde).all()).results;
   const salida = reales.filter((t) => t.estado !== "cancelado");
-  const tomados = new Set(reales.filter((t) => t.fijo_id && t.ocurrencia).map((t) => t.fijo_id + "|" + t.ocurrencia));      // un fijo ya suspendido o movido ese día no cuenta
+  // un fijo ya suspendido, movido o convertido en turno real ese día no cuenta como ocurrencia: se mira por la fecha de ocurrencia
+  // (un turno movido desde la PC tiene otra `fecha`, pero conserva la `ocurrencia` original)
+  const tapados = (await env.DB.prepare("SELECT fijo_id, ocurrencia FROM turnos WHERE ocurrencia >= ? AND ocurrencia <= ? AND fijo_id IS NOT NULL").bind(desde, hasta).all()).results;
+  const tomados = new Set(tapados.map((t) => t.fijo_id + "|" + t.ocurrencia));
   for (let i = 0; i < n; i++) {
     const fecha = sumarDias(desde, i), d = dow(fecha);
     for (const f of fijos) {
@@ -70,6 +74,10 @@ function validarHorario(c, ini) {
   if (!Number.isInteger(ini) || ini < c.ap || ini + c.dur > c.ci || (ini - c.ap) % c.dur !== 0) throw new Err("Ese horario no existe en " + c.nombre);
 }
 const desc = (t, c) => `${c.nombre}, ${t.fecha} ${hm(t.ini)}${t.cliente ? " (" + t.cliente + ")" : ""}`;
+
+// «hay un fijo vivo que se pise con éste»: mismo día de la semana, cancha relacionada y horario cruzado, sin terminar (los terminados antes de empezar no cuentan)
+const FIJO_PISA = (ph) => `FROM fijos x WHERE x.dow = ? AND x.cancha_id IN (${ph}) AND x.ini < ? AND ? < x.ini + (SELECT dur FROM canchas WHERE id = x.cancha_id)
+  AND (x.hasta IS NULL OR (x.hasta >= x.desde AND x.hasta >= ?))`;
 
 // inserta sólo si en ese instante nadie ocupó el lugar (cierra la carrera entre dos celulares)
 async function insertarLibre(env, t, relIds, quien) {
@@ -99,14 +107,17 @@ async function accion(env, b) {
         const f = sumarDias(b.fecha, 7 * i), oc = ocupante(cs, await ocupacion(env, f, cs), c.id, ini, ini + c.dur);
         if (oc) throw new Err(`Choca con otro turno el ${f.slice(8)}/${f.slice(5, 7)}. Liberá ese horario antes de crear el fijo.`, 409);
       }
-      const id = uid("fx"), ahora = Date.now(), ph = relIds(c).map(() => "?").join(",");
-      // sólo se crea si en ese instante otro celular no creó un fijo que se pise con éste (misma carrera que en los turnos comunes)
+      const id = uid("fx"), ahora = Date.now(), ph = relIds(c).map(() => "?").join(","), pisa = [dow(b.fecha), ...relIds(c), ini + c.dur, ini, b.fecha];
+      // sólo se crea si en ese instante no hay otro fijo que se pise con éste (cierra la carrera entre dos celulares, igual que en los turnos comunes)
       const r = await env.DB.prepare(
         `INSERT INTO fijos (id, cancha_id, dow, ini, cliente, tel, nota, desde, hasta, modificado, creado, creado_por, modificado_por, modificado_en)
-         SELECT ?,?,?,?,?,?,?,?,NULL,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM fijos x WHERE x.dow = ? AND x.cancha_id IN (${ph}) AND x.ini < ? AND ? < x.ini + (SELECT dur FROM canchas WHERE id = x.cancha_id)
-           AND (x.hasta IS NULL OR (x.hasta >= x.desde AND x.hasta >= ?)))`
-      ).bind(id, c.id, dow(b.fecha), ini, base.cliente, base.tel, base.nota, b.fecha, ahora, ahora, quien, quien, ahora, dow(b.fecha), ...relIds(c), ini + c.dur, ini, b.fecha).run();
-      if (!r.meta.changes) throw new Err("Ese horario fijo se acaba de ocupar. Actualizá la pantalla.", 409);
+         SELECT ?,?,?,?,?,?,?,?,NULL,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 ${FIJO_PISA(ph)})`
+      ).bind(id, c.id, dow(b.fecha), ini, base.cliente, base.tel, base.nota, b.fecha, ahora, ahora, quien, quien, ahora, ...pisa).run();
+      if (!r.meta.changes) {
+        const x = await env.DB.prepare(`SELECT x.cliente, x.desde ${FIJO_PISA(ph)} LIMIT 1`).bind(...pisa).first();
+        if (x && x.desde > b.fecha) throw new Err(`Choca con el turno fijo de ${x.cliente || "otra persona"}, que empieza el ${x.desde.slice(8)}/${x.desde.slice(5, 7)}. Terminá ese fijo o elegí otro horario.`, 409);
+        throw new Err("Ese horario fijo se acaba de ocupar. Actualizá la pantalla.", 409);
+      }
       await anotar(env, quien, "fijo creado", `Turno FIJO: ${base.cliente || "sin nombre"}, ${c.nombre}, todos los ${DIAS[dow(b.fecha)]} a las ${hm(ini)} (desde el ${b.fecha})`);
       return { ok: true };
     }
@@ -261,7 +272,8 @@ async function buscar(env, q) {
   const campos = "id, cancha_id, fecha, ini, fin, cliente, tel, nota, estado, tipo_precio, fijo_id";
   const todos = (await env.DB.prepare(`SELECT ${campos} FROM turnos WHERE fecha >= ? AND estado != 'cancelado' ORDER BY fecha, ini LIMIT 6000`).bind(desde).all()).results;
   const fijos = (await env.DB.prepare("SELECT * FROM fijos WHERE hasta IS NULL OR (hasta >= ? AND hasta >= desde)").bind(hoy).all()).results;
-  const saltadas = new Set((await env.DB.prepare("SELECT fijo_id, ocurrencia FROM turnos WHERE estado = 'cancelado' AND fijo_id IS NOT NULL AND ocurrencia >= ?").bind(hoy).all()).results.map((r) => r.fijo_id + "|" + r.ocurrencia));
+  // semanas en que ese fijo no juega: suspendidas (turno cancelado) o movidas a otra fecha
+  const saltadas = new Set((await env.DB.prepare("SELECT fijo_id, ocurrencia FROM turnos WHERE ocurrencia >= ? AND fijo_id IS NOT NULL AND (estado = 'cancelado' OR fecha != ocurrencia)").bind(hoy).all()).results.map((r) => r.fijo_id + "|" + r.ocurrencia));
   let turnos = [], hallados = [];
   for (const tolerante of [false, true]) {
     const quiere = armarBusqueda(q, tolerante);

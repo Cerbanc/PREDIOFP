@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS turnos (
   creado_por TEXT NOT NULL DEFAULT '', modificado_por TEXT NOT NULL DEFAULT '', modificado_en INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS turnos_fecha ON turnos (fecha, estado);
+CREATE INDEX IF NOT EXISTS turnos_ocurrencia ON turnos (ocurrencia);        -- para ver rápido qué ocurrencias de fijos ya están suspendidas o movidas
 CREATE TABLE IF NOT EXISTS registro_turnos (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, quien TEXT NOT NULL, accion TEXT NOT NULL, detalle TEXT NOT NULL
 );
