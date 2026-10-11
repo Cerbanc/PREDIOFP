@@ -94,7 +94,14 @@ Si en `C:\Predio\configuracion.json` están `nube_url` (la dirección de la pág
 
 **Turnos:** viven en el programa (menú **Turnos**, con el calendario de siempre: se suman a la cancha cuando empiezan y, si al terminar la cuenta sigue abierta, pasa a una mesa suelta) y **se sincronizan solos con la nube cada 30 segundos**, así también se cargan desde el celular en la misma dirección agregando `/turnos` (misma clave). Lo cargado desde el celular aparece en el programa sin recargar, y lo cargado en el programa aparece en el celular. Reglas: Fútbol 7 bloquea los dos Fútbol 5 y al revés, hay turnos fijos, y cada cambio desde el celular queda anotado con el nombre de quien lo hizo. Un turno que ya está en una cuenta o con pagos en la caja **sólo se cambia desde el programa** (el celular lo muestra pero no lo deja tocar). La seña y el cobro se manejan en la caja del programa. Si dos lados cargan algo que choca, gana lo que ya estaba en la nube y el programa avisa arriba del calendario. Sin internet, el programa sigue funcionando y sincroniza cuando vuelve. El botón **Sincronizar** del calendario fuerza la sincronización.
 
-## 9. Lo que todavía no está
+## 9. Novedades de la versión 1.6
+
+- **Agenda de turnos en Excel:** en la carpeta de cada día (hoy y los 7 siguientes) hay un `..._agenda.xlsx` con el mismo diseño que la planilla de papel (fútbol 14 a 22 hs, pádel de 10:00 a 22:00; «5_7» marca si se jugó fútbol 5 o 7; los fijos llevan «(F)» y van en amarillo; las columnas $ y MP quedan vacías para completar a mano). Se imprime en una hoja A4 apaisada.
+- **Horarios de las canchas** como en el papel. Los precios no cambian: corregilos en Admin.
+- **Stock → Cargar por foto de remito:** lee la foto de verdad. Hace falta una clave gratis de Google (aistudio.google.com/apikey) pegada en `C:\Predio\configuracion.json`, campo `gemini_clave`. Lo dudoso queda marcado para elegir el producto a mano; nada se carga sin que confirmes.
+- **Web de reportes:** pestañas Día, Semana, Mes y Fechas, con comparación y cierres de caja. **Web de turnos:** vista de semana, búsqueda, recordatorios de mañana y quién cargó cada turno. Las dos se pueden instalar como app en el celular.
+
+## 10. Lo que todavía no está
 
 - **Lectura de remitos con foto**: en la carga de stock, la lectura de la foto sigue siendo una simulación.
 - **Google Sheets** como espejo de los reportes.
