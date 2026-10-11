@@ -390,13 +390,15 @@ class ArchivosDiarios:
         self._hilo = threading.Thread(target=self._bucle, name="archivos-diarios", daemon=True)
         self._hilo.start()
 
-    def marcar(self, dias: Iterable[str]) -> None:
+    def marcar(self, dias: Iterable[str], agenda: bool = True) -> None:
+        """Avisa que cambió algo de esos días. `agenda=False` cuando se sabe que no cambió ningún turno, turno fijo ni cancha (una venta, por ejemplo)."""
         ahora = time.monotonic()
         with self._cond:
             for d in dias:
                 if es_dia(d):
                     self._pendientes[d] = self._pendientes.get(d, 0) + 1
-            self.agenda.pedir()                  # lo que cambió pudo ser un turno, un fijo o una cancha: se revisan las agendas
+            if agenda:
+                self.agenda.pedir()              # pudo ser un turno, un fijo o una cancha: se revisan las agendas
             if not self._primera_marca:
                 self._primera_marca = ahora
             self._ultima_marca = ahora

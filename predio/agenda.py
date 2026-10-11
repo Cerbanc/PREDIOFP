@@ -392,7 +392,7 @@ class AgendaDiaria:
         self._trabajo = threading.Lock()              # una sola escritura de agendas a la vez (puede pedirse desde el hilo de fondo y desde la pantalla)
         self._revisar = False
         self._fallidos: set[str] = set()              # días que no se pudieron escribir (archivo abierto): se reintentan
-        self._firmas: dict[str, str] = {}             # día -> firma de lo último que se escribió
+        self._firmas: dict[str, str] = {}             # día -> firma de lo último que se escribió (sólo se toca con _trabajo tomado)
         self._fecha: dt.date | None = None
         self.ultimo_error: str | None = None
         self.ultima_generacion: float | None = None

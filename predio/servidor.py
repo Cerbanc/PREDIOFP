@@ -288,9 +288,9 @@ class Manejador(BaseHTTPRequestHandler):
         except (TypeError, ValueError) as e:
             raise Error(400, f"Pedido de guardado inválido: {e}") from None
         if res["cambios"]:
-            self.app.diario.marcar(res["dias"])
+            cols = {o.get("c") for o in cuerpo.get("ops") or [] if isinstance(o, dict)}
+            self.app.diario.marcar(res["dias"], agenda=bool(cols & {"turnos", "fijos", "canchas"}))      # las agendas sólo se revisan si cambió algo de los turnos
             if self.app.nube is not None:
-                cols = {o.get("c") for o in cuerpo.get("ops") or [] if isinstance(o, dict)}
                 if "cajas" in cols:
                     self.app.nube.empujar()          # se abrió o cerró una caja: el reporte sube enseguida
                 if cols & {"turnos", "fijos", "canchas", "comandas"}:

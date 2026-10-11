@@ -549,9 +549,10 @@ def test_las_canchas_de_papel_son_las_mismas_en_la_pantalla_la_nube_y_la_agenda(
     """Los horarios de papel están escritos en la pantalla (CANCHAS_PAPEL), en la nube (schema.sql) y como respaldo en la agenda: no pueden diferir."""
     html = (RAIZ / "predio" / "web" / "index.html").read_text(encoding="utf-8")
     objeto = re.search(r"const CANCHAS_PAPEL = (\{.*?\n\});", html, re.S).group(1)
-    r = subprocess.run(["node", "-e", f"console.log(JSON.stringify(({objeto})))"], capture_output=True, text=True, timeout=30) if shutil.which("node") else None
-    if r is None:
+    if not shutil.which("node"):
         pytest.skip("falta node")
+    r = subprocess.run(["node", "-"], input=f"console.log(JSON.stringify(({objeto})))", capture_output=True, encoding="utf-8", timeout=30)
+    assert r.returncode == 0, r.stderr
     pantalla = json.loads(r.stdout)
     nube = sqlite3.connect(":memory:")
     nube.executescript((RAIZ / "nube" / "schema.sql").read_text(encoding="utf-8"))
@@ -583,7 +584,7 @@ def test_si_borran_el_archivo_se_vuelve_a_escribir(almacen):
 
 # ------------------------------------------------------------------ equivalencia con la pantalla
 
-def _js_ocurrencias(canchas, fijos, turnos, fechas):
+def _js_ocurrencias(canchas, fijos, turnos, fechas, carpeta):
     html = (RAIZ / "predio" / "web" / "index.html").read_text(encoding="utf-8")
     cancha_js = re.search(r"^const cancha = .*;$", html, re.M).group(0)
     dow_js = re.search(r"^const dowDe = .*;$", html, re.M).group(0)
@@ -594,14 +595,16 @@ def _js_ocurrencias(canchas, fijos, turnos, fechas):
         "const ctx = { DB: { canchas: e.canchas, fijos: e.fijos, turnos: e.turnos }, fechas: e.fechas, out: null }; vm.createContext(ctx);\n"
         "vm.runInContext(e.codigo + '\\nout = fechas.map(f => ocurrenciasFijas(f).map(t => [t.fijoId, t.canchaId, t.ini, t.fin, t.cliente, t.nota]));', ctx);\n"
         "console.log(JSON.stringify(ctx.out));\n")
-    r = subprocess.run(["node", "-e", script], input=json.dumps({"codigo": "\n".join([cancha_js, dow_js, funcion]), "canchas": canchas, "fijos": fijos, "turnos": turnos, "fechas": fechas}),
-                       capture_output=True, text=True, timeout=60)
+    archivo = carpeta / "ocurrencias.js"
+    archivo.write_text(script, encoding="utf-8")
+    r = subprocess.run(["node", str(archivo)], input=json.dumps({"codigo": "\n".join([cancha_js, dow_js, funcion]), "canchas": canchas, "fijos": fijos, "turnos": turnos, "fechas": fechas}),
+                       capture_output=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="falta node")
-def test_las_ocurrencias_de_fijos_son_las_mismas_que_calcula_la_pantalla():
+def test_las_ocurrencias_de_fijos_son_las_mismas_que_calcula_la_pantalla(tmp_path):
     canchas = [{"id": "a", "dur": 60}, {"id": "b", "dur": 90}]
     fijos = [{"id": "f1", "canchaId": "a", "dow": 4, "ini": 840, "cliente": "Uno", "nota": "n", "desde": "2026-09-01", "hasta": None},
              {"id": "f2", "canchaId": "b", "dow": 4, "ini": 600, "cliente": "Dos", "nota": "", "desde": "2026-10-22", "hasta": None},
@@ -617,7 +620,7 @@ def test_las_ocurrencias_de_fijos_son_las_mismas_que_calcula_la_pantalla():
               {"id": "t5", "fijoId": "f5", "ocurrencia": "2026-10-18", "fecha": "2027-01-01", "estado": "reservado"},
               {"id": "t6", "fijoId": "f6", "ocurrencia": "2026-10-19", "fecha": "2026-10-19", "estado": "reservado"}]
     fechas = [(dt.date(2026, 10, 8) + dt.timedelta(days=i)).isoformat() for i in range(0, 40)]
-    de_js = _js_ocurrencias(canchas, fijos, turnos, fechas)
+    de_js = _js_ocurrencias(canchas, fijos, turnos, fechas, tmp_path)
     por_id = {c["id"]: c for c in canchas}
     de_py = [[[t["fijoId"], t["canchaId"], t["ini"], t["fin"], t["cliente"], t["nota"]] for t in ag.ocurrencias_fijas(f, fijos, turnos, por_id)] for f in fechas]
     assert de_py == de_js
@@ -657,3 +660,24 @@ def test_la_agenda_sale_sola_despues_de_guardar_por_la_api(srv):
     assert reservas(ws, mapa(ws)["F"]["19 Hs"]) == ["Desde la pantalla", "5", None, None]
     salud = pedir(srv, "GET", "/api/salud")[1]
     assert salud["diario"]["agenda"]["pendientes"] == [] and salud["diario"]["agenda"]["error"] is None
+
+
+def test_un_guardado_que_no_toca_turnos_no_revisa_las_agendas_y_uno_que_si_las_rehace(srv, monkeypatch):
+    hoy = dt.date.today()
+    base = base_inicial()
+    base["ops"] += [cancha(*c) for c in CANCHAS] + [turno("t1", "cn_f5a", 1140, "Primero", fecha=hoy.isoformat())]
+    pedir(srv, "POST", "/api/guardar", {**base, "base_rev": 0, "usuario": "Marcos"})
+    diario = srv.app.diario
+    assert esperar(lambda: diario.ruta_agenda((hoy + dt.timedelta(days=7)).isoformat()).exists() and not diario.agenda.hay_pendiente())
+    llamadas = contar_construcciones(monkeypatch)
+    rev = pedir(srv, "GET", "/api/estado")[1]["rev"]
+    # un cambio que no es de turnos (el nombre del negocio): se actualiza el resumen del día pero las agendas ni se miran
+    antes = diario.ultima_generacion
+    assert pedir(srv, "POST", "/api/guardar", {"base_rev": rev, "usuario": "Marcos", "ops": [op("negocio", "_", "Otro nombre")]})[0] == 200
+    assert esperar(lambda: diario.ultima_generacion != antes) and not diario.agenda.por_revisar() and llamadas == []
+    # un turno que cambia: se rehace la agenda de ese día y sólo esa
+    rev = pedir(srv, "GET", "/api/estado")[1]["rev"]
+    assert pedir(srv, "POST", "/api/guardar", {"base_rev": rev, "usuario": "Marcos", "ops": [turno("t1", "cn_f5a", 1140, "Segundo", fecha=hoy.isoformat())]})[0] == 200
+    assert esperar(lambda: llamadas == [hoy.isoformat()])
+    ws = load_workbook(diario.ruta_agenda(hoy.isoformat()))["Agenda"]
+    assert reservas(ws, mapa(ws)["F"]["19 Hs"])[0] == "Segundo"
