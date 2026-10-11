@@ -121,6 +121,10 @@ function pedirRango(url, claveDesde, claveHasta) {
 
 // auth = { dentro: la sesión de la web es válida, pc: async () => la clave de la PC es válida }
 export async function manejarReportes(req, env, ruta, url, auth) {
+  try { return await atender(req, env, ruta, url, auth); } catch (e) { return json({ error: "error del servidor: " + (e && e.message) }, 500); }
+}
+
+async function atender(req, env, ruta, url, auth) {
   if (ruta === "/api/subidos") {
     if (req.method !== "GET") return json({ error: "método no permitido" }, 405);
     if (!(await auth.pc())) return json({ error: "clave incorrecta" }, 401);

@@ -26,7 +26,7 @@ from test_diario_copias import venta
 RAIZ = Path(__file__).resolve().parents[1]
 PLAYWRIGHT = os.environ.get("PLAYWRIGHT_PATH") or "/opt/node22/lib/node_modules/playwright"
 WRANGLER = os.environ.get("WRANGLER_PATH") or "/tmp/w/node_modules/.bin/wrangler"
-pytestmark = pytest.mark.skipif(not shutil.which("node") or not Path(PLAYWRIGHT).exists() or not Path(WRANGLER).exists(), reason="falta node, playwright o wrangler")
+pytestmark = pytest.mark.skipif(os.name != "posix" or not shutil.which("node") or not Path(PLAYWRIGHT).exists() or not Path(WRANGLER).exists(), reason="falta node, playwright o wrangler")
 
 CLAVE_PC, CLAVE_VER = "tokenpc", "clave123"
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]

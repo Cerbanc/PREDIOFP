@@ -125,3 +125,47 @@ def test_un_ano_de_datos_se_calcula_rapido(tmp_path):
     filas = [{"dia": (ini + dt.timedelta(days=i)).isoformat(), "r": dia(1000 + i, 5, cajas=[caja(1000 + i)], prods=[{"producto": f"P{i % 40}", "unidades": 2, "importe": 100}])} for i in range(365)]
     p = calcular(tmp_path, filas, "2026-01-01", "2026-12-31", "2026-12-31")["periodo"]
     assert p["totales"]["dias_con_datos"] == 365 and len(p["dias"]) == 365 and len(p["top_productos"]) == 20
+
+
+MANEJADOR = r"""
+import { manejarReportes } from "./reportes.mjs";
+const filas = JSON.parse(process.argv[2]);
+const sqls = [];
+const db = (falla) => ({ prepare: (sql) => ({ bind: (...a) => ({ all: async () => {
+  if (falla) throw new Error("se cayó la base");
+  sqls.push(sql);
+  return { results: filas.filter((f) => f.dia >= a[0] && f.dia <= (typeof a[1] === "string" ? a[1] : "9999")).map((f) => ({ dia: f.dia, subido: 5, r: JSON.stringify(f.r), huella: f.r.huella })) };
+} }) }) });
+const pedir = async (ruta, { dentro = true, pc = true, metodo = "GET", falla = false } = {}) => {
+  const url = new URL("http://nube" + ruta);
+  const r = await manejarReportes(new Request(url, { method: metodo }), { DB: db(falla) }, url.pathname, url, { dentro, pc: async () => pc });
+  return r ? { status: r.status, cuerpo: await r.json() } : null;
+};
+const out = {};
+out.otra_ruta = await pedir("/api/dias");
+out.sin_sesion = await pedir("/api/rango?desde=2026-10-01&hasta=2026-10-02", { dentro: false });
+out.metodo = await pedir("/api/rango?desde=2026-10-01&hasta=2026-10-02", { metodo: "POST" });
+out.cae_la_base = await pedir("/api/rango?desde=2026-10-01&hasta=2026-10-02", { falla: true });
+out.con_anterior = await pedir("/api/rango?desde=2026-10-02&hasta=2026-10-03&ant_desde=2026-10-01&ant_hasta=2026-10-01");
+out.subidos_sin_clave = await pedir("/api/subidos?desde=2026-10-01", { pc: false });
+out.subidos = await pedir("/api/subidos?desde=2026-10-01");
+out.sqls = sqls;
+console.log(JSON.stringify(out));
+"""
+
+
+def test_el_enganche_del_servidor(tmp_path):
+    (tmp_path / "reportes.mjs").write_text((RAIZ / "nube" / "src" / "reportes.js").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "manejador.mjs").write_text(MANEJADOR, encoding="utf-8")
+    filas = [{"dia": "2026-10-01", "r": dict(dia(100, 1), huella="aaa")}, {"dia": "2026-10-02", "r": dict(dia(200, 2), huella="bbb")}, {"dia": "2026-10-03", "r": dict(dia(300, 3), huella="ccc")}]
+    r = subprocess.run(["node", "manejador.mjs", json.dumps(filas)], cwd=tmp_path, capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    assert o["otra_ruta"] is None                                              # lo que no es de reportes sigue su camino
+    assert o["sin_sesion"]["status"] == 401 and o["metodo"]["status"] == 405
+    assert o["cae_la_base"]["status"] == 500 and "se cayó la base" in o["cae_la_base"]["cuerpo"]["error"]       # error en JSON, no una página rota
+    c = o["con_anterior"]["cuerpo"]
+    assert c["totales"]["total_vendido"] == 500 and c["anterior"]["totales"]["total_vendido"] == 100 and c["anterior"]["desde"] == "2026-10-01"
+    assert o["subidos_sin_clave"]["status"] == 401
+    assert o["subidos"]["cuerpo"]["dias"] == {"2026-10-01": "aaa", "2026-10-02": "bbb", "2026-10-03": "ccc"}
+    assert sum("json_remove" in q for q in o["sqls"]) >= 1 and sum("cambios_importantes" in q for q in o["sqls"]) >= 1       # la consulta del período deja afuera lo pesado

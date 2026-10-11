@@ -23,9 +23,9 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;b
 .centro{max-width:340px;margin:18vh auto;text-align:center}.centro input{width:100%;margin:12px 0}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.g2 .card{margin:0}
 [hidden]{display:none!important}
-:root{--hoy:#b45309;--ok-bg:#e3f4ee;--bad-bg:#fdecea;--warn-bg:#fff4d6;--sobre:#fff}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--sobre:#06241b}}
-:root[data-theme=dark]{--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--sobre:#06241b}
+:root{--hoy:#b45309;--ok-bg:#e3f4ee;--bad-bg:#fdecea;--warn-bg:#fff4d6;--warn-tx:#7a5200;--sobre:#fff}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--warn-tx:#e3b341;--sobre:#06241b}}
+:root[data-theme=dark]{--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--warn-tx:#e3b341;--sobre:#06241b}
 .pri{color:var(--sobre)}button,.btn{min-height:44px}button:focus-visible,.btn:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .top a.mu{padding:12px 6px}@media(max-width:520px){.top h1{flex:1 1 100%}.top a.mu{margin-left:auto}}button:disabled{opacity:.45;cursor:default}
 .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:4px;margin-bottom:10px}
@@ -35,7 +35,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;b
 .mid{flex:1;min-width:0;text-align:center}.mid>input{width:100%;min-height:44px}.per{font-weight:700;font-size:17px;line-height:1.25}
 .rng{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.rng label{display:flex;flex-direction:column;align-items:flex-start;font-size:13px;color:var(--mu);flex:1;min-width:130px}.rng input{width:100%;min-height:44px;color:var(--tx)}
 .acc{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.alerta{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}.alerta b{color:var(--warn)}
+.alerta{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}.alerta b{color:var(--warn-tx)}
 .kpis.p{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis.p .k b{font-size:clamp(17px,5.2vw,22px);overflow-wrap:anywhere}.kpis.p .k:first-child{grid-column:1/-1}.kpis.p .k:first-child b{font-size:clamp(22px,7.4vw,28px)}
 @media(min-width:760px){.kpis.p{grid-template-columns:repeat(5,minmax(0,1fr))}.kpis.p .k:first-child{grid-column:auto}.kpis.p .k b,.kpis.p .k:first-child b{font-size:19px;overflow-wrap:normal}}
 .dl{display:block;font-size:13px;margin-top:2px;color:var(--mu)}.dl.up{color:var(--ac)}.dl.down{color:var(--bad)}
@@ -52,10 +52,10 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;b
 .cierres{list-style:none;margin:0;padding:0}.cierres li{padding:10px 0;border-bottom:1px solid var(--ln)}.cierres li:last-child{border-bottom:0}
 .cl1{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.cl2{font-size:14px;margin-top:2px}
 .chip{display:inline-block;border-radius:999px;padding:3px 11px;font-size:14px;font-weight:600;border:1px solid;white-space:nowrap}
-.chip.ok{color:var(--ac);background:var(--ok-bg);border-color:var(--ac)}.chip.bad{color:var(--bad);background:var(--bad-bg);border-color:var(--bad)}.chip.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn)}
+.chip.ok{color:var(--ac);background:var(--ok-bg);border-color:var(--ac)}.chip.bad{color:var(--bad);background:var(--bad-bg);border-color:var(--bad)}.chip.warn{color:var(--warn-tx);background:var(--warn-bg);border-color:var(--warn)}
 .resu{margin:0 0 8px;font-size:16px}.chk{display:flex;align-items:center;gap:8px;min-height:44px;font-size:15px}.chk input{width:22px;height:22px;padding:0}
 details.card summary{cursor:pointer;min-height:32px;display:flex;align-items:center;font-size:15px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}details.card[open] summary{margin-bottom:8px}
-td.n,th.n{white-space:nowrap}.g2 .card p{margin:.4em 0}.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start}.card{min-width:0}
+td.n,th.n{white-space:nowrap}td.n.w{white-space:normal}.g2 .card p{margin:.4em 0}.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start}.card{min-width:0}
 @media(max-width:480px){table{font-size:14px}th,td{padding:6px 3px}}
 @media(max-width:360px){table{font-size:13px}th,td{padding:5px 2px}}.resu .chip{white-space:normal}
 tr.sd td{color:var(--warn)}.cargando{opacity:.5}.err{text-align:center}.err p{margin:4px 0 12px}
@@ -71,7 +71,7 @@ tr.sd td{color:var(--warn)}.cargando{opacity:.5}.err{text-align:center}.err p{ma
 <div class="rng" id="rng" hidden><label>Desde<input type="date" id="d1"></label><label>Hasta<input type="date" id="d2"></label></div></div>
 <button id="sig" aria-label="Siguiente" title="Siguiente">→</button></div>
 <div class="top acc"><button id="hoy">Hoy</button><a class="btn pri" id="xl" href="#">Bajar Excel</a><button class="pri" id="csv" hidden>Bajar para Excel (CSV)</button></div>
-<div class="est" id="est" role="status"></div><div id="cont" role="tabpanel" aria-live="polite"></div></div>
+<div class="est" id="est" role="status"></div><div id="cont" role="tabpanel"></div></div>
 <script>
 "use strict";
 const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1";
@@ -121,13 +121,17 @@ function anteriorDe(p){
   if(vista==="semana"){a=sumar(p.desde,-7);b=sumar(a,largo-1);rot="que la semana pasada"}
   else if(vista==="mes"){a=mesMas(p.desde,-1);const fin=finMes(a),t=sumar(a,largo-1);b=parcial&&t<fin?t:fin;rot="que el mes pasado"}
   else{const L=cuenta(p.desde,p.hasta);a=sumar(p.desde,-L);b=sumar(a,largo-1);rot=`que los ${largo} días anteriores`}
-  return{desde:a,hasta:b,rot:rot+(parcial&&vista!=="fechas"?" (mismos días)":"")};
+  return{desde:a,hasta:b,rot,parcial,largo};
 }
 function etiquetaPeriodo(p){
   if(vista==="semana"){const a=new Date(ms(p.desde)),b=new Date(ms(p.hasta));return a.getUTCMonth()===b.getUTCMonth()?`Semana del ${+p.desde.slice(8)} al ${fmt(p.hasta,{day:"numeric",month:"long"})}`:`Semana del ${fmt(p.desde,{day:"numeric",month:"long"})} al ${fmt(p.hasta,{day:"numeric",month:"long"})}`}
   return mayus(fmt(p.desde,{month:"long",year:"numeric"}));
 }
-function guardarHash(){try{history.replaceState(null,"","#"+vista+"/"+(vista==="fechas"?desde+"/"+hasta:ref))}catch(e){}}
+function guardarHash(){
+  const p=periodo(),h=hoyK(),actual=p.desde<=h&&h<=p.hasta;       // lo de hoy no lleva fecha: un favorito siempre abre lo actual
+  const x=vista==="fechas"?"#fechas/"+desde+"/"+hasta:vista==="dia"?(actual?"":"#dia/"+ref):"#"+vista+(actual?"":"/"+ref);
+  try{history.replaceState(null,"",location.pathname+location.search+x)}catch(e){}
+}
 function leerHash(){
   const p=location.hash.slice(1).split("/"),v=p[0];
   if(!["dia","semana","mes","fechas"].includes(v))return;
@@ -296,20 +300,24 @@ function listaDias(l){
   const t=v.length>1?v.slice(0,-1).join(", ")+" y "+v[v.length-1]:v[0];
   return l.length>6?v.join(", ")+` y ${l.length-6} más`:t;
 }
+const difTxt=d=>[d.dif?m(d.dif):"",d.dif_dig?m(d.dif_dig)+" digital":""].filter(Boolean).join(" · ");
 function htmlPeriodo(R,an){
   const T=R.totales,A=an&&R.anterior&&R.anterior.totales,rot=an?an.rot:"";
   if(T.dias_total===0)return '<div class="card"><p><b>Este período todavía no empezó.</b></p></div>';
   const faltan=R.dias.filter(d=>d.estado==="falta").map(d=>d.dia);
   let h="";
-  if(faltan.length)h+=`<div class="alerta" role="alert"><b>⚠ Faltan ${faltan.length} ${faltan.length===1?"día":"días"} de ${T.dias_total}:</b> ${listaDias(faltan)}. La PC del local no ${faltan.length===1?"lo subió":"los subió"} (estaba apagada o sin internet). ${faltan.length===1?"Ese día no se cuenta":"Esos días no se cuentan"} como cero: ${T.dias_con_datos+T.dias_vacios?"los totales son parciales.":"no hay nada para mostrar."}</div>`;
+  if(faltan.length)h+=`<div class="alerta"><b>⚠ Faltan ${faltan.length} ${faltan.length===1?"día":"días"} de ${T.dias_total}:</b> ${listaDias(faltan)}. La PC del local no ${faltan.length===1?"lo subió":"los subió"} (estaba apagada o sin internet). ${faltan.length===1?"Ese día no se cuenta":"Esos días no se cuentan"} como cero: ${T.dias_con_datos+T.dias_vacios?"los totales son parciales.":"no hay nada para mostrar."}</div>`;
   if(T.dias_con_datos+T.dias_vacios===0)return h+'<div class="card"><p><b>Sin datos de este período.</b></p><p class="mu">La PC no subió ningún día. Cuando se prenda con internet, los días de atrás se completan solos.</p></div>';
   const k=(t,v,a,f,bueno)=>`<div class="k"><span>${t}</span><b>${f(v)}</b>${delta(v,a,A,rot,bueno)}</div>`;
   h+=`<div class="kpis p">${k("Total vendido",T.total_vendido,A&&A.total_vendido,m,1)}${k("Tickets",T.tickets,A&&A.tickets,$$,1)}${k("Ticket promedio",T.ticket_promedio,A&&A.ticket_promedio,m,1)}${k("Descuentos",T.descuentos,A&&A.descuentos,m,0)}${k("Cobrado neto",T.cobrado_neto,A&&A.cobrado_neto,m,1)}</div>`;
-  if(A&&A.dias_con_datos+A.dias_vacios===0)h+='<p class="mu nota">No hay datos del período anterior para comparar.</p>';
-  else if(A&&(A.dias_con_datos+A.dias_vacios)!==(T.dias_con_datos+T.dias_vacios))h+=`<p class="mu nota">La comparación no es exacta: de este período hay datos de ${T.dias_con_datos+T.dias_vacios} de ${T.dias_total} días y del anterior de ${A.dias_con_datos+A.dias_vacios} de ${A.dias_total}.</p>`;
-  else h+='<div class="sp"></div>';
+  const notas=[];
+  if(an&&an.parcial&&vista==="semana")notas.push(`Como la semana todavía no terminó, se compara con los mismos ${an.largo} días de la semana pasada.`);
+  if(an&&an.parcial&&vista==="mes")notas.push(`Como el mes todavía no terminó, se compara con los primeros ${an.largo} días del mes pasado.`);
+  if(A&&A.dias_con_datos+A.dias_vacios===0)notas.push("No hay datos del período anterior para comparar.");
+  else if(A&&(A.dias_con_datos+A.dias_vacios)!==(T.dias_con_datos+T.dias_vacios))notas.push(`La comparación no es exacta: de este período hay datos de ${T.dias_con_datos+T.dias_vacios} de ${T.dias_total} días y del anterior de ${A.dias_con_datos+A.dias_vacios} de ${A.dias_total}.`);
+  h+=notas.length?`<p class="mu nota">${notas.join(" ")}</p>`:'<div class="sp"></div>';
   h+=`<div class="card"><h2>Ventas por día</h2><div id="grafc"></div><div class="det" id="det" aria-live="polite"><span class="mu">Tocá una barra para ver ese día.</span></div>
-   <div class="ley"><span><i class="sw"></i>Con ventas</span><span><i class="sw h"></i>Hoy</span><span><i class="sw f"></i>Sin datos</span></div></div>`;
+   <div class="ley"><span><i class="sw"></i>Con ventas</span>${R.dias.some(d=>d.dia===hoyK())?'<span><i class="sw h"></i>Hoy</span>':""}${faltan.length?'<span><i class="sw f"></i>Sin datos</span>':""}</div></div>`;
   if(R.mejor)h+=`<div class="k3"><div class="k"><span>Mejor día</span><b>${cortaF(R.mejor.dia)}</b><span>${m(R.mejor.total)}</span></div>`+(R.peor?`<div class="k"><span>Día más flojo</span><b>${cortaF(R.peor.dia)}</b><span>${m(R.peor.total)}</span></div>`:"")+`<div class="k"><span>Promedio por día con ventas</span><b>${m(T.promedio_dia)}</b></div></div>`;
   h+=`<div class="card"><h2>Cierres de caja</h2><div id="cierres"></div></div>`;
   const tc=R.por_categoria.reduce((a,x)=>a+x.importe,0);
@@ -325,8 +333,8 @@ function htmlPeriodo(R,an){
   h+=`<details class="card" style="margin-top:12px"${pasados.length<=8?" open":""}><summary>Día por día (tabla)</summary><table><tr><th>Día</th><th class="n">Vendido</th><th class="n">Tickets</th><th class="n">Dif. de caja</th></tr>${pasados.map(d=>{
     if(d.estado==="falta")return `<tr class="sd"><td>${cortaF(d.dia)}</td><td colspan="3">Sin datos (la PC no lo subió)</td></tr>`;
     if(d.estado==="vacio")return `<tr><td>${cortaF(d.dia)}</td><td colspan="3" class="mu">Sin movimiento</td></tr>`;
-    const df=d.dif||d.dif_dig?`<span class="bad">${m(d.dif+d.dif_dig)}</span>`:"";
-    return `<tr><td>${cortaF(d.dia)}</td><td class="n">${m(d.total)}</td><td class="n">${$$(d.tickets)}</td><td class="n">${df}</td></tr>`}).join("")}</table></details>`;
+    const df=d.dif||d.dif_dig?`<span class="bad">${difTxt(d)}</span>`:"";
+    return `<tr><td>${cortaF(d.dia)}</td><td class="n">${m(d.total)}</td><td class="n">${$$(d.tickets)}</td><td class="n w">${df}</td></tr>`}).join("")}</table></details>`;
   return h;
 }
 function cablear(){
@@ -373,7 +381,7 @@ function armarGrafico(R){
 }
 function nombreBarra(x){
   if(G.agr)return `Semana del ${dm(x.desde)} al ${dm(x.hasta)}`;
-  return mayus(larga(x.dia));
+  return mayus(larga(x.dia))+(x.dia===hoyK()?" (hoy)":"");
 }
 function textoBarra(x){
   const n=nombreBarra(x);
@@ -436,8 +444,8 @@ function mostrarDetalle(){
   else if(x.estado==="vacio")t+=": sin movimiento (no hubo ventas ni caja).";
   else{
     t+=` · ${m(x.total)} · ${$$(x.tickets)} ${x.tickets===1?"ticket":"tickets"}`;
-    const df=x.dif+x.dif_dig;
-    if(df)t+=` · caja: <span class="bad">${df>0?"sobran":"faltan"} ${m(Math.abs(df))}</span>`;
+    if(x.dif)t+=` · caja: <span class="bad">${x.dif>0?"sobran":"faltan"} ${m(Math.abs(x.dif))}</span>`;
+    if(x.dif_dig)t+=` · medios digitales: <span class="bad">${x.dif_dig>0?"sobran":"faltan"} ${m(Math.abs(x.dif_dig))}</span>`;
     if(x.faltan)t+=` · <span class="warn">faltan ${x.faltan} ${x.faltan===1?"día":"días"} de datos</span>`;
   }
   if(!G.agr&&x.estado!=="futuro")t+=` <button id="ver" data-d="${x.dia}">Ver este día</button>`;

@@ -105,6 +105,9 @@ const limpio = s => s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   assert.ok(await p.locator('#sig').isDisabled(), 'no se puede avanzar más allá de esta semana');
   assert.strictEqual(await p.locator('#graf .bar.hoy').count(), 1, 'la barra de hoy está resaltada');
   assert.ok(location_hash_ok(await p.evaluate(() => location.hash)));
+  await p.click('.tabs button[data-v=dia]'); await listo(p);
+  assert.strictEqual(await p.evaluate(() => location.hash), '', 'el día de hoy no deja fecha en la dirección');
+  await p.click('.tabs button[data-v=semana]'); await listo(p);
   // "Ver este día" lleva al día
   await ir(p, 'semana/' + S.lunes);
   await tocar(4);
@@ -141,6 +144,10 @@ const limpio = s => s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   await p.fill('#d1', E.hoy_menos_6);
   await p.dispatchEvent('#d1', 'change'); await listo(p);
   assert.strictEqual(await p.locator('#graf .col').count(), 7);
+  // ---- celulares chicos (320 de ancho): ninguna vista se desborda a lo ancho
+  await p.setViewportSize({ width: 320, height: 640 });
+  for (const h of ['dia/' + S.viernes, 'semana/' + S.lunes, 'mes/' + M.ref, 'fechas/' + E.hoy_menos_89 + '/' + E.hoy, 'semana/' + E.hoy]) { await ir(p, h); await sinDesborde(p, h + ' en 320 px'); }
+  await p.setViewportSize({ width: 390, height: 844 });
   // ---- períodos sin nada: no se muestran ceros inventados ni se rompe
   await ir(p, 'fechas/2020-01-01/2020-01-10');
   assert.ok((await p.locator('#cont').innerText()).includes('Sin datos de este período'));
@@ -186,4 +193,4 @@ const limpio = s => s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   console.log('reportes web: todo bien');
 })().catch(e => { console.error(e); process.exit(1); });
 
-function location_hash_ok(h) { return /^#semana\/\d{4}-\d{2}-\d{2}$/.test(h); }
+function location_hash_ok(h) { return h === '#semana'; }          // lo de hoy no lleva fecha en la dirección: un favorito siempre abre lo actual

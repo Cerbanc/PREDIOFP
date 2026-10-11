@@ -10,10 +10,10 @@ de semana y mes de la web tienen datos aunque el programa haya estado apagado, y
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import hashlib
 import json
 import logging
-import datetime as dt
 import tempfile
 import threading
 import time
@@ -143,7 +143,6 @@ class SubidaNube:
                     break
 
     def subir_ahora(self, forzar: bool = False) -> bool:
-        import datetime as dt
         hoy = dia_de(ahora_ms())
         ayer = (dt.date.today() - dt.timedelta(days=1)).isoformat()
         ok = True
