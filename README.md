@@ -41,6 +41,16 @@ Punto de venta **100 % sin internet** para un predio deportivo (kiosco, pádel, 
 
 Cada guardado marca los días tocados; un hilo de fondo (espera 2,5 s sin novedades) regenera `dias/AAAA-MM-DD/AAAA-MM-DD_resumen.xlsx` (Resumen, Ventas, Detalle, Libro de caja, Movimientos de caja, Stock, Turnos, Cambios) y `…_registro.txt`. Se escribe a un temporal y se reemplaza; si el Excel está abierto en Windows se reintenta solo.
 
+### Agenda de turnos en Excel (`predio/agenda.py`)
+
+`dias/AAAA-MM-DD/AAAA-MM-DD_agenda.xlsx` es la planilla de papel de los turnos hecha Excel: una hoja «Agenda» apaisada, ajustada a **una hoja A4**, con el día arriba, el bloque de **Fútbol** (turno | $ | MP | cancha 1 | 5_7 | 5_7 | cancha 2 | $ | MP; en las casillas 5_7 va «5» o «7» y un Fútbol 7 repite el nombre y el 7 en las dos canchas), el de **Pádel** (cancha 1, la columna del medio con los horarios y cancha 2) y **OBSERVACIONES** con las notas de los turnos. Los fijos llevan « (F)» y la celda en amarillo; los turnos cancelados y los fijos suspendidos o movidos no aparecen. Las filas salen de los horarios reales de las canchas (si hay un turno fuera de horario se agrega su fila). Las columnas $ y MP quedan vacías: si alguien las completa a mano en el Excel, se conservan cuando la agenda se vuelve a armar.
+
+Se arma para **hoy y los 7 días siguientes**. Cada guardado le avisa a `ArchivosDiarios`, que revisa las 8 agendas en su hilo de fondo y reescribe sólo las que cambiaron (turnos, turnos fijos, canchas); también se arman al abrir el programa y cuando empieza otro día. Si el archivo está abierto en Excel se reintenta solo, igual que el resumen. La lógica de los turnos fijos (`ocurrencias_fijas`) es la misma que `ocurrenciasFijas()` de la pantalla y hay una prueba que corre las dos con los mismos datos.
+
+### Horarios de las canchas
+
+Los de la planilla de papel (`CANCHAS_PAPEL` en `predio/web/index.html`): fútbol en turnos de 1 hora de 14:00 a 22:00 (el último termina 23:00) y pádel en turnos de 90 minutos, 10:00, 11:30 ... 22:00 (el último termina 23:30). Una base que ya existía se actualiza una sola vez al abrir (marca `horariosPapel` en la configuración; no toca los precios y amplía el rango si ya había turnos fuera de él). La nube se pone al día sola cuando la PC sincroniza las canchas; `nube/migraciones.sql` tiene los `UPDATE` equivalentes por si se quieren correr a mano.
+
 ### Rendimiento con los años
 
 La pantalla sólo carga los últimos `ventana_dias` (35) de `ventas`, `caja`, `movimientos`, `movCaja` y `log`; lo anterior se pide a `/api/historia` cuando se mira un reporte o ticket viejo. Con un año de datos simulados (36 500 tickets, 146 000 líneas de registro, base de 140 MB): abre en 0,4 s y cada operación tarda ~70 ms (sin ventana eran 17 s y ~0,9 s).

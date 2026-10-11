@@ -339,7 +339,8 @@ class Manejador(BaseHTTPRequestHandler):
             "ok": True, "version": VERSION, "modo": app.modo, "carpeta": str(app.rutas.raiz), "rev": app.almacen.rev(),
             "base_bytes": app.rutas.base.stat().st_size if app.rutas.base.exists() else 0, "espacio_libre": libre,
             "copias": len(copias), "ultima_copia": copias[0] if copias else None,
-            "diario": {"pendientes": app.diario.pendientes(), "error": app.diario.ultimo_error, "ultima": app.diario.ultima_generacion},
+            "diario": {"pendientes": app.diario.pendientes(), "error": app.diario.ultimo_error, "ultima": app.diario.ultima_generacion,
+                       "agenda": {"pendientes": app.diario.agenda.fallidos(), "error": app.diario.agenda.ultimo_error, "ultima": app.diario.agenda.ultima_generacion}},
             "avisos": app.avisos, "activo_desde": app.inicio,
         })
 

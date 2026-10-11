@@ -72,9 +72,10 @@ def test_punta_a_punta(tmp_path):
     con.close()
     copias = list((datos / "copias").glob("predio_*.db"))
     assert any("_cierre" in c.name for c in copias) and any("_inicio" in c.name for c in copias)
-    dias = [d for d in (datos / "dias").iterdir() if d.is_dir()]
+    dias = [d for d in (datos / "dias").iterdir() if d.is_dir() and (d / f"{d.name}_resumen.xlsx").exists()]      # (los días que vienen sólo tienen su agenda)
     assert len(dias) == 1
     assert (dias[0] / f"{dias[0].name}_resumen.xlsx").exists() and (dias[0] / f"{dias[0].name}_registro.txt").exists()
+    assert (dias[0] / f"{dias[0].name}_agenda.xlsx").exists() and len(list((datos / "dias").glob("*/*_agenda.xlsx"))) == 8      # la agenda de hoy y de los 7 días siguientes
     registro = (dias[0] / f"{dias[0].name}_registro.txt").read_text(encoding="utf-8")
     assert "Ticket #1 cobrado" in registro and "Marcos" in registro
     assert (datos / "LEEME.txt").exists() and (datos / "configuracion.json").exists()

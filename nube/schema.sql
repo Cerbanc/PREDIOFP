@@ -27,9 +27,11 @@ CREATE INDEX IF NOT EXISTS turnos_fecha ON turnos (fecha, estado);
 CREATE TABLE IF NOT EXISTS registro_turnos (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, quien TEXT NOT NULL, accion TEXT NOT NULL, detalle TEXT NOT NULL
 );
+-- Horarios y nombres de la planilla de papel: fútbol en turnos de 1 hora de 14 a 23 (el último empieza a las 22),
+-- pádel en turnos de 90 minutos de 10:00 a 23:30 (el último empieza a las 22:00). ap/ci/dur en minutos. Los precios son de ejemplo.
 INSERT OR IGNORE INTO canchas VALUES
- ('f5a','f5a','Fútbol 5 · Cancha 1','futbol',60,600,1440,28000,24000,1),
- ('f5b','f5b','Fútbol 5 · Cancha 2','futbol',60,600,1440,28000,24000,2),
- ('f7','f7','Fútbol 7 · Cancha completa','futbol',60,600,1440,48000,42000,3),
- ('padelT','padelT','Pádel · Techada','padel',90,480,1440,26000,22000,4),
- ('padelA','padelA','Pádel · Abierta','padel',90,480,1440,22000,19000,5);
+ ('f5a','f5a','Fútbol 5 · Cancha 1','futbol',60,840,1380,28000,24000,1),
+ ('f5b','f5b','Fútbol 5 · Cancha 2','futbol',60,840,1380,28000,24000,2),
+ ('f7','f7','Fútbol 7 · Cancha completa','futbol',60,840,1380,48000,42000,3),
+ ('padelT','padelT','Pádel · Cancha 1','padel',90,600,1410,26000,22000,4),
+ ('padelA','padelA','Pádel · Cancha 2','padel',90,600,1410,22000,19000,5);

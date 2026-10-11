@@ -2,10 +2,12 @@
 
     C:\\Predio\\dias\\2026-10-03\\2026-10-03_resumen.xlsx   (resumen, ventas, detalle, caja, stock, turnos, cambios)
     C:\\Predio\\dias\\2026-10-03\\2026-10-03_registro.txt   (todo lo que cambió ese día, en texto simple)
+    C:\\Predio\\dias\\2026-10-03\\2026-10-03_agenda.xlsx    (agenda de turnos con el diseño de la planilla de papel; sólo hoy y los 7 días siguientes, ver agenda.py)
 
 Cada vez que se guarda algo se avisa a este módulo; unos segundos después (para no trabajar de más
 cuando hay muchas ventas seguidas) se regeneran los archivos de los días tocados. Si el Excel del día está
 abierto en la PC, Windows no deja reemplazarlo: se reintenta solo hasta que se cierre.
+Cada aviso también hace revisar las agendas (sólo se reescribe la que cambió) y al empezar otro día se arman las nuevas.
 """
 from __future__ import annotations
 
@@ -367,6 +369,8 @@ class ArchivosDiarios:
         self._parar = False
         self.ultimo_error: str | None = None
         self.ultima_generacion: float | None = None
+        from .agenda import AgendaDiaria      # acá adentro porque agenda.py usa funciones de este archivo
+        self.agenda = AgendaDiaria(self)
 
     def carpeta(self, dia: str) -> Path:
         return self.rutas.dias / dia
@@ -376,6 +380,9 @@ class ArchivosDiarios:
 
     def ruta_registro(self, dia: str) -> Path:
         return self.carpeta(dia) / f"{dia}_registro.txt"
+
+    def ruta_agenda(self, dia: str) -> Path:
+        return self.carpeta(dia) / f"{dia}_agenda.xlsx"
 
     # --- uso ---
     def iniciar(self) -> None:
@@ -389,6 +396,7 @@ class ArchivosDiarios:
             for d in dias:
                 if es_dia(d):
                     self._pendientes[d] = self._pendientes.get(d, 0) + 1
+            self.agenda.pedir()                  # lo que cambió pudo ser un turno, un fijo o una cancha: se revisan las agendas
             if not self._primera_marca:
                 self._primera_marca = ahora
             self._ultima_marca = ahora
@@ -421,8 +429,12 @@ class ArchivosDiarios:
             except Exception as e:  # noqa: BLE001 - un error acá nunca debe frenar la caja
                 self.ultimo_error = str(e)
                 log.exception("No se pudo generar el día %s", d)
+        try:
+            self.agenda.escribir()
+        except Exception:  # noqa: BLE001 - la agenda nunca debe frenar el resumen ni la caja
+            log.exception("No se pudo revisar la agenda de turnos")
         with self._cond:
-            if not self._pendientes:
+            if not self._pendientes and not self.agenda.por_revisar():
                 self._primera_marca = self._ultima_marca = 0.0
 
     # --- generación ---
@@ -443,7 +455,10 @@ class ArchivosDiarios:
         while True:
             with self._cond:
                 while not self._parar:
-                    if self._pendientes:
+                    if self.agenda.cambio_de_dia():          # arrancó el programa o empezó otro día: se arman las agendas
+                        self._primera_marca = self._primera_marca or time.monotonic()
+                        self._ultima_marca = time.monotonic()
+                    if self._pendientes or self.agenda.hay_pendiente():
                         ahora = time.monotonic()
                         listo = min(self._ultima_marca + self.ESPERA, self._primera_marca + self.ESPERA_MAXIMA)
                         if ahora >= listo:
@@ -454,7 +469,7 @@ class ArchivosDiarios:
                 if self._parar:
                     return
             self.escribir_ahora()
-            if self.pendientes():                   # quedó algo trabado (archivo abierto): reintentar más tarde
+            if self.pendientes() or self.agenda.fallidos():      # quedó algo trabado (archivo abierto): reintentar más tarde
                 with self._cond:
                     if not self._parar:
                         self._cond.wait(timeout=self.REINTENTO)
