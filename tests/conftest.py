@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,18 @@ FORMAS = {
     "comandas": "mapa", "config": "unico", "negocio": "unico", "pin": "unico", "seq": "unico",
     "contadores": "unico", "v": "unico",
 }
+
+
+def esperar(condicion, plazo=30.0, paso=0.05):
+    """Para lo que otro hilo hace «en algún momento»: espera hasta que `condicion()` sea verdadera y devuelve su último valor.
+    El plazo es largo a propósito (no cuesta nada: se sale apenas se cumple) para que una PC cargada no haga fallar la prueba.
+    Hay que esperar la condición COMPLETA (todo lo que se va a verificar), no un indicio parcial de que el otro hilo ya empezó."""
+    limite = time.monotonic() + plazo
+    while True:
+        valor = condicion()
+        if valor or time.monotonic() >= limite:
+            return valor
+        time.sleep(paso)
 
 
 @pytest.fixture()

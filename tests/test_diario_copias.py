@@ -1,11 +1,10 @@
 import datetime as dt
 import sqlite3
-import time
 
 import pytest
 from openpyxl import load_workbook
 
-from conftest import base_inicial, borrar, op
+from conftest import base_inicial, borrar, esperar, op
 from predio.copias import Copias, CopiaInvalida
 from predio.diario import ArchivosDiarios, ArchivoEnUso, datos_del_dia, texto_registro
 from predio.util import ahora_ms, dia_de
@@ -95,12 +94,9 @@ def test_el_proceso_de_fondo_escribe_solo(con_datos, rutas):
     ad.iniciar()
     try:
         ad.marcar([dia])
-        for _ in range(60):
-            if ad.ruta_excel(dia).exists():
-                break
-            time.sleep(0.1)
-        assert ad.ruta_excel(dia).exists() and ad.ruta_registro(dia).exists()
-        assert ad.pendientes() == []
+        # el hilo escribe el registro, después el Excel y recién entonces saca el día de los pendientes: se espera todo junto,
+        # no sólo el Excel (apenas aparece, el hilo todavía no terminó de anotar que el día quedó listo)
+        assert esperar(lambda: ad.ruta_excel(dia).exists() and ad.ruta_registro(dia).exists() and ad.pendientes() == [])
     finally:
         ad.detener()
 

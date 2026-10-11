@@ -1,6 +1,9 @@
 import hashlib
 import json
 import threading
+import time
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -39,6 +42,57 @@ def github(monkeypatch):
     monkeypatch.setenv("PREDIO_API_GITHUB", f"http://127.0.0.1:{s.server_port}")
     yield estado
     s.shutdown()
+    s.server_close()
+
+
+class CierreDemorado(threading.Event):
+    """Hace de `app.apagar` con el pedido de cierre tardío. El servidor contesta «ok» y *recién después* pide cerrar (otro hilo): si en un
+    momento de poca suerte ese hilo tarda en volver a correr, el cliente ya recibió la respuesta y `apagar` todavía no está marcado.
+    Con la demora puesta a propósito esa «mala suerte» ocurre siempre, así que una prueba que mire `apagar` sin esperar falla siempre."""
+
+    def __init__(self, demora):
+        super().__init__()
+        self.demora = demora
+
+    def set(self):
+        time.sleep(self.demora)
+        super().set()
+
+
+class CierreQueEsperaLaRespuesta(threading.Event):
+    """Hace de `app.apagar`. El servidor contesta «ok» y *recién después* pide cerrar el programa (para que la pantalla alcance a
+    enterarse); como son dos hilos, un cliente que mira `apagar` apenas llega la respuesta puede verlo todavía sin marcar.
+    Este evento hace explícito ese orden: al marcarse espera a que el cliente confirme que la respuesta ya le llegó."""
+
+    def __init__(self):
+        super().__init__()
+        self.respuesta_llego = threading.Event()
+        self.llego_antes = None
+
+    def set(self):
+        self.llego_antes = self.respuesta_llego.wait(10)
+        super().set()
+
+
+@pytest.fixture()
+def programa(github, rutas):
+    """El programa de verdad (servidor local + base) y una función `pedir` para hablarle como lo hace la pantalla."""
+    app = app_mod.crear_aplicacion(rutas, dict(AJUSTES_POR_DEFECTO, actualizaciones_repo="club/predio"), "real")
+    s = Servidor(app, 0); s.iniciar()
+
+    def pedir(m, ruta, cuerpo=None):
+        req = urllib.request.Request(f"http://127.0.0.1:{s.puerto}{ruta}", data=cuerpo, method=m, headers={"X-Predio-Token": app.token, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    try:
+        app.almacen.aplicar({**base_inicial()}, "Sistema", 0)
+        yield app, pedir
+    finally:
+        s.parar(); app_mod.cerrar_aplicacion(app)
 
 
 def test_versiones_se_comparan_como_numeros():
@@ -76,28 +130,30 @@ def test_no_descarga_de_hosts_ajenos(tmp_path):
         actualizador.descargar({"url": "https://github.com/x/y/releases/download/v1/otro.exe"}, tmp_path)
 
 
-def test_api_actualiza_hace_copia_y_pide_cerrar(github, rutas, monkeypatch):
-    import urllib.request
+@pytest.mark.parametrize("demora", [0, 0.3], ids=["cierre_enseguida", "cierre_demorado"])
+def test_api_actualiza_hace_copia_y_pide_cerrar(github, programa, demora):
+    app, pedir = programa
+    if demora:
+        app.apagar = CierreDemorado(demora)
+    estado, r = pedir("GET", "/api/actualizacion")
+    assert estado == 200 and r["hay"] and r["version"] == "9.9.9"
+    estado, r = pedir("POST", "/api/actualizar", b"{}")
+    # el servidor contesta y recién después marca `apagar` (otro hilo): hay que esperarlo, no mirarlo apenas llega la respuesta
+    assert estado == 200 and app.apagar.wait(10) and app.instalador_pendiente.read_bytes() == EXE
+    assert any("antes_de_actualizar" in c["archivo"] for c in app.copias.listar())
+    github["version"] = VERSION
+    app.apagar.clear(); app._actualizacion = None
+    estado, r = pedir("POST", "/api/actualizar", b"{}")
+    assert estado == 400 and not app.apagar.is_set()
 
-    app = app_mod.crear_aplicacion(rutas, dict(AJUSTES_POR_DEFECTO, actualizaciones_repo="club/predio"), "real")
-    s = Servidor(app, 0); s.iniciar()
-    try:
-        def pedir(m, ruta, cuerpo=None):
-            req = urllib.request.Request(f"http://127.0.0.1:{s.puerto}{ruta}", data=cuerpo, method=m, headers={"X-Predio-Token": app.token, "Content-Type": "application/json"})
-            try:
-                with urllib.request.urlopen(req, timeout=20) as r:
-                    return r.status, json.loads(r.read())
-            except urllib.error.HTTPError as e:
-                return e.code, json.loads(e.read())
-        app.almacen.aplicar({**base_inicial()}, "Sistema", 0)
-        estado, r = pedir("GET", "/api/actualizacion")
-        assert estado == 200 and r["hay"] and r["version"] == "9.9.9"
-        estado, r = pedir("POST", "/api/actualizar", b"{}")
-        assert estado == 200 and app.apagar.is_set() and app.instalador_pendiente.read_bytes() == EXE
-        assert any("antes_de_actualizar" in c["archivo"] for c in app.copias.listar())
-        github["version"] = VERSION
-        app.apagar.clear(); app._actualizacion = None
-        estado, r = pedir("POST", "/api/actualizar", b"{}")
-        assert estado == 400 and not app.apagar.is_set()
-    finally:
-        s.parar(); app_mod.cerrar_aplicacion(app)
+
+@pytest.mark.parametrize("ruta", ["/api/actualizar", "/api/cerrar"])
+def test_primero_se_responde_y_despues_se_pide_cerrar(github, programa, ruta):
+    """Orden que le importa a la pantalla: recibe el «ok» antes de que el programa empiece a cerrarse.
+    Si alguien pidiera el cierre antes de contestar, `apagar.set()` esperaría a una respuesta que no puede salir (y falla)."""
+    app, pedir = programa
+    app.apagar = CierreQueEsperaLaRespuesta()
+    estado, r = pedir("POST", ruta, b"{}")
+    assert estado == 200 and r["ok"] is True
+    app.apagar.respuesta_llego.set()
+    assert app.apagar.wait(10) and app.apagar.llego_antes is True

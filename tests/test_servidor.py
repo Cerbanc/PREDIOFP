@@ -7,7 +7,7 @@ import urllib.request
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from conftest import base_inicial, op
+from conftest import base_inicial, esperar, op
 from predio import app as app_mod
 from predio.config import AJUSTES_POR_DEFECTO
 from predio.servidor import Servidor
@@ -96,17 +96,11 @@ def test_guardado_invalido_es_400_y_no_rompe(srv):
 
 
 def test_el_excel_del_dia_se_genera_solo_despues_de_guardar(srv):
-    import time
-
     from predio.util import ahora_ms, dia_de
 
     pedir(srv, "POST", "/api/guardar", {**base_inicial(), "base_rev": 0})
     dia = dia_de(ahora_ms())
-    for _ in range(80):
-        if srv.app.diario.ruta_excel(dia).exists():
-            break
-        time.sleep(0.1)
-    assert srv.app.diario.ruta_excel(dia).exists() and srv.app.diario.ruta_registro(dia).exists()
+    assert esperar(lambda: srv.app.diario.ruta_excel(dia).exists() and srv.app.diario.ruta_registro(dia).exists())
 
 
 def test_auditoria_y_dia(srv):
@@ -180,7 +174,7 @@ def test_imagenes_servidas_desde_archivo(srv):
 
 def test_cerrar_pide_apagar(srv):
     assert pedir(srv, "POST", "/api/cerrar", {})[1]["ok"]
-    assert srv.app.apagar.wait(3)
+    assert srv.app.apagar.wait(10)          # el servidor contesta primero y pide cerrar después (otro hilo): no se mira apenas llega la respuesta
 
 
 def test_ya_no_hay_descarga_de_imagenes_desde_links(srv):
