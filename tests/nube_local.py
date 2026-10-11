@@ -19,7 +19,8 @@ import urllib.request
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-WRANGLER = os.environ.get("WRANGLER_PATH") or "/tmp/w/node_modules/.bin/wrangler"
+_POR_DEFECTO = "/tmp/w/node_modules/.bin/wrangler"
+WRANGLER = os.environ.get("WRANGLER_PATH") or (_POR_DEFECTO if Path(_POR_DEFECTO).exists() else None) or shutil.which("wrangler") or _POR_DEFECTO
 CLAVE_PC = "tokenpc"          # clave de la PC (para /api/sync)
 CLAVE_VER = "clave123"        # clave para mirar la web
 

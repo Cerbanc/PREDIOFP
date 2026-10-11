@@ -359,7 +359,6 @@ async function concurrencia() {
 
 // =====================================================================================================
 async function buscar() {
-  const hoyF = hoy();
   await reservar('f5a', F(3), H(18), 'Hortensia Búsqueda', '11 3333-4444');
   await reservar('f5b', F(4), H(19), 'Ulises Búsqueda', '011 15 5555-9999');
   await reservar('padelT', F(-10), H(10), 'Hortensio Antiguo', '');
@@ -565,8 +564,8 @@ async function refresco_errores() {
 // =====================================================================================================
 async function registro_temas() {
   await reservar('f5a', F(34), H(15), 'Para el Registro', '', 'Ana');
-  for (const [ancho, alto, tema] of [[390, 844, 'light'], [390, 844, 'dark'], [1280, 800, 'light'], [1280, 800, 'dark']]) {
-    const nombre = `${ancho < 700 ? 'm' : 'pc'}_${tema === 'dark' ? 'osc' : 'claro'}`;
+  for (const [ancho, alto, tema] of [[390, 844, 'light'], [390, 844, 'dark'], [320, 640, 'dark'], [1280, 800, 'light'], [1280, 800, 'dark']]) {
+    const nombre = `${ancho < 700 ? (ancho < 360 ? 'xs' : 'm') : 'pc'}_${tema === 'dark' ? 'osc' : 'claro'}`;
     const c = await abrir({ ancho, alto, tema });
     await esperarGrilla(c);
     const fondo = await c.page.evaluate(() => getComputedStyle(document.body).backgroundColor);

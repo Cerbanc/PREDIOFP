@@ -9,18 +9,17 @@ import os
 import shutil
 import subprocess
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
 
 import pytest
 
 from conftest import base_inicial, op
-from pathlib import Path
-
 from nube_local import CLAVE_PC, RAIZ, NubeLocal, disponible
 from predio.nube import SubidaNube
 
-pytestmark = pytest.mark.skipif(not disponible(), reason="falta wrangler (/tmp/w/node_modules/.bin/wrangler) o node")
+pytestmark = pytest.mark.skipif(not disponible(), reason="falta wrangler (/tmp/w/node_modules/.bin/wrangler, WRANGLER_PATH o en el PATH) o node")
 
 # horarios nuevos de las canchas: fútbol 14:00 a 23:00 de a 60 min; pádel 10:00 a 23:30 de a 90 min
 CANCHAS = [
