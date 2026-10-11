@@ -39,7 +39,7 @@ Name: "{autodesktop}\{#Nombre}"; Filename: "{app}\Predio.exe"; Tasks: escritorio
 Name: "{autodesktop}\{#Nombre} (demostración)"; Filename: "{app}\Predio.exe"; Parameters: "--demo"; Tasks: escritorio; Comment: "Datos de ejemplo, separados de los reales. Sirve para mostrar el programa."
 Name: "{group}\{#Nombre}"; Filename: "{app}\Predio.exe"
 Name: "{group}\{#Nombre} (demostración)"; Filename: "{app}\Predio.exe"; Parameters: "--demo"
-Name: "{group}\Carpeta de datos (C:\Predio)"; Filename: "{sys}\explorer.exe"; Parameters: "C:\Predio"
+Name: "{group}\Carpeta de datos"; Filename: "{sys}\explorer.exe"; Parameters: "C:\Predio"
 
 [Run]
 Filename: "{app}\Predio.exe"; Description: "Abrir {#Nombre} ahora"; Flags: nowait postinstall skipifsilent
