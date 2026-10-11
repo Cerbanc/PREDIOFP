@@ -156,8 +156,33 @@ textarea.in{resize:vertical}
 .ab{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px}
 .ab b{font-variant-numeric:tabular-nums;color:var(--good)}
 .ab button{border:0;background:transparent;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px}
-.frow{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) 70px 120px auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
-.frow code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+/* Carga de stock por foto de remito */
+.modal.xwide{width:min(1120px,100%)}
+.rm-leyendo{display:flex;gap:14px;align-items:center;padding:18px 4px}
+.rm-spin{flex:none;width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:rm-giro .9s linear infinite}
+@keyframes rm-giro{to{transform:rotate(360deg)}}
+.rm-pasos{margin:8px 0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.rm-tabla{display:flex;flex-direction:column}
+.rm-head,.rm-row{display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1.15fr) minmax(0,1.45fr) 118px;grid-template-areas:"c t p q e";gap:10px;align-items:center}
+.rm-head{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 6px;border-bottom:1px solid var(--line)}
+.rm-row{padding:9px 0;border-bottom:1px dashed var(--line)}
+.rm-row.off{opacity:.62}
+.rm-ck{grid-area:c;width:20px;height:20px;accent-color:var(--accent)}
+.rm-t{grid-area:t;min-width:0}.rm-p{grid-area:p;min-width:0}.rm-q{grid-area:q}.rm-e{grid-area:e}
+.rm-t code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+.rm-av{display:block;margin-top:3px;font-size:12px;color:var(--warn)}
+.rm-pick{display:flex;justify-content:space-between;align-items:center;gap:6px;text-align:left;cursor:pointer;padding:7px 10px}
+.rm-pick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm-pick.vacio{border-color:var(--bad);color:var(--bad)}
+.rm-q{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rm-q .in{width:auto;padding:7px 8px}
+.rm-q input{width:62px}.rm-q select{width:106px}
+.rm-eq{white-space:nowrap}
+.rm-pop{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;padding:8px;gap:6px}
+.rm-opts{overflow:auto;display:flex;flex-direction:column}
+.rm-opt{display:flex;justify-content:space-between;gap:10px;border:0;background:transparent;padding:7px 8px;border-radius:6px;text-align:left;cursor:pointer}
+.rm-opt:hover,.rm-opt:focus{background:var(--accent-soft)}.rm-opt.sel{font-weight:700}
+.rm-sec{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 8px 2px}
 .total-row b{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 
 /* Mesas */
@@ -242,6 +267,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 
 @media (max-width:980px){
+  .rm-head{display:none}
+  .rm-head,.rm-row{grid-template-columns:26px minmax(0,1fr) 118px;grid-template-areas:"c t e" ". p p" ". q q"}
   .pos,main>.pos{grid-template-columns:1fr;flex:none}
   .grid{overflow:visible;flex:none}
   .pos-r{min-height:380px}
@@ -261,7 +288,6 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
   main{padding:14px 16px 20px}
   #toasts{top:10px;right:16px}
   .grid2{grid-template-columns:1fr}
-  .frow{grid-template-columns:1fr 1fr}
   .prow{grid-template-columns:minmax(0,1fr) 120px auto}
   .search{max-width:none;width:100%}
   h1{font-size:21px}
@@ -2270,60 +2296,250 @@ function modalAjuste(id) {
   });
 }
 
-/* ---------- carga de stock por foto de remito (la lectura es SIMULADA en el prototipo) ---------- */
-const REMITO_EJEMPLO = [
-  { texto: 'COCA COLA 500CC BULTO 6X12', cant: 2 }, { texto: 'SALCHICHA VIENA PAQ X6', cant: 3 },
-  { texto: 'PAN PANCHO X6', cant: 4 }, { texto: 'ALFAJOR TRIPLE CJ X24', cant: 1 }, { texto: 'SERVILLETAS PAPEL X500', cant: 2 },
-];
-function adivinarProducto(texto) {
-  const ruido = ['paq', 'caj', 'cja', 'bulto', 'cj', 'una', 'con', 'los'];
-  const pal = norm(texto).split(/[^a-z0-9]+/).filter(w => w.length > 2 && !/^x?\d/.test(w) && !ruido.includes(w));
-  let best = null, score = 0;
-  DB.productos.filter(p => p.tipo !== 'servicio' && p.tipo !== 'receta').forEach(p => {
-    const nom = norm(p.nombre), sc = pal.filter(w => nom.includes(w.slice(0, 5))).length;
-    if (sc > score) { score = sc; best = p; }
-  });
-  return best;
-}
+/* ---------- carga de stock leyendo la foto de un remito ----------
+   La foto se reduce acá (lado mayor 1600 px) y se manda al programa, que se la pide a la IA (Gemini) y la cruza con los productos del negocio.
+   Nada se carga solo: cada renglón queda con su producto sugerido y la persona tilda lo que está bien. Se pide con fetch (asíncrono) para no congelar la pantalla. */
+const RM_PRES = { unidad: 'unidades', caja: 'cajas', bulto: 'bultos', paquete: 'paquetes', pack: 'packs', otro: 'otro' };
+const RM_UNA = { unidad: 'unidad', caja: 'caja', bulto: 'bulto', paquete: 'paquete', pack: 'pack', otro: 'presentación' };
+let RM_SEQ = 0;
+const rmPedir = (ruta, o = {}) => fetch(ruta, { cache: 'no-store', ...o, headers: { 'X-Predio-Token': PREDIO.token, ...(o.headers || {}) } });
+const rmProductos = () => DB.productos.filter(p => p.activo !== false && p.tipo !== 'servicio' && p.tipo !== 'receta');
+const rmEstado = () => rmPedir('/api/remito/estado').then(r => r.json());
+function rmCancelar() { const R = UI.rm; if (!R) return; R.cancelado = true; if (R.ctrl) R.ctrl.abort(); }
+function rmAbrirCarpeta() { try { http('POST', '/api/abrir-carpeta', { que: 'datos' }); } catch (e) { toast(e.message, 'warn'); } }
+
 function modalFoto() {
-  modal({
-    title: 'Cargar stock con foto del remito',
-    body: `<div class="note warn"><b>Lectura simulada.</b> En este prototipo no se lee la foto de verdad: al tocar "Leer remito" aparece un remito de ejemplo para que veas el recorrido. En la versión real una IA lee el texto de la foto, y vos revisás todo antes de que se cargue algo.</div>
-      <label class="fld">Foto del remito o factura<input class="in" type="file" id="foto-file" accept="image/*" data-in="foto-file"></label><div id="foto-prev"></div>`,
-    actions: [{ label: 'Cancelar' }, { label: 'Leer remito', kind: 'primary', onClick: () => {
-      UI.foto = REMITO_EJEMPLO.map(r => { const p = adivinarProducto(r.texto); return { texto: r.texto, cant: r.cant, prodId: p ? p.id : '', modo: p && p.paqueteUnidades > 1 ? 'paq' : 'uni' }; });
-      revisarFoto(); return false;
-    } }],
+  if (!SERVIDOR) { modal({ title: 'Cargar stock con foto del remito', body: '<p>Esta función sólo anda con el programa instalado en la PC, no con la pantalla abierta como archivo suelto.</p>', actions: [{ label: 'Entendido', kind: 'primary' }] }); return; }
+  const R = UI.rm = { id: ++RM_SEQ, archivo: null, ctrl: null, cancelado: false, lineas: [], huella: '', yaCargado: null };
+  rmEstado().catch(() => ({ clave: !!(PREDIO.remito && PREDIO.remito.clave) })).then(e => {
+    if (UI.rm !== R || R.cancelado) return;
+    if (e.ok === false) { toast(e.error || 'No se pudo hablar con el programa', 'warn'); return; }
+    if (e.clave) rmElegirFoto(); else rmSinClave(e);
   });
 }
-function revisarFoto() {
-  const opts = id => `<option value="">— no cargar —</option>` + DB.productos.filter(p => p.tipo !== 'servicio' && p.tipo !== 'receta').map(p => `<option value="${p.id}" ${p.id === id ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('');
-  const filas = UI.foto.map((f, i) => `<div class="frow"><code>${esc(f.texto)}</code>
-    <select class="in" id="foto-p-${i}" data-in="foto-row">${opts(f.prodId)}</select>
-    <input class="in" id="foto-c-${i}" data-in="foto-row" inputmode="numeric" value="${f.cant}" aria-label="Cantidad">
-    <select class="in" id="foto-m-${i}" data-in="foto-row"><option value="paq" ${f.modo === 'paq' ? 'selected' : ''}>paquetes</option><option value="uni" ${f.modo === 'uni' ? 'selected' : ''}>unidades</option></select>
-    <span class="pill" id="foto-r-${i}"></span></div>`).join('');
-  modal({
-    title: 'Revisá lo que leyó antes de cargar', wide: true,
-    body: `<p class="muted">A la izquierda, lo que dice el remito. Corregí el producto o la cantidad si algo no coincide. Lo que quede en "no cargar" se ignora.</p>${filas}`,
-    actions: [{ label: 'Cancelar' }, { label: 'Cargar al stock', kind: 'primary', onClick: () => {
-      const lista = UI.foto.map((f, i) => ({ f, id: $('#foto-p-' + i).value, u: unidadesFoto(i) })).filter(x => x.id && x.u > 0);
-      if (!lista.length) { toast('No hay renglones para cargar', 'warn'); return false; }
-      const r = tx(() => lista.forEach(x => moverStock(x.id, x.u, 'ingreso', { motivo: 'Remito (foto): ' + x.f.texto })));
-      if (r.ok) { toast(`Se cargaron ${lista.length} productos al stock`); render(); }
-    } }],
+function rmSinClave(e) {
+  const R = UI.rm, archivo = esc(e.archivo || 'C:\\Predio\\configuracion.json');
+  const pasos = e.config_rota ? `<div class="note warn">${esc(e.error)}</div>` : `<p>Para leer la foto de un remito hace falta una <b>clave gratis de Google</b>. Se saca una sola vez y no cuesta nada:</p>
+    <ol class="rm-pasos"><li>Entrá a <b>aistudio.google.com/apikey</b> con una cuenta de Gmail.</li>
+    <li>Tocá <b>Crear clave de API</b> y copiala.</li>
+    <li>Abrí con el Bloc de notas el archivo <b>${archivo}</b>, buscá la línea <b>"gemini_clave"</b> y pegá la clave entre las comillas, sin espacios.</li>
+    <li>Guardá el archivo y tocá <b>Ya la pegué</b>.</li></ol>`;
+  modal({ title: 'Falta la clave de Google', onClose: rmCancelar,
+    body: `${pasos}<p class="muted" style="font-size:12px">La foto del remito se manda a Google para que la lea; no se manda nada más. El plan gratis tiene un límite de lecturas por minuto y por día.</p>`,
+    actions: [{ label: 'Cerrar', onClick: rmCancelar }, { label: 'Abrir la carpeta', onClick: () => { rmAbrirCarpeta(); return false; } },
+      { label: 'Ya la pegué', kind: 'primary', onClick: () => {
+        rmEstado().then(e2 => {
+          if (UI.rm !== R || R.cancelado) return;
+          if (e2.clave) { toast('Listo, la clave está cargada'); rmElegirFoto(); }
+          else toast(e2.config_rota ? e2.error : 'Todavía no está la clave en el archivo. Revisá que esté guardado.', 'warn');
+        }).catch(() => toast('No se pudo hablar con el programa', 'warn'));
+        return false;
+      } }] });
+}
+function rmElegirFoto() {
+  const R = UI.rm; R.archivo = null;
+  modal({ title: 'Cargar stock con foto del remito', onClose: rmCancelar,
+    body: `<p class="muted">Sacale una foto al remito o a la factura del proveedor, que se lea bien. El programa la lee y vos revisás todo antes de que se cargue algo al stock.</p>
+      <label class="fld">Foto del remito o factura<input class="in" type="file" id="foto-file" accept="image/*" data-in="foto-file"></label><div id="foto-prev"></div>
+      <p class="muted" style="font-size:12px">La foto se manda a Google para que la lea (plan gratis); no se manda nada más.</p>`,
+    actions: [{ label: 'Cancelar', onClick: rmCancelar }, { label: 'Leer remito', kind: 'primary', disabled: true, onClick: () => { rmLeer(); return false; } }] });
+}
+/* Reduce la foto: lado mayor 1600 px, JPEG 0,85 (un remito se lee igual y viaja en unos cientos de KB) */
+async function rmReducir(file) {
+  let im;
+  try { im = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { im = await new Promise((ok, mal) => { const x = new Image(); x.onload = () => ok(x); x.onerror = () => mal(new Error('imagen')); x.src = URL.createObjectURL(file); }); }
+  const w0 = im.width || im.naturalWidth, h0 = im.height || im.naturalHeight;
+  if (!w0 || !h0) throw new Error('imagen vacía');
+  const k = Math.min(1, 1600 / Math.max(w0, h0)), cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(w0 * k)); cv.height = Math.max(1, Math.round(h0 * k));
+  const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height); c.imageSmoothingQuality = 'high'; c.drawImage(im, 0, 0, cv.width, cv.height);
+  if (im.close) im.close();
+  return new Promise((ok, mal) => cv.toBlob(b => b ? ok(b) : mal(new Error('no se pudo reducir')), 'image/jpeg', 0.85));
+}
+async function rmLeer() {
+  const R = UI.rm; if (!R || !R.archivo) { toast('Elegí primero la foto', 'warn'); return; }
+  R.cancelado = false; R.ctrl = new AbortController();
+  modal({ title: 'Leyendo el remito…', onClose: rmCancelar,
+    body: `<div class="rm-leyendo" id="rm-leyendo" role="status"><span class="rm-spin"></span><div><b>Leyendo el remito…</b><p class="muted">Puede tardar unos segundos. Mientras tanto la pantalla sigue andando.</p></div></div>`,
+    actions: [{ label: 'Cancelar', onClick: rmCancelar }] });
+  let blob, r, d;
+  try { blob = await rmReducir(R.archivo); }
+  catch (e) { if (!R.cancelado) rmError({ error: 'No se pudo abrir esa foto. Probá con una foto en formato JPG o PNG.', codigo: 'foto' }); return; }
+  if (R.cancelado || UI.rm !== R) return;
+  try {
+    r = await rmPedir('/api/remito/leer', { method: 'POST', body: blob, headers: { 'Content-Type': 'application/octet-stream' }, signal: R.ctrl.signal });
+    d = await r.json().catch(() => null);
+  } catch (e) { if (!R.cancelado) rmError({ error: 'No se pudo hablar con el programa. ¿Se cerró? Probá de nuevo.', codigo: 'programa' }); return; }
+  if (R.cancelado || UI.rm !== R) return;
+  if (!d || d.ok === false) { rmError(d || { error: 'El programa respondió con un error (' + r.status + ').', codigo: 'raro' }); return; }
+  rmArmar(d);
+}
+function rmError(d) {
+  const R = UI.rm, c = d.codigo || '';
+  if (c === 'sin_clave') { rmEstado().then(e => rmSinClave(e)).catch(() => rmSinClave({})); return; }
+  const carpeta = ['clave_invalida', 'config_rota', 'modelo', 'proveedor'].includes(c);
+  const otraVez = !carpeta && !['cupo_dia', 'foto', 'formato', 'imagen_grande'].includes(c);
+  modal({ title: 'No se pudo leer el remito', onClose: rmCancelar,
+    body: `<div class="note warn" id="rm-error">${esc(d.error || 'No se pudo leer el remito.')}</div><p class="muted">Mientras tanto podés cargar el stock a mano con el botón "Ingreso" de cada producto, o con la planilla.</p>`,
+    actions: [{ label: 'Cerrar', onClick: rmCancelar }, ...(carpeta ? [{ label: 'Abrir la carpeta', onClick: () => { rmAbrirCarpeta(); return false; } }] : []),
+      ...(otraVez ? [{ label: 'Probar de nuevo', kind: 'primary', onClick: () => { rmLeer(); return false; } }] : [{ label: 'Elegir otra foto', kind: 'primary', onClick: () => { rmElegirFoto(); return false; } }])] });
+}
+function rmArmar(d) {
+  const R = UI.rm, hoy = dayKey(Date.now()), ref = 'remito:' + String(d.huella || '').slice(0, 16);
+  R.huella = String(d.huella || '');
+  R.yaCargado = R.huella ? (DB.movimientos.find(m => m.ref === ref && dayKey(m.ts) === hoy) || null) : null;
+  R.lineas = (d.lineas || []).map(l => ({
+    texto: l.texto, cant: l.cantidad, pres: l.presentacion, por: l.unidades_por_presentacion || null, porFuente: l.por_fuente || null,
+    prodId: l.sugerido_id && prod(l.sugerido_id) ? l.sugerido_id : '', estado: l.estado, cands: (l.candidatos || []).filter(c => prod(c.id)),
+    avisos: (l.avisos || []).slice(), cargar: l.estado === 'seguro' && !!(l.sugerido_id && prod(l.sugerido_id)), confirmado: false,
+  }));
+  if (!R.lineas.length) {
+    modal({ title: 'No se encontraron renglones', onClose: rmCancelar,
+      body: '<div class="note warn">No pude leer ningún renglón de mercadería en esa foto. Probá con otra foto: de frente, con buena luz y sin sombras.</div>',
+      actions: [{ label: 'Cerrar', onClick: rmCancelar }, { label: 'Elegir otra foto', kind: 'primary', onClick: () => { rmElegirFoto(); return false; } }] });
+    return;
+  }
+  rmPintarTabla();
+}
+const rmUnidades = l => { const c = parseFloat(String(l.cant).replace(',', '.')) || 0, k = l.pres === 'unidad' ? 1 : (parseFloat(l.por) || 0); return Math.max(0, Math.round(c * k)); };
+function rmFilaHtml(l, i) {
+  const pres = Object.entries(RM_PRES).map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+  return `<div class="rm-row" id="rm-r-${i}">
+    <input type="checkbox" class="rm-ck" id="rm-ck-${i}" data-in="rm-ck" aria-label="Cargar este renglón">
+    <div class="rm-t"><code>${esc(l.texto)}</code><small class="rm-av" id="rm-av-${i}" hidden></small></div>
+    <div class="rm-p"><button type="button" class="in rm-pick" id="rm-p-${i}" data-act="rm-pick" data-i="${i}" aria-label="Producto del renglón ${i + 1}"><span></span><i aria-hidden="true">▾</i></button></div>
+    <div class="rm-q"><input class="in" id="rm-c-${i}" data-in="rm-q" inputmode="decimal" value="${esc(l.cant)}" aria-label="Cantidad">
+      <select class="in" id="rm-m-${i}" data-in="rm-q" aria-label="Cómo viene">${pres}</select>
+      <span id="rm-x-${i}">×</span><input class="in" id="rm-n-${i}" data-in="rm-q" inputmode="numeric" aria-label="Unidades por presentación">
+      <span class="rm-eq">= <b id="rm-u-${i}">0</b> unidades</span></div>
+    <div class="rm-e"><span class="pill" id="rm-s-${i}"></span></div></div>`;
+}
+function rmPintarTabla() {
+  const R = UI.rm; rmCerrarPop();
+  modal({ title: 'Revisá lo que leyó antes de cargar', wide: true, onClose: rmCancelar,
+    body: `${R.yaCargado ? `<div class="note warn" id="rm-dup"><b>Ojo:</b> este mismo remito ya se cargó hoy a las ${hhmm(R.yaCargado.ts)}. Si lo cargás de nuevo, el stock se suma dos veces.</div>` : ''}
+      <p class="muted">A la izquierda, lo que dice el remito. <b>Verde</b>: el producto parece seguro. <b>Amarillo</b>: revisalo y tildá el renglón si está bien. <b>Rojo</b>: elegí el producto. Sólo se carga lo que queda tildado.</p>
+      <div class="rm-tabla" id="rm-tabla"><div class="rm-head"><span></span><span>Dice el remito</span><span>Producto</span><span>Cantidad</span><span>Estado</span></div>${R.lineas.map(rmFilaHtml).join('')}</div>
+      <div class="note" id="rm-resumen" aria-live="polite"></div>`,
+    actions: [{ label: 'Cancelar', onClick: rmCancelar }, { label: 'Cargar al stock', kind: 'primary', onClick: () => rmCargar(false) }] });
+  $('#modal-root .modal').classList.add('xwide');
+  R.lineas.forEach((_, i) => rmPintarFila(i));
+  rmResumen();
+}
+function rmAvisos(l, p) {
+  if (l.avisos.length) return l.avisos;
+  const a = [];
+  if (!(parseFloat(String(l.cant).replace(',', '.')) > 0)) a.push('Falta la cantidad.');
+  if (l.pres !== 'unidad') {
+    if (!(l.por > 0)) a.push('Completá cuántas unidades trae cada ' + RM_UNA[l.pres] + '.');
+    else if (p && p.paqueteUnidades > 1 && p.paqueteUnidades !== l.por) a.push(`Ojo: el producto tiene cargado ${p.paqueteUnidades} por ${(p.paqueteNombre || 'paquete')}.`);
+  }
+  return a;
+}
+function rmPintarFila(i) {
+  const R = UI.rm, l = R.lineas[i], p = l.prodId ? prod(l.prodId) : null, u = rmUnidades(l), set = (id, f) => { const e = $('#' + id); if (e) f(e); };
+  const ok = !!(l.cargar && p && u > 0);
+  set('rm-r-' + i, e => e.classList.toggle('off', !ok));
+  set('rm-p-' + i, b => { b.querySelector('span').textContent = p ? p.nombre : 'Elegí el producto'; b.classList.toggle('vacio', !p); });
+  set('rm-ck-' + i, c => { c.checked = !!(l.cargar && p); c.disabled = !p; });
+  set('rm-m-' + i, s => { s.value = l.pres; });
+  set('rm-n-' + i, n => { if (document.activeElement !== n) n.value = l.por || ''; n.hidden = l.pres === 'unidad'; });
+  set('rm-x-' + i, x => { x.hidden = l.pres === 'unidad'; });
+  set('rm-u-' + i, b => { b.textContent = u; });
+  set('rm-s-' + i, s => {
+    const [k, t] = !p ? ['bad', 'elegí el producto'] : l.confirmado ? ['good', l.estado === 'ninguno' ? 'elegido' : 'revisado'] : l.estado === 'seguro' ? ['good', 'seguro'] : ['warn', 'revisar'];
+    s.className = 'pill ' + k; s.textContent = t;
   });
-  UI.foto.forEach((_, i) => fotoResumen(i));
+  set('rm-av-' + i, a => { const t = rmAvisos(l, p); a.textContent = t.join(' '); a.hidden = !t.length; });
 }
-function unidadesFoto(i) {
-  const id = $('#foto-p-' + i).value, p = id && prod(id); if (!p) return 0;
-  const c = num($('#foto-c-' + i).value);
-  return $('#foto-m-' + i).value === 'paq' ? c * p.paqueteUnidades : c;
+function rmResumen() {
+  const R = UI.rm; let n = 0, u = 0, sin = 0;
+  R.lineas.forEach(l => { const un = rmUnidades(l); if (l.cargar && l.prodId && un > 0) { n++; u += un; } else sin++; });
+  const el = $('#rm-resumen');
+  if (el) el.innerHTML = n ? `Se van a cargar <b>${n}</b> renglón${n === 1 ? '' : 'es'} (<b>${u}</b> unidades).${sin ? ` <b>${sin}</b> quedan sin cargar: tildalos cuando los revises o elegí su producto.` : ''}` : 'Todavía no hay ningún renglón tildado para cargar.';
+  const b = $('#mact-1'); if (b) b.disabled = !n;
 }
-function fotoResumen(i) {
-  const el = $('#foto-r-' + i), id = $('#foto-p-' + i).value, u = unidadesFoto(i);
-  el.className = 'pill ' + (id ? 'good' : 'warn'); el.textContent = id ? '+' + u + ' u.' : 'sin producto';
+function rmCambio(el) {
+  const [, campo, n] = el.id.split('-'), i = +n, l = UI.rm.lineas[i];
+  if (campo === 'c') l.cant = parseFloat(String(el.value).replace(',', '.')) || 0;
+  else if (campo === 'm') {
+    l.pres = el.value;
+    const p = l.prodId && prod(l.prodId);
+    if (l.pres !== 'unidad' && !(l.por > 0) && p && p.paqueteUnidades > 1) { l.por = p.paqueteUnidades; l.porFuente = 'producto'; }
+  } else if (campo === 'n') { l.por = num(el.value) || null; l.porFuente = 'mano'; }
+  l.avisos = [];
+  rmPintarFila(i); rmResumen();
 }
+function rmElegir(i, id) {
+  const l = UI.rm.lineas[i], p = prod(id); if (!p) return;
+  l.prodId = id; l.confirmado = true; l.cargar = true; l.avisos = [];
+  if (l.pres !== 'unidad' && l.porFuente !== 'remito' && l.porFuente !== 'mano' && p.paqueteUnidades > 1) { l.por = p.paqueteUnidades; l.porFuente = 'producto'; }
+  rmCerrarPop(); rmPintarFila(i); rmResumen();
+}
+function rmCargar(forzar) {
+  const R = UI.rm;
+  const lista = R.lineas.map(l => ({ l, u: rmUnidades(l) })).filter(x => x.l.cargar && x.l.prodId && prod(x.l.prodId) && x.u > 0);
+  if (!lista.length) { toast('No hay renglones tildados para cargar', 'warn'); return false; }
+  if (R.yaCargado && !forzar) {
+    modal({ title: 'Este remito ya se cargó hoy', onClose: rmCancelar,
+      body: `<p>Esta misma foto ya se cargó hoy a las <b>${hhmm(R.yaCargado.ts)}</b>. Si la cargás otra vez, el stock se suma dos veces.</p>`,
+      actions: [{ label: 'Volver a revisar', onClick: () => { rmPintarTabla(); return false; } }, { label: 'Cargar igual', kind: 'danger', onClick: () => rmCargar(true) }] });
+    return false;
+  }
+  const ref = 'remito:' + R.huella.slice(0, 16), total = sum(lista, x => x.u);
+  const r = tx(() => lista.forEach(x => moverStock(x.l.prodId, x.u, 'ingreso', { ref, motivo: 'Remito (foto) · ' + x.l.texto.slice(0, 80) })));
+  if (!r.ok) return false;
+  toast(`Se cargaron ${lista.length} renglón${lista.length === 1 ? '' : 'es'} al stock (${total} unidades)`);
+  UI.rm = null; render();
+}
+/* Menú para elegir el producto de un renglón: parecidos primero y búsqueda por nombre */
+function rmCerrarPop() { const p = $('#rm-pop'); if (p) p.remove(); }
+function rmAbrirPop(i) {
+  const igual = $('#rm-pop') && +$('#rm-pop').dataset.i === i; rmCerrarPop(); if (igual) return;
+  const b = $('#rm-p-' + i); if (!b) return;
+  const r = b.getBoundingClientRect(), ancho = Math.min(Math.max(r.width, 340), innerWidth - 16), abajo = innerHeight - r.bottom - 12, arriba = r.top - 12;
+  const pop = document.createElement('div'); pop.id = 'rm-pop'; pop.className = 'rm-pop'; pop.dataset.i = i;
+  pop.style.cssText = `left:${Math.max(8, Math.min(r.left, innerWidth - ancho - 8))}px;width:${ancho}px;` + (abajo >= 220 || abajo >= arriba ? `top:${r.bottom + 4}px;max-height:${Math.min(340, abajo)}px` : `bottom:${innerHeight - r.top + 4}px;max-height:${Math.min(340, arriba)}px`);
+  pop.innerHTML = '<input class="in" id="rm-pq" data-in="rm-pq" placeholder="Escribí para buscar el producto…" autocomplete="off" aria-label="Buscar producto"><div class="rm-opts" id="rm-opts"></div>';
+  $('#modal-root').appendChild(pop);
+  rmFiltrarPop(); $('#rm-pq').focus();
+}
+function rmFiltrarPop() {
+  const pop = $('#rm-pop'); if (!pop) return;
+  const i = +pop.dataset.i, l = UI.rm.lineas[i], q = norm($('#rm-pq').value).trim(), todos = rmProductos();
+  const op = (p, par) => `<button type="button" class="rm-opt ${p.id === l.prodId ? 'sel' : ''}" data-act="rm-elegir" data-i="${i}" data-id="${p.id}"><span>${esc(p.nombre)}</span><small class="muted">${par ? 'parecido · ' : ''}stock ${p.stock}</small></button>`;
+  const orden = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
+  let html = '';
+  if (!q) {
+    const par = l.cands.map(c => prod(c.id)).filter(Boolean);
+    if (par.length) html += '<div class="rm-sec">Los más parecidos</div>' + par.map(p => op(p, true)).join('');
+    html += '<div class="rm-sec">Todos los productos</div>' + todos.slice().sort(orden).slice(0, 80).map(p => op(p)).join('');
+    if (todos.length > 80) html += '<div class="rm-sec">Escribí arriba para buscar entre los demás</div>';
+  } else {
+    const ws = q.split(/\s+/), hit = todos.filter(p => { const n = norm(p.nombre); return ws.every(w => n.includes(w)); }).sort((a, b) => (norm(a.nombre).startsWith(ws[0]) ? 0 : 1) - (norm(b.nombre).startsWith(ws[0]) ? 0 : 1) || orden(a, b));
+    html = hit.slice(0, 60).map(p => op(p)).join('') || '<div class="rm-sec">No hay productos con ese nombre</div>';
+  }
+  $('#rm-opts').innerHTML = html;
+}
+/* Teclado en la tabla de remito: Enter no carga por accidente, Esc cierra primero el menú de productos */
+document.addEventListener('keydown', e => {
+  const pop = $('#rm-pop');
+  if (e.key === 'Escape' && pop) { e.stopImmediatePropagation(); const b = $('#rm-p-' + pop.dataset.i); rmCerrarPop(); if (b) b.focus(); return; }
+  if (!e.target.closest || !e.target.closest('#rm-tabla, #rm-pop')) return;
+  if (e.key === 'Enter' && e.target.matches('input')) {
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.target.id === 'rm-pq') { const o = $('#rm-opts .rm-opt'); if (o) o.click(); } else e.target.blur();
+  } else if (e.key === 'ArrowDown' && pop) {
+    e.preventDefault(); const o = [...pop.querySelectorAll('.rm-opt')], k = o.indexOf(document.activeElement); (o[k + 1] || o[0] || e.target).focus();
+  } else if (e.key === 'ArrowUp' && pop) {
+    e.preventDefault(); const o = [...pop.querySelectorAll('.rm-opt')], k = o.indexOf(document.activeElement); (k > 0 ? o[k - 1] : $('#rm-pq')).focus();
+  }
+});
+document.addEventListener('click', e => {      // un clic afuera cierra sólo el menú de productos (no toda la ventana)
+  if (!$('#rm-pop') || e.target.closest('#rm-pop, .rm-pick')) return;
+  rmCerrarPop(); e.stopPropagation(); e.preventDefault();
+}, true);
 
 /* --- CAJA (efectivo del día) --- */
 const MOV_TIPOS = { gasto: ['Gasto', 'warn'], proveedor: ['Proveedor', 'warn'], retiro: ['Retiro a caja mayor', ''], ingreso: ['Ingreso', 'good'], perdida: ['Pérdida', 'bad'] };
@@ -3449,6 +3665,8 @@ const A = {
       onConfirm: map => { const r = tx(() => devolverPago(key, p.id, map[0])); if (r.ok) { toast('Pago devuelto'); render(); } } });
   },
   foto: () => modalFoto(),
+  'rm-pick': d => rmAbrirPop(+d.i),
+  'rm-elegir': d => rmElegir(+d.i, d.id),
   'caja-abrir': () => modalAbrirCaja(),
   'caja-cerrar': () => modalCerrarCaja(),
   'mv-new': d => modalMovimiento(d.t),
@@ -3680,8 +3898,21 @@ const I = {
   'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
   'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
   'mesa-rapido': el => { const m = mesaSel(); if (m) { m.rapido = el.checked; persist(); renderSide(); views.mesas(); } },
-  'foto-file': el => { const f = el.files && el.files[0]; if (f) $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`; },
-  'foto-row': el => { const i = el.id.split('-')[2]; fotoResumen(+i); },
+  'foto-file': el => {
+    const f = el.files && el.files[0], R = UI.rm, b = $('#mact-1'); if (!R) return;
+    R.archivo = null; $('#foto-prev').innerHTML = ''; if (b) b.disabled = true;
+    if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Ese archivo no es una foto', 'warn'); el.value = ''; return; }
+    R.archivo = f; if (b) b.disabled = false;
+    $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`;
+  },
+  'rm-ck': el => {
+    const i = +el.id.split('-')[2], l = UI.rm.lineas[i]; if (!l.prodId) { el.checked = false; return; }
+    l.cargar = el.checked; if (l.estado !== 'seguro') l.confirmado = el.checked;
+    rmPintarFila(i); rmResumen();
+  },
+  'rm-q': el => rmCambio(el),
+  'rm-pq': () => rmFiltrarPop(),
   q: el => { UI.q = el.value; renderGrid(); },
   dest: el => { UI.com = el.value; renderCart(); },
   pg: el => { UI.pago.rows[+el.dataset.i].monto = num(el.value); updateCobro(); },
