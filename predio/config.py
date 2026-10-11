@@ -24,7 +24,8 @@ AJUSTES_POR_DEFECTO = {
         "siempre está guardado). 0 = cargar todo. "
         "actualizaciones_repo: de dónde se bajan las versiones nuevas (usuario/repositorio de GitHub). "
         "nube_url y nube_token: dirección y clave para subir el reporte del día a la página de reportes (vacío = no se sube nada). "
-        "nube_cada_minutos: cada cuánto se sube el reporte (10). nube_turnos_cada_segundos: cada cuánto se sincronizan los turnos (30)."
+        "nube_cada_minutos: cada cuánto se sube el reporte (10). nube_turnos_cada_segundos: cada cuánto se sincronizan los turnos (30). "
+        "nube_relleno_dias: hasta cuántos días atrás se completan en la nube los que le falten (90; 0 = no completar)."
     ),
     "puerto": 8765,
     "copias_conservar_dias": 30,
@@ -35,6 +36,7 @@ AJUSTES_POR_DEFECTO = {
     "nube_token": "",
     "nube_cada_minutos": 10,
     "nube_turnos_cada_segundos": 30,
+    "nube_relleno_dias": 90,
 }
 
 
