@@ -5,7 +5,7 @@ Las claves se guardan como huella SHA-256 en la tabla `config` (`hash_pc` para l
 
 ## Turnos
 
-`/turnos` (misma clave). `src/turnos.js` es la única que decide los choques (Fútbol 7 contra los dos Fútbol 5, fijos, reprogramaciones) y anota cada cambio en `registro_turnos`. Las canchas, horarios y precios están en la tabla `canchas` (se cambian con una consulta SQL, ver `schema.sql`).
+`/turnos` (misma clave). `src/turnos.js` es la única que decide los choques (Fútbol 7 contra los dos Fútbol 5, fijos, reprogramaciones) y anota cada cambio en `registro_turnos`. Las canchas, horarios y precios están en la tabla `canchas` (se cambian con una consulta SQL, ver `schema.sql`). Los horarios son los de la planilla de papel (fútbol 14:00 a 23:00 en turnos de 1 hora; pádel 10:00 a 23:30 en turnos de 90 minutos); la PC los manda sola al sincronizar y `migraciones.sql` tiene los `UPDATE` equivalentes (no se ejecutan solos).
 
 ## Sincronización con la PC
 

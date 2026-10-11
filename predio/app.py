@@ -33,7 +33,8 @@ LEEME = """CAJA DEL PREDIO - carpeta de datos
 Todo lo que guarda el programa está en esta carpeta. No hay datos en ningún otro lado.
 
   datos\\predio.db     La base de datos. Es el archivo más importante. No lo abras ni lo muevas con el programa abierto.
-  dias\\AAAA-MM-DD\\    Una carpeta por día con el Excel de ese día (se actualiza solo) y el registro de cambios en texto.
+  dias\\AAAA-MM-DD\\    Una carpeta por día con el Excel de ese día (se actualiza solo), el registro de cambios en texto y
+                      la agenda de turnos (AAAA-MM-DD_agenda.xlsx, como la planilla de papel: lista para imprimir).
   copias\\             Copias de seguridad de la base (una por día, se guardan las últimas semanas).
   imagenes\\           Fotos de los productos.
   planillas\\          Planillas de productos y stock que se bajaron o subieron.
@@ -151,7 +152,7 @@ def tareas_de_inicio(app: Aplicacion, espera: float = 20.0) -> None:
         app.avisos.append("No se pudo hacer la copia de seguridad automática de hoy. Revisá el espacio libre del disco.")
     hoy = dia_de(ahora_ms())
     ayer = (dt.date.today() - dt.timedelta(days=1)).isoformat()
-    app.diario.marcar([hoy] + ([ayer] if (app.rutas.dias / ayer).exists() else []))
+    app.diario.marcar([hoy] + ([ayer] if app.diario.ruta_excel(ayer).exists() else []))      # (la carpeta de ayer puede existir sólo por su agenda: ahí no hubo nada que resumir)
 
 
 def cerrar_aplicacion(app: Aplicacion) -> None:

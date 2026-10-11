@@ -48,6 +48,7 @@ CAMPOS = {
     "estado": "estado", "tipoPrecio": "tipo de precio", "clienteId": "cliente", "hasta": "hasta", "desde": "desde",
     "pedirPinAjuste": "pedir código para descuentos", "paisWa": "código de país (WhatsApp)", "msgTurno": "mensaje de turno",
     "deporte": "deporte", "dow": "día de la semana", "monto": "monto", "motivo": "motivo",
+    "horariosPapel": "horarios de las canchas como en la planilla de papel",
 }
 DINERO = {"precio", "costo", "precioFijo", "monto", "fondo", "total", "subtotal", "descuento"}
 IDS_A_NOMBRE = {"catId": "categorias", "canchaId": "canchas", "lugarId": "mesas", "clienteId": "clientes", "metodoId": "metodos"}
