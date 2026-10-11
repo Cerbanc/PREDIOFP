@@ -2,9 +2,13 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Turnos del Predio</title>
 <link rel="icon" href="data:,">
+<script>try{var t=localStorage.getItem("tema");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="color-scheme" content="light dark">
 <style>
 :root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--acs:#e3f3ec;--bad:#b3261e;--warn:#9a6700;--info:#1d5fa8;--infos:#e4eefa;--good:#0a7a5a;--goods:#e3f3ec;--s2:#eef2f0}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}}
+:root[data-theme=dark]{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}
+:root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
 main{max-width:1200px;margin:0 auto;padding:12px}
 h1{font-size:20px;margin:0}
@@ -42,9 +46,9 @@ button,.btn{cursor:pointer;text-decoration:none;display:inline-block}.pri{backgr
 <form method="post" action="/entrar"><input type="hidden" name="volver" value="/turnos"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
 <p class="dan" id="mal" hidden>Clave incorrecta</p></div>
 <div id="app" hidden>
-<div class="top"><h1>Turnos</h1><a class="btn" href="/">Reportes</a><a class="mu" href="/salir">Salir</a></div>
+<div class="top"><h1>Turnos</h1><a class="btn" href="/">Reportes</a><button id="tema" title="Cambiar entre claro y oscuro">Claro / Oscuro</button><a class="mu" href="/salir">Salir</a></div>
 <div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><button id="btnreg" style="margin-left:auto">Registro de cambios</button></div>
-<div class="est mu" id="est"></div>
+<div class="est mu"><span id="est"></span> · <span id="quien-txt"></span> <a href="#" id="quien-cambiar">cambiar</a></div>
 <div class="cal-wrap" id="cal"></div>
 <div class="legend"><span>Tocá un hueco libre para reservar.</span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos de Fútbol 5 (y al revés).</span></div>
 <div class="reg" id="reg" hidden></div>
@@ -64,6 +68,7 @@ const larga=f=>new Date(f+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long
 const F5=["f5a","f5b"],rel=(a,b)=>a.id===b.id||(a.clave==="f7"&&F5.includes(b.clave))||(b.clave==="f7"&&F5.includes(a.clave));
 let dia=hoyK(),D={canchas:[],turnos:[]};
 let quien="";try{quien=localStorage.getItem("quien")||""}catch{}
+if($("#tema")){$("#tema").onclick=()=>{const r=document.documentElement,oscuro=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;const n=oscuro?"light":"dark";r.dataset.theme=n;try{localStorage.setItem("tema",n)}catch(e){}};}
 if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
 function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2500)}
 async function api(met,url,cuerpo){
@@ -77,6 +82,8 @@ function iniciar(){
   const mover=n=>{dia=sumar(dia,n);f.value=dia;cargar()};
   $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);$("#hoy").onclick=()=>{dia=hoyK();f.value=dia;cargar()};
   $("#btnreg").onclick=registro;
+  $("#quien-cambiar").onclick=e=>{e.preventDefault();pedirNombre(false)};
+  guardarQuien(quien);if(!quien)pedirNombre(true);
   cargar();setInterval(()=>{if(!document.hidden&&!document.querySelector(".fondo"))cargar(true)},30000);
 }
 const cancha=id=>D.canchas.find(c=>c.id===id);
@@ -121,8 +128,15 @@ function modal(titulo,cuerpo,acciones){
   f.addEventListener("click",e=>{if(e.target===f)f.remove()});
   document.body.appendChild(f);return f;
 }
-const quienHtml=()=>`<label>Quién lo anota<input id="q" value="${esc(quien)}" placeholder="Tu nombre" maxlength="40"></label>`;
-function leerQuien(){const q=$("#q").value.trim();if(!q)throw new Error("Poné tu nombre para anotar el cambio");quien=q;try{localStorage.setItem("quien",q)}catch{}return q}
+const quienHtml=()=>"";
+function guardarQuien(q){quien=q.trim().slice(0,40);try{localStorage.setItem("quien",quien)}catch{}$("#quien-txt").textContent=quien?"Anotás como "+quien:""}
+function pedirNombre(obligatorio){
+  const f=modal("¿Cómo te llamás?",`<p class="mu">Se anota en cada turno que cargues o cambies. Se pregunta una sola vez en este celular.</p><label>Tu nombre<input id="nm" value="${esc(quien)}" maxlength="40" autocomplete="off"></label>`,
+   [...(obligatorio?[]:[{t:"Cancelar"}]),{t:"Guardar",k:"pri",f:()=>{const v=$("#nm").value.trim();if(!v)throw new Error("Escribí tu nombre");guardarQuien(v)}}]);
+  if(obligatorio)f.addEventListener("click",e=>{if(e.target===f)e.stopImmediatePropagation()},true);
+  setTimeout(()=>$("#nm").focus(),50);
+}
+function leerQuien(){if(!quien){pedirNombre(true);throw new Error("Primero decinos tu nombre")}return quien}
 async function enviar(cuerpo,ok){await api("POST","/api/turnos",{...cuerpo,quien:leerQuien()});toast(ok);await cargar()}
 function nuevo(cid,ini){
   const c=cancha(cid),r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));

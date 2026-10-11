@@ -2,9 +2,13 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Reportes del Predio</title>
 <link rel="icon" href="data:,">
+<script>try{var t=localStorage.getItem("tema");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="color-scheme" content="light dark">
 <style>
 :root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--bad:#b3261e;--warn:#9a6700}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--bad:#ff8a80;--warn:#e3b341}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--bad:#ff8a80;--warn:#e3b341}}
+:root[data-theme=dark]{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--bad:#ff8a80;--warn:#e3b341}
+:root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
 main{max-width:980px;margin:0 auto;padding:16px}
 h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 8px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
@@ -23,7 +27,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;b
 <form method="post" action="/entrar"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
 <p class="bad" id="mal" hidden>Clave incorrecta</p></div>
 <div id="app" hidden>
-<div class="top"><h1>Reportes del Predio</h1><a class="btn" href="/turnos">Turnos</a><a class="mu" href="/salir">Salir</a></div>
+<div class="top"><h1>Reportes del Predio</h1><a class="btn" href="/turnos">Turnos</a><button id="tema" title="Cambiar entre claro y oscuro">Claro / Oscuro</button><a class="mu" href="/salir">Salir</a></div>
 <div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><a class="btn pri" id="xl" href="#">Bajar Excel</a></div>
 <div class="est" id="est"></div><div id="cont"></div></div>
 <script>
@@ -36,6 +40,7 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const hoyK=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const hora=ts=>new Date(ts).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
 let dia=hoyK(),timer;
+if($("#tema")){$("#tema").onclick=()=>{const r=document.documentElement,oscuro=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;const n=oscuro?"light":"dark";r.dataset.theme=n;try{localStorage.setItem("tema",n)}catch(e){}};}
 if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
 function iniciar(){
   const f=$("#fecha");f.value=dia;
@@ -64,6 +69,15 @@ async function cargar(silencioso){
    <div class="k"><span>Ticket promedio</span><b>${m(k.ticket_promedio)}</b></div>
    <div class="k"><span>Descuentos</span><b>${m(k.descuentos)}</b></div>
    <div class="k"><span>Cobrado neto</span><b>${m(k.cobrado_neto)}</b></div></div><div style="height:12px"></div>`;
+  const fi0=d.fiado||{},aVentas=(k.total_vendido||0)-(fi0.cargos||0),otros=(k.cobrado_neto||0)-(aVentas+(fi0.pagos||0));
+  h+=`<div class="card"><h2>De lo vendido a lo cobrado</h2><table>
+   <tr><td>Total vendido (tickets del día)</td><td class="n">${m(k.total_vendido)}</td></tr>
+   <tr><td>− Quedó en fiado (cuenta corriente)</td><td class="n">${m(-(fi0.cargos||0))}</td></tr>
+   <tr><td>+ Deudas de fiado que pagaron hoy</td><td class="n">${m(fi0.pagos||0)}</td></tr>
+   <tr><td>± Señas de turnos, correcciones y otros</td><td class="n">${m(otros)}</td></tr>
+   <tr><td><b>Cobrado neto (lo que entró)</b></td><td class="n"><b>${m(k.cobrado_neto)}</b></td></tr></table>
+   <p class="mu" style="margin:8px 0 0;font-size:13px">Cobrado y vendido no tienen por qué coincidir: se suma lo que se pagó hoy aunque sea de una venta o una deuda de otro día.</p></div>
+  `;
   h+=`<div class="card"><h2>Cierres de caja</h2>${tabla([
    {t:"Responsable",f:c=>esc(c.responsable||"")},
    {t:"Abrió",f:c=>c.abierta?hora(c.abierta):""},

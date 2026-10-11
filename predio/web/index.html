@@ -715,7 +715,7 @@ const sumarDias = (f, n) => dayKey(new Date(f + 'T12:00:00').getTime() + n * 864
 
 /* Registro de cambios: todo ajuste de precio, anulación, corrección o devolución deja una línea acá y no se puede borrar */
 const cajaAbierta = () => DB.cajas.find(c => !c.cerrada) || null;
-const USUARIO = () => { const c = cajaAbierta(), base = c && c.responsable ? c.responsable : 'Caja'; return Date.now() < UI.adminUntil ? base + ' (con código)' : base; };
+const USUARIO = () => { const c = cajaAbierta(), base = c && c.responsable ? c.responsable : 'Caja'; return base; };
 const soloDigitos = s => String(s || '').replace(/\D/g, '');
 const metodosReales = () => DB.metodos.filter(m => m.activo && !m.fiado);
 function logPush(tipo, ref, detalle, datos) {

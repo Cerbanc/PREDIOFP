@@ -49,7 +49,7 @@ Para **actualizarla**: el programa avisa solo (si hay internet) cuando hay una v
 
 - *Admin → **Todo lo que cambió*** muestra, hecho solo por el programa, cada cosa que se agrega, se cambia o se borra: ítems que alguien saca de una cuenta, movimientos de caja, ajustes de stock, cambios de precio, turnos agendados o borrados, descuentos, anulaciones… con **quién** y **cuándo**. Lo importante va marcado y se puede filtrar. Con *Detalle* se ve cómo estaba antes y cómo quedó (si algo se borró, queda guardado entero).
 - Ese registro **no se puede borrar ni editar**, ni siquiera desde el programa.
-- «Quién» es la persona que abrió la caja; si se usó el código de administración, dice «(con código)».
+- «Quién» es la persona que abrió la caja.
 
 ## 5. Dónde está todo (`C:\Predio`)
 
