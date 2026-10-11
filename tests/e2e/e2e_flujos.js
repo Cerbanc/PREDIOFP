@@ -101,7 +101,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.locator('[data-act=caja-cerrar]').click();
   await page.locator('#cc-contado').fill('1000'); await page.locator('#cc-dejado').fill('1000');
   await page.locator('#cd-0').fill('1900');                                                      // la app de Mercado Pago dice otra cosa
-  assert.ok(/faltan\s+\$\s?100/.test(await page.locator('#cd-r-0').innerText()) && await page.locator('#mact-1').isDisabled(), 'con diferencia hace falta una nota');
+  assert.ok(/faltan\s+\$\s?100/.test(await page.locator('#cd-r-0').innerText()) && !(await page.locator('#mact-1').isDisabled()) && /con diferencia/i.test(await page.locator('#mact-1').innerText()), 'con diferencia se puede cerrar igual (la nota es opcional)');
   await page.locator('#cc-nota').fill('Revisé los pagos y no la encontré');
   await page.locator('#mact-1').click();
   await page.waitForFunction(() => !cajaAbierta());
@@ -140,6 +140,31 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.strictEqual(await ev(() => __pos.DB.productos.length), 3, 'y conserva el producto con foto, que ya estaba en la copia');
   assert.ok((await audit('Se restauró la copia')).length === 1, 'la restauración quedó anotada');
 
+  // ---- 4b. el aviso de stock bajo es sólo del producto que se acaba de sumar
+  const infoP = await ev(() => __pos.DB.productos.map(p => ({ id: p.id, nombre: p.nombre, tipo: p.tipo, stock: p.stock, activo: p.activo })));
+  const otro = infoP.find(p => p.id !== infoP[0].id && p.tipo === 'directo' && p.activo);
+  if (otro) {
+    await ev(([a, b]) => { __pos.tx(() => { const pa = __pos.DB.productos.find(p => p.id === a), pb = __pos.DB.productos.find(p => p.id === b); pa.stock = 2; pa.minimo = 5; pb.stock = 500; pb.minimo = 1; }); }, [infoP[0].id, otro.id]);
+    await page.locator('[data-act=nav][data-v=venta]').click().catch(() => {});
+    await page.locator('select[data-in=dest]').selectOption('M');
+    await tile(infoP[0].nombre).click();
+    const tt = await page.locator('.toast').allInnerTexts();
+    assert.ok(tt.some(x => /Quedan \d+ de|No queda/.test(x)), 'avisa del producto que se sumó: ' + JSON.stringify(tt) + ' ' + JSON.stringify(await ev(() => __pos.DB.comandas.M.items)));
+    await ev(() => document.querySelectorAll('.toast').forEach(t => t.remove()));
+    await tile(otro.nombre).first().click();
+    assert.strictEqual(await page.locator('.toast', { hasText: 'Quedan' }).count(), 0, 'sumar otro producto no vuelve a avisar del primero');
+    await ev(() => { __pos.tx(() => { __pos.DB.comandas.M.items = []; }); });
+  }
+
+  // ---- 4c. eliminar un producto desde Stock (con sus recetas ajustadas)
+  await page.locator('[data-act=nav][data-v=stock]').click();
+  const antes = await ev(() => __pos.DB.productos.length);
+  const fila = page.locator('tbody tr', { hasText: infoP[infoP.length - 1].nombre }).first();
+  await fila.locator('[data-act=prod-del]').click();
+  await page.locator('#mact-1').click();
+  await page.waitForFunction(n => __pos.DB.productos.length === n - 1, antes);
+  assert.ok((await audit('Producto')).some(t => /elimin|borr/i.test(t)), 'eliminar queda anotado');
+
   // ---- 5. borrar el historial: pide escribir BORRAR, hace copia y deja los productos
   await page.locator('[data-act=nav][data-v=admin]').click();
   await page.locator('[data-act=adm-entrar]').click();
@@ -151,7 +176,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.ok(!(await page.locator('#mact-1').isDisabled()));
   await Promise.all([page.waitForEvent('load', { timeout: 15000 }), page.locator('#mact-1').click()]);
   await page.waitForFunction(() => window.__pos && window.__pos.DB);
-  assert.deepStrictEqual(await ev(() => [__pos.DB.ventas.length, __pos.DB.movimientos.length, __pos.DB.contadores.venta, __pos.DB.productos.length]), [0, 0, 0, 3]);
+  assert.deepStrictEqual(await ev(() => [__pos.DB.ventas.length, __pos.DB.movimientos.length, __pos.DB.contadores.venta, __pos.DB.productos.length]), [0, 0, 0, 2]);      // uno menos: se eliminó un producto desde Stock
   assert.ok((await audit('SE BORRÓ EL HISTORIAL')).length === 1);
   assert.deepStrictEqual(errs, [], JSON.stringify(errs));
   console.log('E2E FLUJOS OK');

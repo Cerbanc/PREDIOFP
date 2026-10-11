@@ -1,6 +1,8 @@
 // Reportes del Predio: recibe el resumen del día que sube la PC del local y lo muestra en sólo lectura.
 // Claves: se guardan (como huella SHA-256) en la tabla config de la base D1; no hay secretos en el código.
 import PAGINA from "./pagina.html";
+import PAGINA_TURNOS from "./pagina_turnos.html";
+import { manejarTurnos } from "./turnos.js";
 
 const enc = new TextEncoder();
 const sha = async (t) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(t)))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -41,17 +43,18 @@ export default {
     if (ruta === "/entrar" && req.method === "POST") {
       const f = await req.formData();
       if (igual(await sha(String(f.get("clave") || "").trim()), cfg.hash_ver))
-        return new Response(null, { status: 303, headers: { location: "/", "set-cookie": `s=${sesion}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict` } });
-      return new Response(null, { status: 303, headers: { location: "/?mal=1" } });
+        return new Response(null, { status: 303, headers: { location: String(f.get("volver")) === "/turnos" ? "/turnos" : "/", "set-cookie": `s=${sesion}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict` } });
+      return new Response(null, { status: 303, headers: { location: (String(f.get("volver")) === "/turnos" ? "/turnos" : "/") + "?mal=1" } });
     }
-    if (ruta === "/salir") return new Response(null, { status: 303, headers: { location: "/", "set-cookie": "s=; Path=/; Max-Age=0" } });
+    if (ruta === "/salir") return new Response(null, { status: 303, headers: { location: String(f.get("volver")) === "/turnos" ? "/turnos" : "/", "set-cookie": "s=; Path=/; Max-Age=0" } });
     const dentro = igual(cookie(req, "s"), sesion);
-    if (ruta === "/" || ruta === "/index.html") {
+    if (ruta === "/" || ruta === "/index.html" || ruta === "/turnos") {
       const mal = url.searchParams.get("mal") ? "1" : "0";
-      return new Response(PAGINA.replace("__DENTRO__", dentro ? "1" : "0").replace("__MAL__", mal), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...SEG, "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'" } });
+      return new Response((ruta === "/turnos" ? PAGINA_TURNOS : PAGINA).replace("__DENTRO__", dentro ? "1" : "0").replace("__MAL__", mal), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...SEG, "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'" } });
     }
     if (!dentro) return json({ error: "no autorizado" }, 401);
 
+    if (ruta.startsWith("/api/turnos")) return (await manejarTurnos(req, env, ruta, url)) || json({ error: "no existe" }, 404);
     if (ruta === "/api/dias") {
       const { results } = await env.DB.prepare("SELECT dia, subido, json_extract(resumen,'$.kpis.total_vendido') AS total FROM dias ORDER BY dia DESC LIMIT 400").all();
       return json({ dias: results });

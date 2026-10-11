@@ -237,3 +237,10 @@ def test_nombre_sale_de_la_carpeta_personalizar_y_el_logo_es_fijo(srv):
     assert pedir(srv, "GET", "/marca/logo", token=False, crudo=True)[1].startswith(b"\x89PNG")
     marca.write_text("esto no es json", encoding="utf-8")
     assert "Predio Fútbol-Pádel".encode() in pedir(srv, "GET", "/", token=False, crudo=True)[1]
+
+
+def test_nube_sin_configurar_avisa_y_no_sube(srv):
+    estado, cuerpo, _ = pedir(srv, "GET", "/api/nube")
+    assert estado == 200 and cuerpo["activa"] is False
+    estado, cuerpo, _ = pedir(srv, "POST", "/api/nube/subir", {})
+    assert estado == 400 and "nube_url" in cuerpo["error"]

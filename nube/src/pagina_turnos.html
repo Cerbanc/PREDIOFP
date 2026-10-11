@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Turnos del Predio</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--acs:#e3f3ec;--bad:#b3261e;--warn:#9a6700;--info:#1d5fa8;--infos:#e4eefa;--good:#0a7a5a;--goods:#e3f3ec;--s2:#eef2f0}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--acs:#16352b;--bad:#ff8a80;--warn:#e3b341;--info:#7db4f0;--infos:#14283f;--good:#3fbf96;--goods:#16352b;--s2:#1d2b26}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:12px}
+h1{font-size:20px;margin:0}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.top h1{flex:1}
+button,input,select,.btn{font:inherit;border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:9px 12px}
+button,.btn{cursor:pointer;text-decoration:none;display:inline-block}.pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dan{color:var(--bad)}
+.mu{color:var(--mu)}.est{font-size:14px;margin:4px 0 10px}
+.cal-wrap{overflow:auto;border:1px solid var(--ln);border-radius:14px;background:var(--card);max-height:calc(100vh - 200px);min-height:320px}
+.cal{display:grid}
+.chead{position:sticky;top:0;z-index:3;background:var(--s2);padding:8px 10px;border-bottom:1px solid var(--ln);border-left:1px solid var(--ln);display:flex;flex-direction:column;gap:1px;min-width:0}
+.chead small{color:var(--mu);font-size:11px}.chead.corner{left:0;z-index:5;border-left:0}
+.tcol{position:sticky;left:0;z-index:2;background:var(--card);border-right:1px solid var(--ln)}
+.tcol span{position:absolute;right:6px;font-size:11px;color:var(--mu);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+.ccol{position:relative;border-left:1px solid var(--ln);background-image:linear-gradient(var(--ln) 1px,transparent 1px);background-size:100% var(--hp)}
+.slot{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12px;cursor:pointer;border:1px dashed var(--ln);background:transparent;line-height:1.2}
+.slot b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slot span{color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.free:hover{border-color:var(--ac);background:var(--acs)}
+.slot.res{border-style:solid}
+.slot.res.t-futbol{background:var(--goods);border-color:color-mix(in srgb,var(--good) 45%,var(--ln))}
+.slot.res.t-padel{background:var(--infos);border-color:color-mix(in srgb,var(--info) 50%,var(--ln))}
+.slot.res.fijo{border-left:5px solid var(--ac)}.slot.res.done{opacity:.7}
+.slot.blk{border-style:solid;background:repeating-linear-gradient(45deg,var(--s2),var(--s2) 6px,var(--card) 6px,var(--card) 12px)}
+.slot.past{opacity:.55}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mu);font-size:13px;margin-top:10px}
+.fondo{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:20;padding:12px}
+.modal{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto}
+.modal h2{margin:0 0 8px;font-size:18px}.modal label{display:block;margin:8px 0;font-size:14px;color:var(--mu)}.modal input,.modal select{width:100%;margin-top:3px;color:var(--tx)}
+.acc{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
+.note{background:var(--s2);border-radius:10px;padding:8px 10px;font-size:14px;margin:8px 0}.err{color:var(--bad);font-size:14px;margin-top:8px}
+.centro{max-width:340px;margin:18vh auto;text-align:center}.centro input{width:100%;margin:12px 0}
+.reg{margin-top:16px}.reg table{width:100%;border-collapse:collapse;font-size:14px}.reg td{padding:6px 4px;border-bottom:1px solid var(--ln);vertical-align:top}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ac);color:#fff;padding:10px 16px;border-radius:12px;z-index:30}
+</style></head><body><main>
+<div id="login" class="centro" hidden><h1>Turnos del Predio</h1>
+<form method="post" action="/entrar"><input type="hidden" name="volver" value="/turnos"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
+<p class="dan" id="mal" hidden>Clave incorrecta</p></div>
+<div id="app" hidden>
+<div class="top"><h1>Turnos</h1><a class="btn" href="/">Reportes</a><a class="mu" href="/salir">Salir</a></div>
+<div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><button id="btnreg" style="margin-left:auto">Registro de cambios</button></div>
+<div class="est mu" id="est"></div>
+<div class="cal-wrap" id="cal"></div>
+<div class="legend"><span>Tocá un hueco libre para reservar.</span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos de Fútbol 5 (y al revés).</span></div>
+<div class="reg" id="reg" hidden></div>
+</div>
+<script>
+"use strict";
+const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1",HP=46;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money=n=>"$ "+Math.round(n||0).toLocaleString("es-AR");
+const pad=n=>String(n).padStart(2,"0"),hm=m=>pad(Math.floor(m/60)%24)+":"+pad(m%60);
+const hoyK=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const sumar=(f,n)=>new Date(new Date(f+"T12:00:00Z").getTime()+n*864e5).toISOString().slice(0,10);
+const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const dow=f=>new Date(f+"T12:00:00Z").getUTCDay();
+const larga=f=>new Date(f+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+const F5=["f5a","f5b"],rel=(a,b)=>a.id===b.id||(a.clave==="f7"&&F5.includes(b.clave))||(b.clave==="f7"&&F5.includes(a.clave));
+let dia=hoyK(),D={canchas:[],turnos:[]};
+let quien="";try{quien=localStorage.getItem("quien")||""}catch{}
+if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
+function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2500)}
+async function api(met,url,cuerpo){
+  const r=await fetch(url,{method:met,headers:{"content-type":"application/json"},body:cuerpo?JSON.stringify(cuerpo):undefined,cache:"no-store"});
+  if(r.status===401){location.reload();throw new Error("Sesión vencida")}
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Error");return j;
+}
+function iniciar(){
+  const f=$("#fecha");f.value=dia;
+  f.onchange=()=>{dia=f.value||hoyK();cargar()};
+  const mover=n=>{dia=sumar(dia,n);f.value=dia;cargar()};
+  $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);$("#hoy").onclick=()=>{dia=hoyK();f.value=dia;cargar()};
+  $("#btnreg").onclick=registro;
+  cargar();setInterval(()=>{if(!document.hidden&&!document.querySelector(".fondo"))cargar(true)},30000);
+}
+const cancha=id=>D.canchas.find(c=>c.id===id);
+function ocupante(canchaId,ini,fin,ignorar){const c=cancha(canchaId);return D.turnos.find(t=>t.ini<fin&&ini<t.fin&&rel(c,cancha(t.cancha_id))&&t.id!==ignorar)}
+async function cargar(silencioso){
+  try{D=await api("GET","/api/turnos?fecha="+dia)}catch(e){if(!silencioso)$("#est").innerHTML='<span class="dan">'+esc(e.message)+'</span>';return}
+  pintar();
+}
+function textoEstado(t){
+  if(t.estado==="cobrado")return "cobrado ✓";
+  if(t.tipo_precio==="fijo"&&!t.sena)return "FIJO · "+money(t.precio);
+  return t.sena>0?`seña ${money(t.sena)} · debe ${money(t.precio-t.sena)}`:"sin pago · "+money(t.precio);
+}
+function pintar(){
+  const cs=D.canchas,hoy=hoyK(),n=new Date(),ahora=n.getHours()*60+n.getMinutes();
+  if(!cs.length){$("#cal").innerHTML='<p style="padding:12px">No hay canchas cargadas.</p>';return}
+  const ap=Math.min(...cs.map(c=>c.ap)),ci=Math.max(...cs.map(c=>c.ci)),H=(ci-ap)/60*HP;
+  const horas=[];for(let m=ap;m<ci;m+=60)horas.push(m);
+  $("#est").textContent=`${larga(dia)} · ${D.turnos.length} turnos (${D.turnos.filter(t=>t.tipo_precio==="fijo"&&t.fijo_id).length} fijos)`;
+  const heads=cs.map(c=>`<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)} · fijo ${money(c.precio_fijo)}</small>${c.clave==="f7"?"<small>ocupa también las dos de Fútbol 5</small>":F5.includes(c.clave)?"<small>si se usa, no hay Fútbol 7</small>":""}</div>`).join("");
+  const cols=cs.map(c=>{let h="";for(let s=c.ap;s+c.dur<=c.ci;s+=c.dur){
+    const e=s+c.dur,top=(s-ap)/60*HP,alto=c.dur/60*HP,oc=ocupante(c.id,s,e),pasado=dia<hoy||(dia===hoy&&e<=ahora);
+    let cls,inner,act;
+    if(!oc){cls="free";inner=`<b>${hm(s)}</b><span>libre</span>`;act=`data-c="${c.id}" data-s="${s}"`}
+    else if(oc.cancha_id===c.id){cls="res t-"+c.deporte+(oc.fijo_id&&oc.tipo_precio==="fijo"?" fijo":"")+(oc.estado==="cobrado"?" done":"");inner=`<b>${hm(s)} · ${esc(oc.cliente||"Sin nombre")}</b><span>${textoEstado(oc)}</span>`;act=`data-t="${esc(oc.id)}"`}
+    else{cls="blk";inner=`<b>${hm(s)}</b><span>ocupada por ${esc(cancha(oc.cancha_id).nombre)}</span>`;act=`data-t="${esc(oc.id)}"`}
+    h+=`<button class="slot ${cls} ${pasado?"past":""}" style="top:${top}px;height:${alto}px" ${act}>${inner}</button>`}
+    return `<div class="ccol" style="height:${H}px">${h}</div>`}).join("");
+  const wrap=$("#cal"),prev=wrap.scrollTop;
+  wrap.innerHTML=`<div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(130px,1fr));min-width:${54+cs.length*130}px;--hp:${HP}px"><div class="chead corner"></div>${heads}<div class="tcol" style="height:${H}px">${horas.map((m,i)=>`<span style="top:${i*HP}px">${hm(m)}</span>`).join("")}</div>${cols}</div>`;
+  wrap.scrollTop=prev||(dia===hoy?Math.max(0,((ahora-ap)/60-1)*HP):0);
+  wrap.querySelectorAll(".slot").forEach(b=>b.onclick=()=>b.dataset.c?nuevo(b.dataset.c,+b.dataset.s):ver(b.dataset.t));
+}
+function modal(titulo,cuerpo,acciones){
+  const f=document.createElement("div");f.className="fondo";
+  f.innerHTML=`<div class="modal"><h2>${titulo}</h2>${cuerpo}<div class="err" id="m-err"></div><div class="acc"></div></div>`;
+  const acc=f.querySelector(".acc");
+  acciones.forEach(a=>{const b=document.createElement("button");b.textContent=a.t;if(a.k)b.className=a.k;b.onclick=async()=>{
+    if(!a.f){f.remove();return}
+    b.disabled=true;try{const r=await a.f();if(r!==false)f.remove()}catch(e){f.querySelector("#m-err").textContent=e.message}b.disabled=false};acc.appendChild(b)});
+  f.addEventListener("click",e=>{if(e.target===f)f.remove()});
+  document.body.appendChild(f);return f;
+}
+const quienHtml=()=>`<label>Quién lo anota<input id="q" value="${esc(quien)}" placeholder="Tu nombre" maxlength="40"></label>`;
+function leerQuien(){const q=$("#q").value.trim();if(!q)throw new Error("Poné tu nombre para anotar el cambio");quien=q;try{localStorage.setItem("quien",q)}catch{}return q}
+async function enviar(cuerpo,ok){await api("POST","/api/turnos",{...cuerpo,quien:leerQuien()});toast(ok);await cargar()}
+function nuevo(cid,ini){
+  const c=cancha(cid),r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));
+  modal("Reservar · "+esc(c.nombre),`<p><b>${esc(larga(dia))}</b> · ${hm(ini)} a ${hm(ini+c.dur)} (${c.dur} min)</p>
+   ${r.length?`<div class="note">Al reservar, en ese horario también quedan ocupadas: <b>${r.map(x=>esc(x.nombre)).join(" y ")}</b>.</div>`:""}
+   <label>Tipo de turno<select id="tipo"><option value="comun">Común · ${money(c.precio)}</option><option value="fijo">FIJO, todos los ${DIAS[dow(dia)]} · ${money(c.precio_fijo)} por turno</option></select></label>
+   <label>A nombre de<input id="cli" placeholder="Ej: Los Pibes" autocomplete="off"></label>
+   <label>Teléfono<input id="tel" inputmode="tel" placeholder="Ej: 11 5555-1234"></label>
+   <label>Nota (opcional)<input id="nota"></label>
+   <label id="sbox">Seña (opcional, $)<input id="sena" inputmode="numeric" placeholder="0"></label>${quienHtml()}`,
+   [{t:"Cancelar"},{t:"Reservar",k:"pri",f:()=>enviar({accion:"crear",cancha:cid,fecha:dia,ini,fijo:$("#tipo").value==="fijo",cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value,sena:$("#sena").value},"Turno reservado")}]);
+  $("#tipo").onchange=()=>{$("#sbox").hidden=$("#tipo").value==="fijo"};
+}
+function ver(id){
+  const t=D.turnos.find(x=>x.id===id);if(!t){toast("Ese turno ya no existe");return cargar()}
+  const c=cancha(t.cancha_id),fijo=!!t.fijo_id,virtual=!!t.virtual,r=D.canchas.filter(x=>x.id!==c.id&&rel(c,x));
+  const dg=(t.tel||"").replace(/\D/g,"").replace(/^0+/,""),wa=dg?`https://wa.me/${dg.startsWith("54")?dg:"549"+dg}?text=${encodeURIComponent(`Hola ${t.cliente||""}! Te recordamos tu turno de ${c.nombre} el ${larga(t.fecha)} a las ${hm(t.ini)}. ¡Te esperamos!`)}`:"";
+  const acc=[{t:"Cerrar"}];
+  if(t.estado==="reservado"){
+    acc.push({t:fijo?"Suspender este día":"Cancelar turno",k:"dan",f:()=>enviar({accion:"cancelar",id:t.id},"Listo")});
+    acc.push({t:"Reprogramar",f:()=>{setTimeout(()=>mover(t),0)}});
+    if(fijo)acc.push({t:"Terminar el fijo",k:"dan",f:()=>enviar({accion:"terminar_fijo",fijo_id:t.fijo_id,desde:t.fecha},"Fijo terminado")});
+    acc.push({t:"Editar datos",k:"pri",f:()=>{setTimeout(()=>editar(t),0)}});
+  }
+  modal(esc(c.nombre)+(fijo?" · FIJO":""),`<p><b>${esc(larga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
+   <p><span class="mu">A nombre de</span><br><b>${esc(t.cliente||"Sin nombre")}</b>${t.tel?"<br>"+esc(t.tel):""}${t.nota?'<br><span class="mu">'+esc(t.nota)+"</span>":""}</p>
+   ${wa?`<p><a class="btn" href="${wa}" target="_blank" rel="noopener">Avisar por WhatsApp</a></p>`:""}
+   <div class="note">Precio ${t.tipo_precio==="fijo"?"de fijo":"común"}: <b>${money(t.precio)}</b>${t.sena?` · seña ${money(t.sena)} · saldo ${money(t.precio-t.sena)}`:""}</div>
+   ${r.length?`<div class="note">En este horario también están ocupadas: ${r.map(x=>esc(x.nombre)).join(" y ")}.</div>`:""}
+   ${quienHtml()}`,acc);
+}
+function editar(t){
+  const c=cancha(t.cancha_id);
+  modal("Editar · "+esc(c.nombre),`<label>A nombre de<input id="cli" value="${esc(t.cliente)}"></label><label>Teléfono<input id="tel" value="${esc(t.tel)}" inputmode="tel"></label>
+   <label>Nota<input id="nota" value="${esc(t.nota)}"></label>${t.fijo_id?"":`<label>Seña ($)<input id="sena" inputmode="numeric" value="${t.sena||""}"></label>`}${quienHtml()}
+   ${t.fijo_id?'<div class="note">Cambia el nombre, teléfono y nota de este fijo en todas sus semanas.</div>':""}`,
+   [{t:"Cancelar"},{t:"Guardar",k:"pri",f:()=>enviar(t.fijo_id?{accion:"editar_fijo",fijo_id:t.fijo_id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value}:{accion:"editar",id:t.id,cliente:$("#cli").value,tel:$("#tel").value,nota:$("#nota").value,sena:$("#sena").value},"Guardado")}]);
+}
+function mover(t){
+  modal("Reprogramar",`<label>Fecha<input type="date" id="rf" value="${t.fecha}"></label>
+   <label>Cancha<select id="rc">${D.canchas.map(c=>`<option value="${c.id}" ${c.id===t.cancha_id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
+   <label>Hora (de inicio)<input id="rh" type="time" step="1800" value="${hm(t.ini)}"></label>
+   <label>Precio<select id="rp"><option value="comun" ${t.tipo_precio!=="fijo"?"selected":""}>Común</option><option value="fijo" ${t.tipo_precio==="fijo"?"selected":""}>De fijo</option></select></label>${quienHtml()}`,
+   [{t:"Cancelar"},{t:"Mover",k:"pri",f:()=>{const [h,m]=$("#rh").value.split(":").map(Number);return enviar({accion:"mover",id:t.id,cancha:$("#rc").value,fecha:$("#rf").value,ini:h*60+m,tipo_precio:$("#rp").value},"Turno reprogramado")}}]);
+}
+async function registro(){
+  const box=$("#reg");if(!box.hidden){box.hidden=true;return}
+  const {registro:r}=await api("GET","/api/turnos/registro");
+  box.hidden=false;box.innerHTML='<h2 style="font-size:16px">Registro de cambios (últimos 200)</h2><table>'+r.map(x=>`<tr><td class="mu" style="white-space:nowrap">${new Date(x.ts).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.quien)}</td><td>${esc(x.detalle)}</td></tr>`).join("")+"</table>";
+  box.scrollIntoView({behavior:"smooth"});
+}
+</script></main></body></html>

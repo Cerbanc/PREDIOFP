@@ -85,7 +85,7 @@ class SubidaNube:
                 if self.app.apagar.wait(5):          # junta varios cambios seguidos
                     break
 
-    def subir_ahora(self) -> bool:
+    def subir_ahora(self, forzar: bool = False) -> bool:
         import datetime as dt
         hoy = dia_de(ahora_ms())
         ayer = (dt.date.today() - dt.timedelta(days=1)).isoformat()
@@ -98,23 +98,26 @@ class SubidaNube:
                 con.close()
             k = pedido["resumen"]
             huella = hashlib.sha256(json.dumps({x: k[x] for x in k if x != "generado"}, sort_keys=True, default=str).encode()).hexdigest()
-            if self._huellas.get(dia) == huella and dia != hoy:
+            if not forzar and self._huellas.get(dia) == huella and dia != hoy:
                 continue
-            if self._huellas.get(dia) == huella and self.ultima_subida and time.time() - self.ultima_subida < 3600:
+            if not forzar and self._huellas.get(dia) == huella and self.ultima_subida and time.time() - self.ultima_subida < 3600:
                 continue          # nada nuevo: se vuelve a subir como mucho cada hora para que la nube sepa que la PC está viva
-            if dia == ayer and not k["kpis"]["tickets"] and not k["cajas"]:
+            if not forzar and dia == ayer and not k["kpis"]["tickets"] and not k["cajas"]:
                 continue
             ok = self._enviar(pedido) and ok
             if ok:
                 self._huellas[dia] = huella
         return ok
 
+    def estado(self) -> dict:
+        return {"activa": self.activa, "url": self.url, "ultima_subida": int(self.ultima_subida * 1000) if self.ultima_subida else None, "error": self.ultimo_error}
+
     def _enviar(self, pedido: dict) -> bool:
         cuerpo = json.dumps(pedido).encode("utf-8")
         req = urllib.request.Request(self.url + "/api/subir", data=cuerpo, method="POST",
                                      headers={"Authorization": "Bearer " + self.token, "Content-Type": "application/json", "User-Agent": "CajaDelPredio"})
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:           # noqa: S310 - la URL es https y la define quien administra
+            with urllib.request.urlopen(req, timeout=20) as r:           # noqa: S310 - la URL es https y la define quien administra
                 r.read()
             self.ultimo_error = None
             self.ultima_subida = time.time()

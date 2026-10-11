@@ -742,7 +742,6 @@ function cerrarCaja(contado, dejado, nota, digitales) {
   const ef = efectivoDeCaja(c), dif = contado - ef.esperado;
   const dig = (digitales || []).map(d => { const esp = saldoDigital(c, d.metodoId), m = metodo(d.metodoId); return { metodoId: d.metodoId, nombre: m ? m.nombre : '?', esperado: esp, informado: d.informado, diferencia: d.informado === null ? null : d.informado - esp }; });
   if (dejado > contado) throw new Error('No se puede dejar más de lo que hay contado');
-  if ((dif !== 0 || dig.some(d => d.diferencia)) && !String(nota || '').trim()) throw new Error('Hay diferencia: explicala en la nota');
   const retiro = contado - dejado;
   if (retiro > 0) DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: 'retiro', concepto: 'Retiro de cierre a caja mayor', proveedor: '', monto: retiro, nota: '' });
   Object.assign(c, { cerrada: Date.now(), esperado: ef.esperado, contado, diferencia: dif, dejado, retiroFinal: retiro, nota: String(nota || '').trim(), desglose: ef, digital: dig });
@@ -1356,16 +1355,18 @@ function setItems(key, items, neg) {
 function aplicarItems(key, items, neg) {
   const pag = pagadoDe(getCom(key));
   if (pag > 0 && totalItems(items) < pag) return toast(`No se puede: ya pagaron ${money(pag)}. Primero devolvé un pago.`, 'warn');
+  const antes = consumoItems(getCom(key).items || []);
   const r = tx(() => setItems(key, items, neg));
   if (!r.ok) return;
   if (neg) toast('Se vende igual: el stock va a quedar en negativo hasta que cargues la mercadería.', 'warn', 'neg');
-  else avisoBajo(items);
+  else avisoBajo(items, antes);
   if (UI.view === 'venta') { renderGrid(); renderCart(); }
   renderSide();
 }
-function avisoBajo(items) {
+function avisoBajo(items, antes) {
   const need = consumoItems(items), res = reservadoOtros('__nada__');
-  const bajos = Object.keys(need).map(id => prod(id)).filter(p => p && p.stock - (res[p.id] || 0) <= p.minimo);
+  // sólo avisa de lo que se acaba de sumar: si vendés agua no te vuelve a avisar de la coca que ya estaba en la cuenta
+  const bajos = Object.keys(need).filter(id => (need[id] || 0) > ((antes || {})[id] || 0)).map(id => prod(id)).filter(p => p && p.stock - (res[p.id] || 0) <= p.minimo);
   if (!bajos.length) return;
   toast(bajos.map(p => { const r = Math.max(0, p.stock - (res[p.id] || 0)); return r === 0 ? `No queda ${p.nombre} (según el sistema)` : `Quedan ${r} de ${p.nombre}`; }).join(' · '), 'warn', 'stock');
 }
@@ -1760,6 +1761,14 @@ function pintarAvisoGuardado() {
   if (!SERVIDOR || ESTADO_GUARDADO.ok) return;
   $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-guardado" style="background:var(--bad-soft);color:var(--bad);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span><b>No se está guardando.</b> ${esc(ESTADO_GUARDADO.error)} No cierres la ventana: se reintenta solo.</span><button class="btn sm danger" data-act="reintentar-guardado">Reintentar ahora</button></div>`);
 }
+function textoNube(r) {
+  if (!r.activa) return 'No está configurada: poné <b>nube_url</b> y <b>nube_token</b> en <b>C:\\Predio\\configuracion.json</b> y reiniciá el programa.';
+  return (r.ultima_subida ? 'Última subida: <b>' + esc(fechaHora(r.ultima_subida)) + '</b>. ' : 'Todavía no subió nada desde que se abrió el programa. ') + (r.error ? '<span style="color:var(--bad)">Último error: ' + esc(r.error) + '</span>' : 'Se sube sola cada 10 minutos.');
+}
+function pintarNube(r, err) {
+  const el = $('#nube-est'); if (!el) return;
+  el.innerHTML = err ? '<span style="color:var(--bad)">' + esc(err) + '</span>' : textoNube(r);
+}
 /* Actualizaciones: se consulta en segundo plano (sin trabar la pantalla) y sólo se baja algo cuando se lo pide. */
 let ACTUALIZACION = null;
 function consultarActualizacion(forzar, avisar) {
@@ -1804,7 +1813,8 @@ function renderSide() {
   const aviso = SERVIDOR
     ? `${PREDIO.modo === 'demo' ? '<div class="demo-tag">Modo demostración: datos de ejemplo, separados de los reales.</div>' : ''}
        <div class="guardado ${ESTADO_GUARDADO.ok ? 'ok' : 'mal'}" id="estado-guardado">${esc(textoGuardado())}</div>
-       <button data-act="carpeta-dia" title="Abre la carpeta con el Excel y el registro de cambios de hoy">${ic('carpeta')}<b>Carpeta de hoy</b></button>`
+       <button data-act="carpeta-dia" title="Abre la carpeta con el Excel y el registro de cambios de hoy">${ic('carpeta')}<b>Carpeta de hoy</b></button>
+       ${DB.config.usarTurnos ? '' : `<button data-act="nube-abrir" data-p="/turnos" title="Abre el calendario de turnos en la web (hace falta internet)">${ic('cal')}<b>Turnos (web)</b></button>`}`
     : `<div class="demo-tag">Prototipo con datos de ejemplo. Se guarda sólo en este navegador.</div>
        ${STORAGE_OK ? '' : '<div class="demo-tag" style="background:var(--bad-soft);color:var(--bad)">Este navegador no deja guardar: al recargar se pierde todo.</div>'}`;
   $('#side-foot').innerHTML = aviso + `<button data-act="tema" aria-label="Cambiar entre modo claro y oscuro">${ic('tema')}<b>Claro / Oscuro</b></button>` +
@@ -2149,7 +2159,7 @@ views.stock = () => {
       ${list.map(p => { const [k, t] = stockEstado(p), rec = p.tipo === 'receta';
         return `<tr><td><span class="dot" style="--h:${hueDe(p.catId)};margin-right:8px"></span><b>${esc(p.nombre)}</b></td><td class="muted">${TIPOS[p.tipo].n}</td>
         <td class="r num"><b ${p.stock < 0 ? 'style="color:var(--bad)"' : ''}>${rec ? '—' : p.stock}</b></td><td class="r num">${rec ? '—' : p.minimo}</td><td><span class="pill ${k}">${t}</span></td>
-        <td class="r">${rec ? '<span class="muted">usa insumos</span>' : `<div class="actions"><button class="btn sm primary" data-act="stk-ing" data-id="${p.id}">Ingreso</button><button class="btn sm" data-act="stk-aj" data-id="${p.id}">Contar</button></div>`}</td></tr>`; }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Nada para mostrar.</td></tr>'}
+        <td class="r">${rec ? '<span class="muted">usa insumos</span><div class="actions"><button class="btn sm ghost" data-act="prod-del" data-id="${p.id}">Eliminar</button></div>' : `<div class="actions"><button class="btn sm primary" data-act="stk-ing" data-id="${p.id}">Ingreso</button><button class="btn sm" data-act="stk-aj" data-id="${p.id}">Contar</button><button class="btn sm ghost" data-act="prod-del" data-id="${p.id}">Eliminar</button></div>`}</td></tr>`; }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Nada para mostrar.</td></tr>'}
       </tbody></table></div>
       <p class="muted" style="margin-top:10px">Los productos de servicio (turnos, café, minutas) no llevan stock y no aparecen acá.</p>`;
   } else {
@@ -2348,7 +2358,7 @@ function modalCerrarCaja() {
       ${UI.cierre.dig.map((d, i) => `<div class="card" style="padding:12px"><div class="l2"><b>${esc(d.nombre)}</b><span>debería haber <b>${money(d.esperado)}</b></span></div>
         <label class="fld">Según la app (lo que ves en Mercado Pago)<input class="in" id="cd-${i}" data-in="cc" inputmode="numeric" placeholder="${d.esperado}" autocomplete="off"></label><div id="cd-r-${i}" class="muted" style="margin-top:6px"></div></div>`).join('')}
       <div class="pg-sum" id="cc-res"></div>
-      <label class="fld">Nota (obligatoria si hay diferencia)<input class="in" id="cc-nota" data-in="cc" placeholder="Ej: faltaron $200 de vuelto"></label>`,
+      <label class="fld">Nota (opcional; conviene si hay diferencia: por ejemplo la comisión del QR)<input class="in" id="cc-nota" data-in="cc" placeholder="Ej: faltaron $200 de vuelto"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Cerrar caja', kind: 'primary', disabled: true, onClick: () => {
       const r = tx(() => cerrarCaja(num($('#cc-contado').value), num($('#cc-dejado').value), $('#cc-nota').value, UI.cierre.dig.map((d, i) => ({ metodoId: d.id, informado: $('#cd-' + i).value.trim() === '' ? null : num($('#cd-' + i).value) }))));
       if (!r.ok) return false;
@@ -2374,7 +2384,7 @@ function pintarCierre() {
     el.innerHTML = df === 0 ? '<span class="pill good">cuadra</span>' : `<b style="color:var(--bad)">${df > 0 ? 'sobran' : 'faltan'} ${money(Math.abs(df))}</b> · revisá los pagos en Caja, corregí tickets o cargá un movimiento o una pérdida y volvé a cerrar`;
   });
   $('#cc-res').innerHTML = html + (hay && dif === 0 && !difDig ? '<div class="l"><span>Resultado</span><span class="pill good">todo cuadra</span></div>' : '');
-  const b = $('#mact-1'); if (b) b.disabled = !hay || dejado > contado || ((dif !== 0 || difDig) && !$('#cc-nota').value.trim());
+  const b = $('#mact-1'); if (b) { b.disabled = !hay || dejado > contado; b.textContent = (dif !== 0 || difDig) ? 'Cerrar con diferencia' : 'Cerrar caja'; }
 }
 
 /* --- CLIENTES --- */
@@ -2673,7 +2683,8 @@ admBody.pagos = () => {
 };
 function tarjetasServidor() {
   let sa, cp;
-  try { sa = http('GET', '/api/salud'); cp = http('GET', '/api/copias').copias; }
+  let nb = { activa: false };
+  try { sa = http('GET', '/api/salud'); cp = http('GET', '/api/copias').copias; nb = http('GET', '/api/nube'); }
   catch (e) { return `<div class="card"><h2>Datos</h2><p class="err">${esc(e.message)}</p></div>`; }
   const mb = n => n == null ? '—' : (n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.max(0.1, n / 1e6).toFixed(1) + ' MB');
   const fecha = d => d.split('-').reverse().join('/');
@@ -2687,6 +2698,7 @@ function tarjetasServidor() {
       <div class="l2"><span>Espacio libre en el disco</span><b>${mb(sa.espacio_libre)}</b></div>
       <div class="l2"><span>Excel y registro de hoy</span><b>${esc(dia)}</b></div>
       <div class="l2"><span>Versión del programa</span><b>${esc(sa.version)}</b></div></div></div>
+    ${SERVIDOR ? `<div class="card"><h2>Reportes en la nube</h2><div class="stack"><p class="muted" id="nube-est">${textoNube(nb)}</p><div class="row"><button class="btn primary" data-act="nube-subir">Subir ahora</button><button class="btn" data-act="nube-abrir">Abrir la página de reportes</button><button class="btn" data-act="nube-abrir" data-p="/turnos">Abrir turnos</button></div></div></div>` : ''}
     <div class="card"><h2>Actualizaciones</h2><div class="stack"><p class="muted">Versión instalada: <b>${esc(sa.version)}</b>. El programa avisa solo cuando hay una nueva (si hay internet) y la baja <b>sólo si vos lo pedís</b>.</p><button class="btn" data-act="act-buscar" style="align-self:flex-start">Buscar actualización</button></div></div>
     <div class="card"><h2>Copias de seguridad</h2><div class="stack">
       <p class="muted">Se hace una copia sola al abrir el programa cada día y otra al cerrarlo. Última: <b>${esc(ult)}</b>.</p>
@@ -3254,19 +3266,33 @@ function guardarProducto() {
   if (r.ok) { toast('Producto guardado'); render(); }
 }
 function eliminarProducto(id) {
-  const p = prod(id);
-  const usado = DB.productos.find(x => x.receta && x.receta.some(r => r.id === id));
-  if (usado) return toast(`No se puede: "${usado.nombre}" lo usa en su receta`, 'warn');
-  if (Object.values(DB.comandas).some(c => c.items.some(i => i.prodId === id))) return toast('No se puede: está en una cuenta abierta', 'warn');
-  ask('Eliminar producto', `¿Eliminar <b>${esc(p.nombre)}</b>? Los tickets viejos mantienen su nombre. Si sólo querés que no aparezca en la caja, usá "Ocultar".`, 'Eliminar', () => {
-    const r = tx(() => { DB.productos = DB.productos.filter(x => x.id !== id); });
-    if (r.ok) { toast('Producto eliminado'); render(); }
-  }, true);
+  const p = prod(id); if (!p) return;
+  const enAbierta = Object.entries(DB.comandas).find(([k, c]) => c.items.some(i => i.prodId === id));
+  if (enAbierta) return toast(`No se puede: está en una cuenta abierta (${enAbierta[0] === 'M' ? 'Mostrador' : enAbierta[0]}). Cobrala o sacalo de la cuenta primero.`, 'warn');
+  const usados = DB.productos.filter(x => x.id !== id && x.receta && x.receta.some(r => r.id === id));
+  const extra = usados.length ? `<p class="note warn">Lo usan estas recetas: <b>${usados.map(u => esc(u.nombre)).join(', ')}</b>. Se lo saca de esas recetas.</p>` : '';
+  const stk = p.tipo !== 'servicio' && p.tipo !== 'receta' && p.stock > 0 ? `<p class="muted">Tiene ${p.stock} unidades en stock: se pierden del inventario (queda en el registro).</p>` : '';
+  modal({ title: 'Eliminar producto', body: `<p>¿Eliminar <b>${esc(p.nombre)}</b>? Los tickets viejos mantienen su nombre. Si sólo querés que no aparezca en la caja, usá "Ocultar".</p>${extra}${stk}`,
+    actions: [{ label: 'Cancelar' }, { label: 'Eliminar', kind: 'danger', onClick: () => {
+      const r = tx(() => {
+        usados.forEach(u => { u.receta = u.receta.filter(x => x.id !== id); });
+        DB.productos = DB.productos.filter(x => x.id !== id);
+      });
+      if (r.ok) { toast('Producto eliminado'); render(); }
+    } }] });
 }
 
 /* ---------- acciones de los botones ---------- */
 const A = {
   'act-buscar': () => consultarActualizacion(true, true),
+  'nube-subir': () => {
+    const el = $('#nube-est'); if (el) el.textContent = 'Subiendo…';
+    setTimeout(() => {
+      try { const r = http('POST', '/api/nube/subir', {}); pintarNube(r); toast(r.ok ? 'Reporte subido a la nube' : 'No se pudo subir: ' + (r.error || 'revisá la conexión'), r.ok ? 'ok' : 'warn'); }
+      catch (e) { pintarNube(null, e.message); toast(e.message, 'warn'); }
+    }, 50);
+  },
+  'nube-abrir': d => { try { const r = http('GET', '/api/nube'); if (r.url) window.open(r.url + (d.p || ''), '_blank', 'noopener'); else toast('Falta nube_url en configuracion.json', 'warn'); } catch (e) { toast(e.message, 'warn'); } },
   'act-ver': () => {
     const a = ACTUALIZACION; if (!a || !a.hay) return;
     modal({ title: 'Actualizar a la versión ' + a.version, wide: true,

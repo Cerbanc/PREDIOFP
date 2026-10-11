@@ -90,10 +90,12 @@ Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el 
 
 ## 8. Reportes desde el celular (opcional)
 
-Si en `C:\Predio\configuracion.json` están `nube_url` (la dirección de la página) y `nube_token` (la clave de la PC), el programa sube solo el reporte de hoy cada 10 minutos y al abrir o cerrar una caja. Se ve desde cualquier celular o PC en esa dirección, con otra clave (de sólo lectura), eligiendo el día, y se puede bajar el Excel. Si no hay internet, no pasa nada: se reintenta solo. Para cambiar el valor hay que cerrar y volver a abrir el programa. El código está en la carpeta `nube/`.
+Si en `C:\Predio\configuracion.json` están `nube_url` (la dirección de la página) y `nube_token` (la clave de la PC), el programa sube solo el reporte de hoy cada 10 minutos y al abrir o cerrar una caja. Se ve desde cualquier celular o PC en esa dirección, con otra clave (de sólo lectura), eligiendo el día, y se puede bajar el Excel. Si no hay internet, no pasa nada: se reintenta solo. Para cambiar el valor hay que cerrar y volver a abrir el programa. El código está en la carpeta `nube/`. En *Admin → Datos y seguridad → Reportes en la nube* está el botón **Subir ahora** (sube en el acto y muestra si salió bien o el error) y los accesos para abrir la página de reportes y la de turnos.
+
+**Turnos (web):** en la misma dirección, agregando `/turnos`, está el calendario (también desde el botón *Turnos (web)* de la barra lateral). Se abre desde el celular o cualquier PC con la misma clave. Es la **única fuente de los turnos**: no se pueden pisar dos reservas (Fútbol 7 bloquea los dos Fútbol 5 y al revés), hay turnos fijos, se puede reprogramar, suspender y avisar por WhatsApp, y todo cambio queda anotado con el nombre de quien lo hizo (botón *Registro de cambios*). Por ahora **el cobro de los turnos no está conectado con la caja** de la PC: la seña se anota como dato.
 
 ## 9. Lo que todavía no está
 
-- **Turnos en la nube** (planilla compartida / celular / bot): el calendario de turnos del programa está apagado por ahora (se prende en *Datos y seguridad*) hasta resolver cómo se conectan con el celular.
+- **Cobro de turnos desde la caja**: los turnos ya se manejan en la web, pero cobrarlos y que sumen a la caja y a los reportes todavía no está conectado (el calendario viejo del programa sigue apagado).
 - **Lectura de remitos con foto**: en la carga de stock, la lectura de la foto sigue siendo una simulación.
 - **Google Sheets** como espejo de los reportes.

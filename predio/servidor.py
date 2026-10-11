@@ -202,6 +202,8 @@ class Manejador(BaseHTTPRequestHandler):
             ("POST", "/api/guardar"): self.api_guardar,
             ("POST", "/api/latido"): self.api_latido,
             ("GET", "/api/salud"): self.api_salud,
+            ("GET", "/api/nube"): self.api_nube_estado,
+            ("POST", "/api/nube/subir"): self.api_nube_subir,
             ("GET", "/api/auditoria"): self.api_auditoria,
             ("GET", "/api/copias"): self.api_copias,
             ("POST", "/api/copias/crear"): self.api_copia_crear,
@@ -292,6 +294,17 @@ class Manejador(BaseHTTPRequestHandler):
     def api_latido(self, q: dict) -> None:
         self._leer_cuerpo(10_000)
         self._json(200, {"ok": True, "rev": self.app.almacen.rev(), "avisos": self.app.avisos})
+
+    def api_nube_estado(self, q: dict) -> None:
+        self._json(200, self.app.nube.estado())
+
+    def api_nube_subir(self, q: dict) -> None:
+        self._leer_cuerpo(10_000)
+        nube = self.app.nube
+        if not nube.activa:
+            raise Error(400, "La nube no está configurada: faltan nube_url y nube_token en configuracion.json.")
+        ok = nube.subir_ahora(forzar=True)
+        self._json(200, {"ok": ok, **nube.estado()})
 
     def api_salud(self, q: dict) -> None:
         app = self.app
