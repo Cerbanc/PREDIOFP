@@ -6,7 +6,6 @@ if not exist .venv ( py -3.11 -m venv .venv || goto :error )
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip || goto :error
 pip install -r requirements-dev.txt || goto :error
-python packaging\hacer_icono.py || goto :error
 python -m pytest tests -q --ignore=tests\test_e2e.py || goto :error
 pyinstaller packaging\predio.spec --noconfirm || goto :error
 python packaging\probar_exe.py dist\Predio\Predio.exe || goto :error

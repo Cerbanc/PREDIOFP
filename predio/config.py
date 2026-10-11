@@ -160,21 +160,21 @@ def carpeta_recursos() -> Path:
     return Path(__file__).resolve().parent
 
 
-MARCA_POR_DEFECTO = {"nombre": "Predio Fútbol-Pádel", "logo": "logo.png"}
+MARCA_POR_DEFECTO = {"nombre": "Predio Fútbol-Pádel"}
 LEEME_PERSONALIZAR = """PERSONALIZAR EL PROGRAMA
 ========================
 
-marca.json  -> el nombre que aparece arriba a la izquierda y en los tickets, y el nombre del archivo del logo.
-logo.png    -> el logo (PNG, JPG o WEBP; cuadrado o apaisado, idealmente de 200 px de alto o más).
+marca.json  -> el nombre que aparece arriba a la izquierda y en los tickets.
 
-Para ver un cambio: guardá el archivo y en el programa apretá F5 (no hace falta cerrar nada ni reinstalar).
-Este archivo y el logo NO se tocan al actualizar el programa.
+El logo es fijo (viene dentro del programa).
+Para ver un cambio de nombre: guardá el archivo y en el programa apretá F5 (no hace falta cerrar nada ni reinstalar).
+Este archivo NO se toca al actualizar el programa.
 Si borrás marca.json, se vuelve a crear con los valores de fábrica.
 """
 
 
 def leer_marca(rutas: Rutas) -> dict:
-    """Nombre y logo del negocio. Se leen de C:\\Predio\\personalizar cada vez que se abre la pantalla."""
+    """Nombre del negocio. Se leen de C:\\Predio\\personalizar cada vez que se abre la pantalla."""
     marca = dict(MARCA_POR_DEFECTO)
     ruta = rutas.personalizar / "marca.json"
     try:
@@ -184,8 +184,6 @@ def leer_marca(rutas: Rutas) -> dict:
             if isinstance(leido, dict):
                 if isinstance(leido.get("nombre"), str) and leido["nombre"].strip():
                     marca["nombre"] = leido["nombre"].strip()[:60]
-                if isinstance(leido.get("logo"), str):
-                    marca["logo"] = leido["logo"].strip()
         else:
             ruta.write_text(json.dumps(MARCA_POR_DEFECTO, indent=2, ensure_ascii=False), encoding="utf-8")
         leeme = rutas.personalizar / "LEEME.txt"
@@ -196,9 +194,6 @@ def leer_marca(rutas: Rutas) -> dict:
     return marca
 
 
-def ruta_logo(rutas: Rutas, marca: dict) -> Path | None:
-    nombre = Path(marca.get("logo") or "").name           # sólo el nombre: nunca rutas
-    if not nombre or Path(nombre).suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
-        return None
-    p = rutas.personalizar / nombre
-    return p if p.is_file() else None
+def ruta_logo() -> Path:
+    """El logo es fijo: viene dentro del programa y no se cambia desde ninguna carpeta."""
+    return carpeta_recursos() / "web" / "logo.png"

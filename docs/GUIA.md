@@ -11,7 +11,7 @@ Punto de venta para el predio (kiosco, pádel y buffet) que **funciona sin inter
    - **Caja del Predio (demostración)**: abre una copia aparte con datos de ejemplo, para mostrarla o practicar sin tocar nada real.
 4. Al abrirla por primera vez se crea la carpeta **`C:\Predio`**. Ahí vive todo (ver el punto 5).
 
-Para **actualizarla**: el programa avisa solo (si hay internet) cuando hay una versión nueva, con un cartel arriba: **Ver qué cambió y actualizar**. Se baja el instalador completo (unos 20 MB) **una sola vez y sólo si lo pedís**, hace una copia de seguridad, se cierra y se vuelve a abrir solo. También está *Admin → Datos y seguridad → Buscar actualización*. Los datos de `C:\Predio` no se tocan nunca; si la base necesita cambios, el programa hace otra copia y los hace solo. No hace falta ser administrador de Windows. Las versiones se publican en GitHub como v1.1.0, v1.2.0…
+Para **actualizarla**: el programa avisa solo (si hay internet) cuando hay una versión nueva, con un cartel arriba y el botón **Actualizar ahora** (si ya tenés la última, no aparece nada). Se baja el instalador completo (unos 20 MB) **una sola vez y sólo si lo pedís**, hace una copia de seguridad, se cierra y se vuelve a abrir solo. También está *Admin → Datos y seguridad → Buscar actualización*. Los datos de `C:\Predio` no se tocan nunca; si la base necesita cambios, el programa hace otra copia y los hace solo. No hace falta ser administrador de Windows. Las versiones se publican en GitHub como v1.1.0, v1.2.0…
 
 ## 2. El primer día: cargar productos y stock
 
@@ -62,7 +62,7 @@ C:\Predio\
   copias\                   Copias de seguridad de la base (se hacen solas, ver punto 6)
   imagenes\                 Fotos de los productos
   planillas\                Las planillas de productos que bajaste o subiste
-  personalizar\             marca.json (el nombre del negocio) y logo.png: se cambian con el Bloc de notas y se ven con F5
+  personalizar\             marca.json (el nombre del negocio): se cambia con el Bloc de notas y se ve con F5
   configuracion.json        Ajustes que se pueden cambiar con el Bloc de notas
   LEEME.txt                 Resumen de esta carpeta
 ```
@@ -71,7 +71,7 @@ Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el 
 
 **Mirar la base desde otro programa:** instalá *DB Browser for SQLite* (gratis), abrí `predio.db` con *Abrir en modo sólo lectura* y mirá las vistas que empiezan con `v_` (`v_ventas`, `v_venta_items`, `v_productos`, `v_libro_caja`, `v_cambios`…): ya vienen ordenadas en columnas.
 
-**Logo:** un PNG cuadrado de **256 × 256 px** (fondo transparente) llamado `logo.png`; en pantalla se ve a 34 px y también se usa como ícono de la ventana. **Nombre (fijo del negocio):** en `C:\Predio\personalizar\`. Abrí `marca.json` con el Bloc de notas y cambiá el nombre; copiá tu logo en esa carpeta con el nombre `logo.png`. Guardá y apretá **F5** en el programa: no hay que reinstalar nada, y las actualizaciones no tocan esa carpeta.
+**Logo:** es fijo, viene dentro del programa y no se cambia. **Nombre del negocio:** en `C:\Predio\personalizar\marca.json`; abrilo con el Bloc de notas, cambiá el nombre, guardá y apretá **F5** en el programa. Las actualizaciones no tocan esa carpeta.
 
 ## 6. Copias de seguridad
 

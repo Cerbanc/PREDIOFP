@@ -224,18 +224,16 @@ def test_aviso_si_la_base_esta_vacia_pero_hay_copias(rutas):
         app_mod.cerrar_aplicacion(app2)
 
 
-def test_nombre_y_logo_salen_de_la_carpeta_personalizar(srv):
+def test_nombre_sale_de_la_carpeta_personalizar_y_el_logo_es_fijo(srv):
     marca = srv.app.rutas.personalizar / "marca.json"
     estado, html, _ = pedir(srv, "GET", "/", token=False, crudo=True)
-    assert "Predio Fútbol-Pádel".encode() in html and marca.exists() and '"logo": false' in html.decode()
-    assert pedir(srv, "GET", "/marca/logo", token=False)[0] == 404
-    marca.write_text('{"nombre": "Mi Club <b>", "logo": "logo.png"}', encoding="utf-8")
-    (srv.app.rutas.personalizar / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 20)
-    estado, html, _ = pedir(srv, "GET", "/", token=False, crudo=True)          # sin reiniciar nada
-    assert "Mi Club".encode() in html and b"<b>" not in html.split(b"window.PREDIO=")[1].split(b";</script>")[0] and '"logo": true' in html.decode()
+    assert "Predio Fútbol-Pádel".encode() in html and marca.exists() and '"logo": true' in html.decode()
     estado, img, cab = pedir(srv, "GET", "/marca/logo", token=False, crudo=True)
     assert estado == 200 and cab["Content-Type"] == "image/png" and img.startswith(b"\x89PNG")
-    marca.write_text('{"nombre": "X", "logo": "../datos/predio.db"}', encoding="utf-8")
-    assert pedir(srv, "GET", "/marca/logo", token=False)[0] == 404
+    marca.write_text('{"nombre": "Mi Club <b>", "logo": "../datos/predio.db"}', encoding="utf-8")
+    (srv.app.rutas.personalizar / "logo.png").write_bytes(b"otro")             # un logo suelto no reemplaza al fijo
+    estado, html, _ = pedir(srv, "GET", "/", token=False, crudo=True)          # sin reiniciar nada
+    assert "Mi Club".encode() in html and b"<b>" not in html.split(b"window.PREDIO=")[1].split(b";</script>")[0]
+    assert pedir(srv, "GET", "/marca/logo", token=False, crudo=True)[1].startswith(b"\x89PNG")
     marca.write_text("esto no es json", encoding="utf-8")
     assert "Predio Fútbol-Pádel".encode() in pedir(srv, "GET", "/", token=False, crudo=True)[1]

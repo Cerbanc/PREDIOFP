@@ -427,7 +427,7 @@ const UI = {
   editSalon: false, mesaEdit: null, admTab: 'productos', admQ: '', adminUntil: 0,
 };
 
-/* Nombre y logo del negocio: salen de C:\\Predio\\personalizar (no se editan desde el programa). Sin el programa, se usa el nombre guardado. */
+/* Nombre del negocio: sale de C:\\Predio\\personalizar (no se edita desde el programa); el logo es fijo. Sin el programa, se usa el nombre guardado. */
 const nombreNegocio = () => (SERVIDOR && PREDIO.marca && PREDIO.marca.nombre) || (DB && DB.negocio) || 'Predio';
 function uid(prefix) { return prefix + (DB.seq++).toString(36); }
 
@@ -1773,7 +1773,7 @@ function consultarActualizacion(forzar, avisar) {
 function pintarActualizacion() {
   const viejo = document.getElementById('aviso-actualizacion'); if (viejo) viejo.remove();
   if (!SERVIDOR || !ACTUALIZACION || !ACTUALIZACION.hay) return;
-  $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-actualizacion" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span>Hay una <b>versión nueva</b> del programa: ${esc(ACTUALIZACION.version)} (tenés la ${esc(ACTUALIZACION.actual)}).</span><button class="btn sm primary" data-act="act-ver">Ver qué cambió y actualizar</button></div>`);
+  $('#main').insertAdjacentHTML('afterbegin', `<div class="note" id="aviso-actualizacion" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span>Hay una <b>versión nueva</b> del programa: ${esc(ACTUALIZACION.version)} (tenés la ${esc(ACTUALIZACION.actual)}).</span><button class="btn sm primary" data-act="act-ver">Actualizar ahora</button></div>`);
 }
 let AVISOS_SIS = [];
 function pintarAvisosSistema() {
@@ -2696,7 +2696,7 @@ function tarjetasServidor() {
 admBody.datos = () => {
   $('#adm-body').innerHTML = `<div class="cols">
     <div class="card"><h2>Datos del negocio</h2><div class="stack">
-      ${SERVIDOR ? `<p class="muted">Nombre y logo: se cambian en la carpeta <b>C:\\Predio\\personalizar</b> (archivo marca.json y logo.png) y se ven con F5.</p>` : `<label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>`}
+      ${SERVIDOR ? `<p class="muted">Nombre: se cambia en <b>C:\\Predio\\personalizar\\marca.json</b> y se ve con F5. El logo es fijo.</p>` : `<label class="fld">Nombre (aparece en los tickets)<input class="in" data-in="negocio" value="${esc(DB.negocio)}"></label>`}
       <label class="fld">Código de administración<input class="in" id="newpin" type="password" inputmode="numeric" placeholder="Nuevo código"><small>Dejalo vacío para no cambiarlo. Es una traba para que nadie toque precios por error, no una clave de seguridad.</small></label>
       <button class="btn primary" data-act="pin-save" style="align-self:flex-start">Guardar código</button>
       <label class="row" style="gap:8px;margin-top:6px"><input type="checkbox" data-in="cfg-pin" ${DB.config.pedirPinAjuste ? 'checked' : ''}> Pedir el código para dar descuentos o vender al costo</label>

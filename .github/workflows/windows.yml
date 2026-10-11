@@ -41,8 +41,6 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Pruebas (en Windows)
         run: python -m pytest tests -q --ignore=tests/test_e2e.py
-      - name: Icono
-        run: python packaging/hacer_icono.py
       - name: Armar el programa
         run: pyinstaller packaging/predio.spec --noconfirm
       - name: Probar el programa armado

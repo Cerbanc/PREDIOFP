@@ -227,7 +227,7 @@ class Manejador(BaseHTTPRequestHandler):
     def _pagina(self) -> None:
         app = self.app
         marca = leer_marca(app.rutas)
-        marca["logo"] = bool(ruta_logo(app.rutas, marca))
+        marca["logo"] = ruta_logo().is_file()
         config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "marca": marca}, ensure_ascii=False).replace("<", "\\u003c")
         icono = '<link rel="icon" href="/marca/logo">' if marca["logo"] else ""
         html = app.html.replace("<!--PREDIO-CONFIG-->", f"{icono}<script>window.PREDIO={config};</script>")
@@ -235,11 +235,10 @@ class Manejador(BaseHTTPRequestHandler):
 
     def _logo(self) -> None:
         app = self.app
-        ruta = ruta_logo(app.rutas, leer_marca(app.rutas))
-        if not ruta or ruta.stat().st_size > 5_000_000:
+        ruta = ruta_logo()
+        if not ruta.is_file():
             raise Error(404, "No hay logo")
-        tipo = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}[ruta.suffix.lower()]
-        self._enviar(200, ruta.read_bytes(), tipo, {"Cache-Control": "no-cache"})
+        self._enviar(200, ruta.read_bytes(), "image/png", {"Cache-Control": "public, max-age=86400"})
 
     def _imagen(self, nombre: str) -> None:
         if not IMAGEN.match(nombre):
