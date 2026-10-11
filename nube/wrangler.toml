@@ -1,0 +1,13 @@
+name = "predio-reportes"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "predio-reportes"
+database_id = "ad044e7e-aadd-41ea-b63e-0343ce1c8c5b"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true

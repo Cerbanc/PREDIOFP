@@ -88,9 +88,12 @@ Los Excel diarios llevan montos, productos y nombres, **sin teléfonos**. Si el 
 - **Años de datos**: el programa carga en pantalla los últimos 35 días de ventas, caja y stock para ser rápido; lo anterior se trae solo cuando mirás tickets o reportes de fechas viejas. Todo sigue guardado.
 - **Empezar a usar en serio después de probar**: *Admin → Datos y seguridad → Restablecer → Borrar ventas e historial* (hace una copia antes y pide escribir BORRAR; borra tickets, caja, movimientos de stock, turnos, deudas de clientes y cuentas abiertas, y deja productos con su stock, clientes, categorías, mesas y medios de pago).
 
-## 8. Lo que todavía no está
+## 8. Reportes desde el celular (opcional)
+
+Si en `C:\Predio\configuracion.json` están `nube_url` (la dirección de la página) y `nube_token` (la clave de la PC), el programa sube solo el reporte de hoy cada 10 minutos y al abrir o cerrar una caja. Se ve desde cualquier celular o PC en esa dirección, con otra clave (de sólo lectura), eligiendo el día, y se puede bajar el Excel. Si no hay internet, no pasa nada: se reintenta solo. Para cambiar el valor hay que cerrar y volver a abrir el programa. El código está en la carpeta `nube/`.
+
+## 9. Lo que todavía no está
 
 - **Turnos en la nube** (planilla compartida / celular / bot): el calendario de turnos del programa está apagado por ahora (se prende en *Datos y seguridad*) hasta resolver cómo se conectan con el celular.
-- **Mirar ventas desde el celular**: la base ya tiene todo lo necesario (resumen del día, cambios) para mostrarlo en modo sólo lectura; falta elegir cómo (planilla en la nube o acceso por la red local).
 - **Lectura de remitos con foto**: en la carga de stock, la lectura de la foto sigue siendo una simulación.
 - **Google Sheets** como espejo de los reportes.

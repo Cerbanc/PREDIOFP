@@ -59,6 +59,7 @@ class Aplicacion:
     inicio: float = field(default_factory=time.time)
     html: str = ""
     puerto: int = 0
+    nube: object = None
 
 
 def abrir_carpeta(ruta: Path) -> None:
@@ -284,6 +285,8 @@ class Manejador(BaseHTTPRequestHandler):
             raise Error(400, f"Pedido de guardado inválido: {e}") from None
         if res["cambios"]:
             self.app.diario.marcar(res["dias"])
+            if self.app.nube is not None and any(isinstance(o, dict) and o.get("c") == "cajas" for o in cuerpo.get("ops") or []):
+                self.app.nube.empujar()          # se abrió o cerró una caja: el reporte sube enseguida
         self._json(200, {"ok": True, "rev": res["rev"], "reemplazos": res["reemplazos"]})
 
     def api_latido(self, q: dict) -> None:

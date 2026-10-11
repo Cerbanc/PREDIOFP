@@ -20,6 +20,7 @@ from .config import Rutas, carpeta_por_defecto, carpeta_recursos, leer_ajustes, 
 from .copias import Copias
 from .db import BaseCorrupta, BaseDeDatos
 from .diario import ArchivosDiarios
+from .nube import SubidaNube
 from .servidor import Aplicacion, Servidor
 from .util import dia_de, ahora_ms
 from .ventana import abrir_ventana
@@ -118,6 +119,7 @@ def crear_aplicacion(rutas: Rutas, ajustes: dict, modo: str = "real") -> Aplicac
                       "Si no esperabas empezar de cero, restaurala desde Admin → Datos y seguridad → Copias de seguridad.")
     diario = ArchivosDiarios(db, rutas)
     app = Aplicacion(rutas=rutas, ajustes=ajustes, db=db, almacen=almacen, copias=copias, diario=diario, modo=modo, avisos=avisos)
+    app.nube = SubidaNube(app)
     preparar_pagina(app)
     return app
 
@@ -249,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     if os.name == "nt" and not args.datos and not os.environ.get("PREDIO_DATOS") and str(raiz).upper() != (os.environ.get("SystemDrive", "C:") + "\\Predio").upper():
         app.avisos.append(f"Los datos se están guardando en {raiz} porque no se pudo usar C:\\Predio. Si antes usabas C:\\Predio, cerrá el programa y revisá los permisos de esa carpeta.")
     app.diario.iniciar()
+    app.nube.iniciar()
     servidor.iniciar()
     espera = float(os.environ.get("PREDIO_ESPERA_INICIO", "20"))
     threading.Thread(target=tareas_de_inicio, args=(app, espera), name="inicio", daemon=True).start()

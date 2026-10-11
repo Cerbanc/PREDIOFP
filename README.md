@@ -8,6 +8,7 @@ Punto de venta **100 % sin internet** para un predio deportivo (kiosco, pádel, 
 | `tests/` | 60+ pruebas con pytest y dos pruebas de punta a punta con un navegador real |
 | `packaging/` | PyInstaller, instalador Inno Setup y prueba del ejecutable |
 | `.github/workflows/windows.yml` | Arma, prueba (en Windows) y publica el instalador |
+| `nube/` | Página de reportes en Cloudflare (Worker + D1) a la que sube la PC |
 | `docs/GUIA.md` | Guía para quien lo usa (en español, sin tecnicismos) |
 | `prototipo/` | El prototipo HTML original (guarda en el navegador). Quedó como referencia |
 

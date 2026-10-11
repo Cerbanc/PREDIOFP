@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reportes del Predio</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#f4f6f5;--card:#fff;--tx:#14211c;--mu:#5b6b64;--ln:#dfe6e2;--ac:#0a7a5a;--bad:#b3261e;--warn:#9a6700}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#17221e;--tx:#e8f0ec;--mu:#9bb0a7;--ln:#2a3a34;--ac:#3fbf96;--bad:#ff8a80;--warn:#e3b341}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 8px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.top h1{flex:1}
+button,input,.btn{font:inherit;border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:9px 12px}
+button,.btn{cursor:pointer;text-decoration:none;display:inline-block}.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.k{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px}
+.k b{display:block;font-size:22px}.k span{color:var(--mu);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;border-bottom:1px solid var(--ln);text-align:left}th{color:var(--mu);font-weight:600;font-size:13px}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.est{font-size:14px;margin:6px 0 12px}.ok{color:var(--ac)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mu{color:var(--mu)}
+.centro{max-width:340px;margin:18vh auto;text-align:center}.centro input{width:100%;margin:12px 0}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.g2 .card{margin:0}
+</style></head><body><main>
+<div id="login" class="centro" hidden><h1>Reportes del Predio</h1>
+<form method="post" action="/entrar"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
+<p class="bad" id="mal" hidden>Clave incorrecta</p></div>
+<div id="app" hidden>
+<div class="top"><h1>Reportes del Predio</h1><a class="mu" href="/salir">Salir</a></div>
+<div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><a class="btn pri" id="xl" href="#">Bajar Excel</a></div>
+<div class="est" id="est"></div><div id="cont"></div></div>
+<script>
+"use strict";
+const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1";
+const $=s=>document.querySelector(s);
+const $$=(n,d=0)=>(Math.round(n||0)).toLocaleString("es-AR");
+const m=n=>"$ "+$$(n);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const hoyK=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const hora=ts=>new Date(ts).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+let dia=hoyK(),timer;
+if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
+function iniciar(){
+  const f=$("#fecha");f.value=dia;
+  f.onchange=()=>{dia=f.value||hoyK();cargar()};
+  const mover=n=>{const d=new Date(dia+"T12:00:00");d.setDate(d.getDate()+n);dia=d.toISOString().slice(0,10);f.value=dia;cargar()};
+  $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);$("#hoy").onclick=()=>{dia=hoyK();f.value=dia;cargar()};
+  cargar();timer=setInterval(()=>{if(dia===hoyK()&&!document.hidden)cargar(true)},120000);
+}
+function tabla(cols,filas,vacio){
+  if(!filas.length)return `<p class="mu">${vacio||"Sin datos"}</p>`;
+  return `<table><tr>${cols.map(c=>`<th class="${c.n?"n":""}">${c.t}</th>`).join("")}</tr>${filas.map(f=>`<tr>${cols.map(c=>`<td class="${c.n?"n":""}">${c.f(f)}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+async function cargar(silencioso){
+  const x=$("#xl");x.href="/excel/"+dia;
+  let r;try{r=await fetch("/api/dia/"+dia,{cache:"no-store"})}catch{ $("#est").innerHTML='<span class="bad">Sin conexión.</span>';return}
+  if(r.status===401){location.reload();return}
+  if(r.status===404){$("#est").textContent="";$("#cont").innerHTML='<div class="card"><p class="mu">No hay reporte de este día todavía.</p></div>';x.hidden=true;return}
+  const {resumen:d,subido,ahora}=await r.json();x.hidden=false;
+  const min=Math.max(0,Math.round((ahora-subido)/6e4));
+  const viejo=dia===hoyK()&&min>35;
+  $("#est").innerHTML=`Actualizado a las <b>${hora(subido)}</b> (hace ${min<1?"menos de 1 minuto":min+" min"})`+(viejo?' · <span class="warn">la PC del local no está enviando datos: puede estar apagada o sin internet</span>':"");
+  const k=d.kpis;
+  let h=`<div class="kpis">
+   <div class="k"><span>Total vendido</span><b>${m(k.total_vendido)}</b></div>
+   <div class="k"><span>Tickets</span><b>${$$(k.tickets)}</b><span>${k.anulados?k.anulados+" anulados":""}</span></div>
+   <div class="k"><span>Ticket promedio</span><b>${m(k.ticket_promedio)}</b></div>
+   <div class="k"><span>Descuentos</span><b>${m(k.descuentos)}</b></div>
+   <div class="k"><span>Cobrado neto</span><b>${m(k.cobrado_neto)}</b></div></div><div style="height:12px"></div>`;
+  h+=`<div class="card"><h2>Cierres de caja</h2>${tabla([
+   {t:"Responsable",f:c=>esc(c.responsable||"")},
+   {t:"Abrió",f:c=>c.abierta?hora(c.abierta):""},
+   {t:"Cerró",f:c=>c.cerrada?hora(c.cerrada):'<span class="warn">abierta</span>'},
+   {t:"Debía haber",n:1,f:c=>c.cerrada?m(c.esperado):""},
+   {t:"Contado",n:1,f:c=>c.cerrada?m(c.contado):""},
+   {t:"Diferencia",n:1,f:c=>c.cerrada?`<span class="${c.diferencia?"bad":"ok"}">${c.diferencia?m(c.diferencia):"cuadra"}</span>`:""}],d.cajas,"No se abrió caja")}
+   ${d.cajas.map(c=>[...(c.digital||[]).map(g=>`<p class="mu">${esc(g.nombre)}: debía ${m(g.esperado)}${g.informado==null?" (sin controlar)":g.diferencia?`, <span class="bad">${g.diferencia>0?"sobran":"faltan"} ${m(Math.abs(g.diferencia))}</span>`:", cuadra"}</p>`),c.nota?`<p class="mu">Nota: ${esc(c.nota)}</p>`:""].join("")).join("")}</div>`;
+  h+=`<div class="g2"><div class="card"><h2>Por medio de pago</h2>${tabla([{t:"Medio",f:x=>esc(x.medio)},{t:"Cobros",n:1,f:x=>m(x.cobros)},{t:"Devol.",n:1,f:x=>m(x.devoluciones)},{t:"Neto",n:1,f:x=>`<b>${m(x.neto)}</b>`}],d.por_medio)}</div>
+   <div class="card"><h2>Por categoría</h2>${tabla([{t:"Categoría",f:x=>esc(x.categoria)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],d.por_categoria)}</div>
+   <div class="card"><h2>Por destino</h2>${tabla([{t:"Destino",f:x=>esc(x.destino)},{t:"Tickets",n:1,f:x=>$$(x.tickets)},{t:"Total",n:1,f:x=>m(x.total)}],d.por_destino)}</div>
+   <div class="card"><h2>Lo más vendido</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],d.top_productos)}</div></div><div style="height:12px"></div>`;
+  const mc=Object.entries(d.movimientos_caja||{}),fi=d.fiado||{};
+  h+=`<div class="g2"><div class="card"><h2>Movimientos de caja y fiado</h2>${mc.length?mc.map(([a,b])=>`<p>${esc(a)}: <b>${m(b)}</b></p>`).join(""):'<p class="mu">Sin movimientos de caja</p>'}<p>Fiado: cargos ${m(fi.cargos)} · pagos ${m(fi.pagos)}</p></div>
+   <div class="card"><h2>Stock bajo</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Stock",n:1,f:x=>$$(x.stock)},{t:"Mínimo",n:1,f:x=>$$(x.minimo)}],d.stock_bajo,"Nada por reponer")}</div></div>
+   <div class="card" style="margin-top:12px"><h2>Cambios importantes (${d.cambios_importantes.length})</h2>${tabla([{t:"Hora",f:x=>hora(x.ts)},{t:"Quién",f:x=>esc(x.usuario)},{t:"Qué",f:x=>esc(x.resumen)}],d.cambios_importantes,"Ninguno")}</div>`;
+  $("#cont").innerHTML=h;
+}
+</script></main></body></html>

@@ -22,13 +22,18 @@ AJUSTES_POR_DEFECTO = {
         "ventana_completa: abrir la ventana ocupando toda la pantalla. "
         "ventana_dias: cuántos días de ventas, caja y stock se cargan en pantalla al abrir (lo anterior se pide al mirar reportes o tickets viejos; "
         "siempre está guardado). 0 = cargar todo. "
-        "actualizaciones_repo: de dónde se bajan las versiones nuevas (usuario/repositorio de GitHub)."
+        "actualizaciones_repo: de dónde se bajan las versiones nuevas (usuario/repositorio de GitHub). "
+        "nube_url y nube_token: dirección y clave para subir el reporte del día a la página de reportes (vacío = no se sube nada). "
+        "nube_cada_minutos: cada cuánto se sube (10)."
     ),
     "puerto": 8765,
     "copias_conservar_dias": 30,
     "ventana_completa": True,
     "ventana_dias": 35,
     "actualizaciones_repo": "Cerbanc/PREDIOFP",
+    "nube_url": "",
+    "nube_token": "",
+    "nube_cada_minutos": 10,
 }
 
 
