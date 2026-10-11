@@ -12,3 +12,4 @@ __pycache__/
 configuracion.json
 clave_api.txt
 .env
+/.wrangler/

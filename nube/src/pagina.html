@@ -22,78 +22,448 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:6px 4px;b
 .est{font-size:14px;margin:6px 0 12px}.ok{color:var(--ac)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mu{color:var(--mu)}
 .centro{max-width:340px;margin:18vh auto;text-align:center}.centro input{width:100%;margin:12px 0}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.g2 .card{margin:0}
+[hidden]{display:none!important}
+:root{--hoy:#b45309;--ok-bg:#e3f4ee;--bad-bg:#fdecea;--warn-bg:#fff4d6;--sobre:#fff}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--sobre:#06241b}}
+:root[data-theme=dark]{--hoy:#f5b84a;--ok-bg:#16332a;--bad-bg:#3a1d1b;--warn-bg:#3a2e0f;--sobre:#06241b}
+.pri{color:var(--sobre)}button,.btn{min-height:44px}button:focus-visible,.btn:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.top a.mu{padding:12px 6px}@media(max-width:520px){.top h1{flex:1 1 100%}.top a.mu{margin-left:auto}}button:disabled{opacity:.45;cursor:default}
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:4px;margin-bottom:10px}
+.tabs button{flex:1;border:0;background:transparent;border-radius:9px;font-weight:600;color:var(--mu);padding:9px 4px}
+.tabs button[aria-selected=true]{background:var(--ac);color:var(--sobre)}
+.nav{display:flex;gap:8px;align-items:center;margin-bottom:10px}.nav button{min-width:48px}
+.mid{flex:1;min-width:0;text-align:center}.mid>input{width:100%;min-height:44px}.per{font-weight:700;font-size:17px;line-height:1.25}
+.rng{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.rng label{display:flex;flex-direction:column;align-items:flex-start;font-size:13px;color:var(--mu);flex:1;min-width:130px}.rng input{width:100%;min-height:44px;color:var(--tx)}
+.acc{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.alerta{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}.alerta b{color:var(--warn)}
+.kpis.p{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis.p .k b{font-size:clamp(17px,5.2vw,22px);overflow-wrap:anywhere}.kpis.p .k:first-child{grid-column:1/-1}.kpis.p .k:first-child b{font-size:clamp(22px,7.4vw,28px)}
+@media(min-width:760px){.kpis.p{grid-template-columns:repeat(5,minmax(0,1fr))}.kpis.p .k:first-child{grid-column:auto}.kpis.p .k b,.kpis.p .k:first-child b{font-size:19px;overflow-wrap:normal}}
+.dl{display:block;font-size:13px;margin-top:2px;color:var(--mu)}.dl.up{color:var(--ac)}.dl.down{color:var(--bad)}
+.nota{font-size:13px;margin:8px 2px 12px}.sp{height:12px}
+.graf{width:100%;display:block;touch-action:pan-y;user-select:none;-webkit-user-select:none;border-radius:8px}.graf:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.graf text{fill:var(--mu);font:11px system-ui,sans-serif}.graf text.v{fill:var(--tx);font-weight:600}.graf text.hoy{fill:var(--hoy);font-weight:700}
+.graf .gr{stroke:var(--ln);stroke-width:1}.graf .bar{fill:var(--ac)}.graf .bar.hoy{fill:var(--hoy)}.graf .bar.vacia{fill:var(--mu)}
+.graf .rayas{fill:url(#rayas);stroke:var(--mu);stroke-width:1;stroke-dasharray:3 3}.graf .sombra{fill:var(--ln);opacity:0}.graf .col.sel .sombra{opacity:.6}.graf .col.sel .bar{stroke:var(--tx);stroke-width:2}
+.det{min-height:48px;padding:8px 2px 2px;font-size:15px}.det button{margin-left:6px;padding:6px 12px;min-height:40px}
+.ley{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--mu);margin-top:6px}.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px;background:var(--ac)}
+.sw.h{background:var(--hoy)}.sw.f{background:repeating-linear-gradient(45deg,var(--mu) 0 1.5px,transparent 1.5px 5px);border:1px dashed var(--mu)}
+.k3{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}.k3 .k b{font-size:18px}.k3 .k:nth-child(3):last-child{grid-column:1/-1}
+@media(min-width:600px){.k3{grid-template-columns:repeat(3,1fr)}.k3 .k:nth-child(3):last-child{grid-column:auto}}
+.cierres{list-style:none;margin:0;padding:0}.cierres li{padding:10px 0;border-bottom:1px solid var(--ln)}.cierres li:last-child{border-bottom:0}
+.cl1{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.cl2{font-size:14px;margin-top:2px}
+.chip{display:inline-block;border-radius:999px;padding:3px 11px;font-size:14px;font-weight:600;border:1px solid;white-space:nowrap}
+.chip.ok{color:var(--ac);background:var(--ok-bg);border-color:var(--ac)}.chip.bad{color:var(--bad);background:var(--bad-bg);border-color:var(--bad)}.chip.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn)}
+.resu{margin:0 0 8px;font-size:16px}.chk{display:flex;align-items:center;gap:8px;min-height:44px;font-size:15px}.chk input{width:22px;height:22px;padding:0}
+details.card summary{cursor:pointer;min-height:32px;display:flex;align-items:center;font-size:15px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}details.card[open] summary{margin-bottom:8px}
+td.n,th.n{white-space:nowrap}.g2 .card p{margin:.4em 0}.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start}.card{min-width:0}
+@media(max-width:480px){table{font-size:14px}th,td{padding:6px 3px}}
+@media(max-width:360px){table{font-size:13px}th,td{padding:5px 2px}}.resu .chip{white-space:normal}
+tr.sd td{color:var(--warn)}.cargando{opacity:.5}.err{text-align:center}.err p{margin:4px 0 12px}
 </style></head><body><main>
 <div id="login" class="centro" hidden><h1>Reportes del Predio</h1>
 <form method="post" action="/entrar"><input type="password" name="clave" placeholder="Clave" autofocus autocomplete="current-password"><button class="pri" style="width:100%">Entrar</button></form>
 <p class="bad" id="mal" hidden>Clave incorrecta</p></div>
 <div id="app" hidden>
 <div class="top"><h1>Reportes del Predio</h1><a class="btn" href="/turnos">Turnos</a><button id="tema" title="Cambiar entre claro y oscuro">Claro / Oscuro</button><a class="mu" href="/salir">Salir</a></div>
-<div class="top"><button id="ant">←</button><input type="date" id="fecha"><button id="sig">→</button><button id="hoy">Hoy</button><a class="btn pri" id="xl" href="#">Bajar Excel</a></div>
-<div class="est" id="est"></div><div id="cont"></div></div>
+<div class="tabs" role="tablist" aria-label="Qué período ver"><button role="tab" data-v="dia">Día</button><button role="tab" data-v="semana">Semana</button><button role="tab" data-v="mes">Mes</button><button role="tab" data-v="fechas">Fechas</button></div>
+<div class="nav"><button id="ant" aria-label="Anterior" title="Anterior">←</button>
+<div class="mid"><input type="date" id="fecha" aria-label="Fecha"><div class="per" id="per" hidden></div>
+<div class="rng" id="rng" hidden><label>Desde<input type="date" id="d1"></label><label>Hasta<input type="date" id="d2"></label></div></div>
+<button id="sig" aria-label="Siguiente" title="Siguiente">→</button></div>
+<div class="top acc"><button id="hoy">Hoy</button><a class="btn pri" id="xl" href="#">Bajar Excel</a><button class="pri" id="csv" hidden>Bajar para Excel (CSV)</button></div>
+<div class="est" id="est" role="status"></div><div id="cont" role="tabpanel" aria-live="polite"></div></div>
 <script>
 "use strict";
 const DENTRO="__DENTRO__"==="1",MAL="__MAL__"==="1";
 const $=s=>document.querySelector(s);
-const $$=(n,d=0)=>(Math.round(n||0)).toLocaleString("es-AR");
-const m=n=>"$ "+$$(n);
+const NUM=new Intl.NumberFormat("es-AR",{useGrouping:"always",maximumFractionDigits:0});
+const $$=n=>NUM.format(Math.round(n||0)+0);
+const m=n=>(n<0?"− ":"")+"$\u00a0"+$$(Math.abs(n||0));
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const hoyK=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const hora=ts=>new Date(ts).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
-let dia=hoyK(),timer;
+const pct=(v,t)=>t>0?Math.round(v/t*100)+"%":"";
+const corto=v=>v>=1e6?new Intl.NumberFormat("es-AR",{maximumFractionDigits:1}).format(v/1e6)+" M":v>=1e4?$$(v/1e3)+" mil":v>=1e3?new Intl.NumberFormat("es-AR",{maximumFractionDigits:1}).format(v/1e3)+" mil":$$(v);
+// ---- fechas (todo en AAAA-MM-DD, en hora de Argentina, igual que el programa del local) ----
+const hoyK=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const ms=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10));
+const de=x=>new Date(x).toISOString().slice(0,10);
+const valida=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"")&&de(ms(d))===d;
+const sumar=(d,k)=>de(ms(d)+k*864e5);
+const cuenta=(a,b)=>Math.round((ms(b)-ms(a))/864e5)+1;
+const lunesDe=d=>sumar(d,-((new Date(ms(d)).getUTCDay()+6)%7));
+const iniMes=d=>d.slice(0,8)+"01";
+const mesMas=(d,k)=>{const x=new Date(ms(d));return de(Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+k,1))};
+const finMes=d=>{const x=new Date(ms(d));return de(Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+1,0))};
+const fmt=(d,o)=>new Date(ms(d)).toLocaleDateString("es-AR",{...o,timeZone:"UTC"}).replace(",","");
+const larga=d=>fmt(d,{weekday:"long",day:"numeric",month:"long"});
+const dm=d=>+d.slice(8)+"/"+ +d.slice(5,7);
+const sem=d=>fmt(d,{weekday:"short"}).replace(".","");
+const cortaF=d=>sem(d)+" "+dm(d);
+const mayus=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const MAX_DIAS=400;
+// ---- estado de la pantalla ----
+let vista="dia",ref=hoyK(),desde=sumar(hoyK(),-6),hasta=hoyK(),tok=0,rz=0,abajo=false,ult=null,G=null,soloDif=false,verTodos=false;
 if($("#tema")){$("#tema").onclick=()=>{const r=document.documentElement,oscuro=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;const n=oscuro?"light":"dark";r.dataset.theme=n;try{localStorage.setItem("tema",n)}catch(e){}};}
 if(!DENTRO){$("#login").hidden=false;if(MAL)$("#mal").hidden=false}else{$("#app").hidden=false;iniciar()}
+
+function periodo(){
+  if(vista==="dia")return{desde:ref,hasta:ref};
+  if(vista==="semana"){const l=lunesDe(ref);return{desde:l,hasta:sumar(l,6)}}
+  if(vista==="mes")return{desde:iniMes(ref),hasta:finMes(ref)};
+  return{desde,hasta};
+}
+// El período con el que se compara: lo mismo de antes y, si el actual todavía no terminó, sólo los mismos días.
+function anteriorDe(p){
+  const h=hoyK(),ef=p.hasta>h?h:p.hasta;
+  if(vista==="dia"||ef<p.desde)return null;
+  const largo=cuenta(p.desde,ef),parcial=p.hasta>h;
+  let a,b,rot;
+  if(vista==="semana"){a=sumar(p.desde,-7);b=sumar(a,largo-1);rot="que la semana pasada"}
+  else if(vista==="mes"){a=mesMas(p.desde,-1);const fin=finMes(a),t=sumar(a,largo-1);b=parcial&&t<fin?t:fin;rot="que el mes pasado"}
+  else{const L=cuenta(p.desde,p.hasta);a=sumar(p.desde,-L);b=sumar(a,largo-1);rot=`que los ${largo} días anteriores`}
+  return{desde:a,hasta:b,rot:rot+(parcial&&vista!=="fechas"?" (mismos días)":"")};
+}
+function etiquetaPeriodo(p){
+  if(vista==="semana"){const a=new Date(ms(p.desde)),b=new Date(ms(p.hasta));return a.getUTCMonth()===b.getUTCMonth()?`Semana del ${+p.desde.slice(8)} al ${fmt(p.hasta,{day:"numeric",month:"long"})}`:`Semana del ${fmt(p.desde,{day:"numeric",month:"long"})} al ${fmt(p.hasta,{day:"numeric",month:"long"})}`}
+  return mayus(fmt(p.desde,{month:"long",year:"numeric"}));
+}
+function guardarHash(){try{history.replaceState(null,"","#"+vista+"/"+(vista==="fechas"?desde+"/"+hasta:ref))}catch(e){}}
+function leerHash(){
+  const p=location.hash.slice(1).split("/"),v=p[0];
+  if(!["dia","semana","mes","fechas"].includes(v))return;
+  vista=v;
+  if(v==="fechas"){if(valida(p[1])&&valida(p[2])&&p[1]<=p[2]&&cuenta(p[1],p[2])<=MAX_DIAS){desde=p[1];hasta=p[2]}}
+  else if(valida(p[1]))ref=p[1];
+}
+function controles(){
+  const p=periodo(),h=hoyK();
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===vista?"true":"false"));
+  $("#fecha").hidden=vista!=="dia";$("#per").hidden=vista==="dia"||vista==="fechas";$("#rng").hidden=vista!=="fechas";
+  if(vista==="dia")$("#fecha").value=ref;
+  else if(vista==="fechas"){$("#d1").value=desde;$("#d2").value=hasta}
+  else $("#per").textContent=etiquetaPeriodo(p);
+  const sigDesde=vista==="fechas"?sumar(hasta,1):vista==="dia"?sumar(ref,1):vista==="semana"?sumar(p.hasta,1):mesMas(p.desde,1);
+  $("#sig").disabled=sigDesde>h;
+  const hb=$("#hoy");hb.hidden=vista==="fechas";hb.textContent=vista==="dia"?"Hoy":vista==="semana"?"Esta semana":"Este mes";
+  $("#xl").hidden=vista!=="dia";$("#csv").hidden=true;
+  guardarHash();
+}
+function ir(v){
+  if(v===vista)return;
+  const p=periodo(),h=hoyK();
+  if(v==="fechas"){if(vista==="dia"){hasta=ref;desde=sumar(ref,-6)}else{desde=p.desde;hasta=p.hasta}}
+  else if(vista==="fechas")ref=hasta>h?h:hasta;
+  else if(v==="dia"&&ref>h)ref=h;
+  vista=v;verTodos=false;cambiar();
+}
+function mover(k){
+  if(vista==="dia")ref=sumar(ref,k);
+  else if(vista==="semana")ref=sumar(ref,7*k);
+  else if(vista==="mes")ref=mesMas(ref,k);
+  else{const L=cuenta(desde,hasta);desde=sumar(desde,L*k);hasta=sumar(hasta,L*k)}
+  verTodos=false;cambiar();
+}
+function cambiar(){controles();cargar()}
 function iniciar(){
-  const f=$("#fecha");f.value=dia;
-  f.onchange=()=>{dia=f.value||hoyK();cargar()};
-  const mover=n=>{const d=new Date(dia+"T12:00:00");d.setDate(d.getDate()+n);dia=d.toISOString().slice(0,10);f.value=dia;cargar()};
-  $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);$("#hoy").onclick=()=>{dia=hoyK();f.value=dia;cargar()};
-  cargar();timer=setInterval(()=>{if(dia===hoyK()&&!document.hidden)cargar(true)},120000);
+  leerHash();
+  document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>ir(b.dataset.v));
+  $("#fecha").onchange=e=>{if(valida(e.target.value)){ref=e.target.value;cambiar()}};
+  const fechas=()=>{let a=$("#d1").value,b=$("#d2").value;if(!valida(a)||!valida(b))return;if(a>b){if(document.activeElement===$("#d1"))b=a;else a=b}desde=a;hasta=b;cambiar()};
+  $("#d1").onchange=fechas;$("#d2").onchange=fechas;
+  $("#ant").onclick=()=>mover(-1);$("#sig").onclick=()=>mover(1);
+  $("#hoy").onclick=()=>{ref=hoyK();cambiar()};
+  $("#csv").onclick=bajarCsv;
+  addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(dibujar,150)});
+  addEventListener("pointerup",()=>{abajo=false});addEventListener("pointercancel",()=>{abajo=false});
+  controles();cargar();
+  setInterval(()=>{if(!document.hidden&&periodo().hasta>=hoyK()&&periodo().desde<=hoyK())cargar(true)},120000);
 }
 function tabla(cols,filas,vacio){
   if(!filas.length)return `<p class="mu">${vacio||"Sin datos"}</p>`;
   return `<table><tr>${cols.map(c=>`<th class="${c.n?"n":""}">${c.t}</th>`).join("")}</tr>${filas.map(f=>`<tr>${cols.map(c=>`<td class="${c.n?"n":""}">${c.f(f)}</td>`).join("")}</tr>`).join("")}</table>`;
 }
+function falla(msg,silencioso){
+  if(silencioso){$("#est").innerHTML='<span class="bad">Sin conexión: se muestran los últimos datos.</span>';return}
+  $("#cont").classList.remove("cargando");$("#est").textContent="";
+  $("#cont").innerHTML=`<div class="card err"><p class="bad"><b>${esc(msg)}</b></p><button id="reint">Probar de nuevo</button></div>`;
+  $("#reint").onclick=()=>cargar();
+}
+async function pedir(ruta){
+  let r;try{r=await fetch(ruta,{cache:"no-store"})}catch{throw{msg:"No hay conexión. Revisá tu internet y probá de nuevo."}}
+  if(r.status===401){location.reload();throw{callar:true}}
+  return r;
+}
+async function msgError(r){
+  let t="";try{t=(await r.json()).error||""}catch{}
+  return r.status>=500?"La página tuvo un problema. Probá de nuevo en un rato.":(t||"No se pudo cargar. Probá de nuevo.");
+}
 async function cargar(silencioso){
-  const x=$("#xl");x.href="/excel/"+dia;
-  let r;try{r=await fetch("/api/dia/"+dia,{cache:"no-store"})}catch{ $("#est").innerHTML='<span class="bad">Sin conexión.</span>';return}
-  if(r.status===401){location.reload();return}
-  if(r.status===404){$("#est").textContent="";$("#cont").innerHTML='<div class="card"><p class="mu">No hay reporte de este día todavía.</p></div>';x.hidden=true;return}
-  const {resumen:d,subido,ahora}=await r.json();x.hidden=false;
+  const mi=++tok;
+  if(!silencioso){$("#cont").classList.add("cargando");$("#est").textContent="Cargando…"}
+  try{
+    if(vista==="dia")await cargarDia(mi,silencioso);else await cargarPeriodo(mi,silencioso);
+  }catch(e){if(mi===tok&&!e.callar)falla(e.msg||"No se pudo cargar. Probá de nuevo.",silencioso)}
+}
+// ---------------------------------------------------------------- un día
+async function cargarDia(mi,silencioso){
+  const dia=ref,x=$("#xl");x.href="/excel/"+dia;
+  const r=await pedir("/api/dia/"+dia);
+  if(mi!==tok)return;
+  if(r.status===404){$("#est").textContent="";$("#cont").classList.remove("cargando");$("#cont").innerHTML='<div class="card"><p><b>Sin datos de este día.</b></p><p class="mu">La PC del local no subió este día (estaba apagada o sin internet) o todavía no se usó el programa. Eso no significa que no se haya vendido.</p></div>';x.hidden=true;ult=null;return}
+  if(!r.ok)throw{msg:await msgError(r)};
+  const {resumen:d,subido,ahora}=await r.json();
+  if(mi!==tok)return;
+  x.hidden=false;ult=null;
   const min=Math.max(0,Math.round((ahora-subido)/6e4));
   const viejo=dia===hoyK()&&min>35;
   $("#est").innerHTML=`Actualizado a las <b>${hora(subido)}</b> (hace ${min<1?"menos de 1 minuto":min+" min"})`+(viejo?' · <span class="warn">la PC del local no está enviando datos: puede estar apagada o sin internet</span>':"");
+  $("#cont").classList.remove("cargando");$("#cont").innerHTML=htmlDia(d);
+}
+// "De lo vendido a lo cobrado": lo que quedó en fiado son los cargos menos los tickets anulados (esos ya no están en lo vendido).
+function cuadroCobrado(k,fi0,titulo,pagosTxt){
+  const enFiado=(fi0.cargos||0)-(fi0.anulaciones||0),aVentas=(k.total_vendido||0)-enFiado,otros=(k.cobrado_neto||0)-(aVentas+(fi0.pagos||0));
+  return `<div class="card"><h2>De lo vendido a lo cobrado</h2><table>
+   <tr><td>Total vendido (${titulo})</td><td class="n">${m(k.total_vendido)}</td></tr>
+   <tr><td>− Quedó en fiado (cuenta corriente)</td><td class="n">${m(-enFiado)}</td></tr>
+   <tr><td>+ Deudas de fiado que pagaron${pagosTxt}</td><td class="n">${m(fi0.pagos||0)}</td></tr>
+   <tr><td>± Señas de turnos, correcciones y otros</td><td class="n">${m(otros)}</td></tr>
+   <tr><td><b>Cobrado neto (lo que entró)</b></td><td class="n"><b>${m(k.cobrado_neto)}</b></td></tr></table>
+   <p class="mu" style="margin:8px 0 0;font-size:13px">Cobrado y vendido no tienen por qué coincidir: se suma lo que se pagó ${vista==="dia"?"hoy":"en el período"} aunque sea de una venta o una deuda de otro día.</p></div>`;
+}
+// Un cierre de caja como renglón (sirve para el día y para el historial del período); `deDia`: se muestra el día y no la hora.
+function liCierre(c,deDia){
+  const chip=!c.cerrada?'<span class="chip warn">sin cerrar</span>':c.diferencia?`<span class="chip bad">✗ ${c.diferencia>0?"sobran":"faltan"} ${m(Math.abs(c.diferencia))}</span>`:'<span class="chip ok">✓ cuadra</span>';
+  const dg=(c.digital||[]).map(g=>deDia
+    ?(g.diferencia?`<div class="cl2 bad">${esc(g.nombre)}: ${g.diferencia>0?"sobran":"faltan"} ${m(Math.abs(g.diferencia))}</div>`:"")
+    :`<div class="cl2 mu">${esc(g.nombre)}: debía ${m(g.esperado)}${g.informado==null?" (sin controlar)":g.diferencia?`, <span class="bad">${g.diferencia>0?"sobran":"faltan"} ${m(Math.abs(g.diferencia))}</span>`:", cuadra"}</div>`).join("");
+  const quien=deDia?`<b>${cortaF(c.dia)}</b> · ${esc(c.responsable)}`:`<b>${esc(c.responsable||"")}</b> · ${c.abierta?hora(c.abierta):""}${c.cerrada?" a "+hora(c.cerrada):" (abierta)"}`;
+  return `<li><div class="cl1"><span>${quien}</span>${chip}</div>${c.cerrada?`<div class="cl2 mu">Debía haber ${m(c.esperado)} · Contado ${m(c.contado)}</div>`:""}${dg}${c.nota?`<div class="cl2 mu">Nota: ${esc(c.nota)}</div>`:""}</li>`;
+}
+function htmlDia(d){
   const k=d.kpis;
   let h=`<div class="kpis">
    <div class="k"><span>Total vendido</span><b>${m(k.total_vendido)}</b></div>
    <div class="k"><span>Tickets</span><b>${$$(k.tickets)}</b><span>${k.anulados?k.anulados+" anulados":""}</span></div>
    <div class="k"><span>Ticket promedio</span><b>${m(k.ticket_promedio)}</b></div>
    <div class="k"><span>Descuentos</span><b>${m(k.descuentos)}</b></div>
-   <div class="k"><span>Cobrado neto</span><b>${m(k.cobrado_neto)}</b></div></div><div style="height:12px"></div>`;
-  const fi0=d.fiado||{},aVentas=(k.total_vendido||0)-(fi0.cargos||0),otros=(k.cobrado_neto||0)-(aVentas+(fi0.pagos||0));
-  h+=`<div class="card"><h2>De lo vendido a lo cobrado</h2><table>
-   <tr><td>Total vendido (tickets del día)</td><td class="n">${m(k.total_vendido)}</td></tr>
-   <tr><td>− Quedó en fiado (cuenta corriente)</td><td class="n">${m(-(fi0.cargos||0))}</td></tr>
-   <tr><td>+ Deudas de fiado que pagaron hoy</td><td class="n">${m(fi0.pagos||0)}</td></tr>
-   <tr><td>± Señas de turnos, correcciones y otros</td><td class="n">${m(otros)}</td></tr>
-   <tr><td><b>Cobrado neto (lo que entró)</b></td><td class="n"><b>${m(k.cobrado_neto)}</b></td></tr></table>
-   <p class="mu" style="margin:8px 0 0;font-size:13px">Cobrado y vendido no tienen por qué coincidir: se suma lo que se pagó hoy aunque sea de una venta o una deuda de otro día.</p></div>
-  `;
-  h+=`<div class="card"><h2>Cierres de caja</h2>${tabla([
-   {t:"Responsable",f:c=>esc(c.responsable||"")},
-   {t:"Abrió",f:c=>c.abierta?hora(c.abierta):""},
-   {t:"Cerró",f:c=>c.cerrada?hora(c.cerrada):'<span class="warn">abierta</span>'},
-   {t:"Debía haber",n:1,f:c=>c.cerrada?m(c.esperado):""},
-   {t:"Contado",n:1,f:c=>c.cerrada?m(c.contado):""},
-   {t:"Diferencia",n:1,f:c=>c.cerrada?`<span class="${c.diferencia?"bad":"ok"}">${c.diferencia?m(c.diferencia):"cuadra"}</span>`:""}],d.cajas,"No se abrió caja")}
-   ${d.cajas.map(c=>[...(c.digital||[]).map(g=>`<p class="mu">${esc(g.nombre)}: debía ${m(g.esperado)}${g.informado==null?" (sin controlar)":g.diferencia?`, <span class="bad">${g.diferencia>0?"sobran":"faltan"} ${m(Math.abs(g.diferencia))}</span>`:", cuadra"}</p>`),c.nota?`<p class="mu">Nota: ${esc(c.nota)}</p>`:""].join("")).join("")}</div>`;
+   <div class="k"><span>Cobrado neto</span><b>${m(k.cobrado_neto)}</b></div></div><div class="sp"></div>`;
+  h+=cuadroCobrado(k,d.fiado||{},"tickets del día"," hoy");
+  h+=`<div class="card"><h2>Cierres de caja</h2>${d.cajas.length?`<ul class="cierres">${d.cajas.map(c=>liCierre(c,false)).join("")}</ul>`:'<p class="mu">No se abrió caja</p>'}</div>`;
   h+=`<div class="g2"><div class="card"><h2>Por medio de pago</h2>${tabla([{t:"Medio",f:x=>esc(x.medio)},{t:"Cobros",n:1,f:x=>m(x.cobros)},{t:"Devol.",n:1,f:x=>m(x.devoluciones)},{t:"Neto",n:1,f:x=>`<b>${m(x.neto)}</b>`}],d.por_medio)}</div>
    <div class="card"><h2>Por categoría</h2>${tabla([{t:"Categoría",f:x=>esc(x.categoria)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],d.por_categoria)}</div>
    <div class="card"><h2>Por destino</h2>${tabla([{t:"Destino",f:x=>esc(x.destino)},{t:"Tickets",n:1,f:x=>$$(x.tickets)},{t:"Total",n:1,f:x=>m(x.total)}],d.por_destino)}</div>
-   <div class="card"><h2>Lo más vendido</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],d.top_productos)}</div></div><div style="height:12px"></div>`;
+   <div class="card"><h2>Lo más vendido</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],d.top_productos)}</div></div><div class="sp"></div>`;
   const mc=Object.entries(d.movimientos_caja||{}),fi=d.fiado||{};
   h+=`<div class="g2"><div class="card"><h2>Movimientos de caja y fiado</h2>${mc.length?mc.map(([a,b])=>`<p>${esc(a)}: <b>${m(b)}</b></p>`).join(""):'<p class="mu">Sin movimientos de caja</p>'}<p>Fiado: cargos ${m(fi.cargos)} · pagos ${m(fi.pagos)}</p></div>
    <div class="card"><h2>Stock bajo</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Stock",n:1,f:x=>$$(x.stock)},{t:"Mínimo",n:1,f:x=>$$(x.minimo)}],d.stock_bajo,"Nada por reponer")}</div></div>
    <div class="card" style="margin-top:12px"><h2>Cambios importantes (${d.cambios_importantes.length})</h2>${tabla([{t:"Hora",f:x=>hora(x.ts)},{t:"Quién",f:x=>esc(x.usuario)},{t:"Qué",f:x=>esc(x.resumen)}],d.cambios_importantes,"Ninguno")}</div>`;
-  $("#cont").innerHTML=h;
+  return h;
+}
+// ---------------------------------------------------------------- semana, mes o fechas
+async function cargarPeriodo(mi,silencioso){
+  const p=periodo();
+  if(cuenta(p.desde,p.hasta)>MAX_DIAS){$("#est").textContent="";$("#cont").classList.remove("cargando");$("#cont").innerHTML=`<div class="card"><p class="warn"><b>Es un período muy largo.</b> El máximo es de ${MAX_DIAS} días (más de un año). Elegí fechas más cercanas.</p></div>`;ult=null;$("#csv").hidden=true;return}
+  const an=anteriorDe(p);
+  const r=await pedir(`/api/rango?desde=${p.desde}&hasta=${p.hasta}`+(an?`&ant_desde=${an.desde}&ant_hasta=${an.hasta}`:""));
+  if(mi!==tok)return;
+  if(!r.ok)throw{msg:await msgError(r)};
+  const R=await r.json();
+  if(mi!==tok)return;
+  ult={R,p,an};
+  $("#cont").classList.remove("cargando");
+  const h=hoyK(),T=R.totales,hayDatos=T.dias_con_datos+T.dias_vacios>0;
+  $("#csv").hidden=!hayDatos;
+  const hoyFila=R.dias.find(d=>d.dia===h);
+  if(hoyFila&&hoyFila.estado!=="falta"&&hoyFila.subido){
+    const min=Math.max(0,Math.round((R.ahora-hoyFila.subido)/6e4));
+    $("#est").innerHTML=`Hoy: actualizado a las <b>${hora(hoyFila.subido)}</b> (hace ${min<1?"menos de 1 minuto":min+" min"})`+(min>35?' · <span class="warn">la PC del local no está enviando datos: puede estar apagada o sin internet</span>':"");
+  }else if(hoyFila){$("#est").innerHTML='<span class="warn">Hoy todavía no llegó nada de la PC del local: puede estar apagada o sin internet.</span>'}
+  else $("#est").textContent="";
+  $("#cont").innerHTML=htmlPeriodo(R,an);
+  if($("#cierres")){armarGrafico(R);cablear()}
+}
+function delta(act,ant,A,rot,buenoSube){
+  if(!A)return"";
+  if(A.dias_con_datos+A.dias_vacios===0)return"";
+  if(!ant)return act?'<small class="dl">Antes no había ventas</small>':'<small class="dl">Igual que antes (cero)</small>';
+  const r=Math.round((act-ant)/ant*100);
+  if(r===0)return `<small class="dl">= Igual ${rot}</small>`;
+  const sube=r>0,cls=buenoSube?(sube?"up":"down"):"";
+  return `<small class="dl ${cls}">${sube?"▲ +":"▼ −"}${Math.abs(r)}% ${rot}</small>`;
+}
+function listaDias(l){
+  const v=l.slice(0,6).map(d=>d===hoyK()?"hoy":cortaF(d));
+  const t=v.length>1?v.slice(0,-1).join(", ")+" y "+v[v.length-1]:v[0];
+  return l.length>6?v.join(", ")+` y ${l.length-6} más`:t;
+}
+function htmlPeriodo(R,an){
+  const T=R.totales,A=an&&R.anterior&&R.anterior.totales,rot=an?an.rot:"";
+  if(T.dias_total===0)return '<div class="card"><p><b>Este período todavía no empezó.</b></p></div>';
+  const faltan=R.dias.filter(d=>d.estado==="falta").map(d=>d.dia);
+  let h="";
+  if(faltan.length)h+=`<div class="alerta" role="alert"><b>⚠ Faltan ${faltan.length} ${faltan.length===1?"día":"días"} de ${T.dias_total}:</b> ${listaDias(faltan)}. La PC del local no ${faltan.length===1?"lo subió":"los subió"} (estaba apagada o sin internet). ${faltan.length===1?"Ese día no se cuenta":"Esos días no se cuentan"} como cero: ${T.dias_con_datos+T.dias_vacios?"los totales son parciales.":"no hay nada para mostrar."}</div>`;
+  if(T.dias_con_datos+T.dias_vacios===0)return h+'<div class="card"><p><b>Sin datos de este período.</b></p><p class="mu">La PC no subió ningún día. Cuando se prenda con internet, los días de atrás se completan solos.</p></div>';
+  const k=(t,v,a,f,bueno)=>`<div class="k"><span>${t}</span><b>${f(v)}</b>${delta(v,a,A,rot,bueno)}</div>`;
+  h+=`<div class="kpis p">${k("Total vendido",T.total_vendido,A&&A.total_vendido,m,1)}${k("Tickets",T.tickets,A&&A.tickets,$$,1)}${k("Ticket promedio",T.ticket_promedio,A&&A.ticket_promedio,m,1)}${k("Descuentos",T.descuentos,A&&A.descuentos,m,0)}${k("Cobrado neto",T.cobrado_neto,A&&A.cobrado_neto,m,1)}</div>`;
+  if(A&&A.dias_con_datos+A.dias_vacios===0)h+='<p class="mu nota">No hay datos del período anterior para comparar.</p>';
+  else if(A&&(A.dias_con_datos+A.dias_vacios)!==(T.dias_con_datos+T.dias_vacios))h+=`<p class="mu nota">La comparación no es exacta: de este período hay datos de ${T.dias_con_datos+T.dias_vacios} de ${T.dias_total} días y del anterior de ${A.dias_con_datos+A.dias_vacios} de ${A.dias_total}.</p>`;
+  else h+='<div class="sp"></div>';
+  h+=`<div class="card"><h2>Ventas por día</h2><div id="grafc"></div><div class="det" id="det" aria-live="polite"><span class="mu">Tocá una barra para ver ese día.</span></div>
+   <div class="ley"><span><i class="sw"></i>Con ventas</span><span><i class="sw h"></i>Hoy</span><span><i class="sw f"></i>Sin datos</span></div></div>`;
+  if(R.mejor)h+=`<div class="k3"><div class="k"><span>Mejor día</span><b>${cortaF(R.mejor.dia)}</b><span>${m(R.mejor.total)}</span></div>`+(R.peor?`<div class="k"><span>Día más flojo</span><b>${cortaF(R.peor.dia)}</b><span>${m(R.peor.total)}</span></div>`:"")+`<div class="k"><span>Promedio por día con ventas</span><b>${m(T.promedio_dia)}</b></div></div>`;
+  h+=`<div class="card"><h2>Cierres de caja</h2><div id="cierres"></div></div>`;
+  const tc=R.por_categoria.reduce((a,x)=>a+x.importe,0);
+  h+=`<div class="g2"><div class="card"><h2>Por medio de pago</h2>${tabla([{t:"Medio",f:x=>esc(x.medio)},{t:"Cobros",n:1,f:x=>m(x.cobros)},...(R.por_medio.some(x=>x.devoluciones)?[{t:"Devol.",n:1,f:x=>m(x.devoluciones)}]:[]),{t:"Neto",n:1,f:x=>`<b>${m(x.neto)}</b>`}],R.por_medio)}</div>
+   <div class="card"><h2>Por categoría</h2>${tabla([{t:"Categoría",f:x=>esc(x.categoria)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)},{t:"%",n:1,f:x=>pct(x.importe,tc)}],R.por_categoria)}</div>
+   <div class="card"><h2>Por destino</h2>${tabla([{t:"Destino",f:x=>esc(x.destino)},{t:"Tickets",n:1,f:x=>$$(x.tickets)},{t:"Total",n:1,f:x=>m(x.total)},{t:"%",n:1,f:x=>pct(x.total,R.por_destino.reduce((a,y)=>a+y.total,0))}],R.por_destino)}</div>
+   <div class="card"><h2>Lo más vendido</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Unid.",n:1,f:x=>$$(x.unidades)},{t:"Importe",n:1,f:x=>m(x.importe)}],R.top_productos.slice(0,15))}<p class="mu nota" style="margin:8px 0 0">Se arma con los 15 más vendidos de cada día.</p></div></div><div class="sp"></div>`;
+  h+=cuadroCobrado(T,R.fiado,"tickets del período"," en el período");
+  const mc=Object.entries(R.movimientos_caja||{}),fi=R.fiado;
+  h+=`<div class="sp"></div><div class="g2"><div class="card"><h2>Fiado y movimientos de caja</h2><p>Quedó en fiado (cargos): <b>${m(fi.cargos)}</b></p><p>Pagaron deudas: <b>${m(fi.pagos)}</b></p>${fi.anulaciones?`<p>Fiado de tickets anulados: <b>${m(fi.anulaciones)}</b></p>`:""}${mc.map(([a,b])=>`<p>${esc(mayus(a))}: <b>${m(b)}</b></p>`).join("")}</div>
+   <div class="card"><h2>Stock bajo</h2>${tabla([{t:"Producto",f:x=>esc(x.producto)},{t:"Stock",n:1,f:x=>$$(x.stock)},{t:"Mínimo",n:1,f:x=>$$(x.minimo)}],R.stock_bajo?R.stock_bajo.lista:[],"Nada por reponer")}${R.stock_bajo?`<p class="mu nota" style="margin:8px 0 0">Según el último día con datos (${cortaF(R.stock_bajo.dia)}).</p>`:""}</div></div>`;
+  const pasados=R.dias.filter(d=>d.estado!=="futuro");
+  h+=`<details class="card" style="margin-top:12px"${pasados.length<=8?" open":""}><summary>Día por día (tabla)</summary><table><tr><th>Día</th><th class="n">Vendido</th><th class="n">Tickets</th><th class="n">Dif. de caja</th></tr>${pasados.map(d=>{
+    if(d.estado==="falta")return `<tr class="sd"><td>${cortaF(d.dia)}</td><td colspan="3">Sin datos (la PC no lo subió)</td></tr>`;
+    if(d.estado==="vacio")return `<tr><td>${cortaF(d.dia)}</td><td colspan="3" class="mu">Sin movimiento</td></tr>`;
+    const df=d.dif||d.dif_dig?`<span class="bad">${m(d.dif+d.dif_dig)}</span>`:"";
+    return `<tr><td>${cortaF(d.dia)}</td><td class="n">${m(d.total)}</td><td class="n">${$$(d.tickets)}</td><td class="n">${df}</td></tr>`}).join("")}</table></details>`;
+  return h;
+}
+function cablear(){
+  const R=ult.R;
+  const pintar=()=>{
+    const cr=R.cierres_resumen;
+    let h="";
+    if(!R.cierres.length)h='<p class="mu">No se abrió caja en este período.</p>';
+    else{
+      h+=cr.cerradas?(cr.dias_con_diferencia?`<p class="resu"><span class="chip bad">✗ Hubo diferencia en ${cr.dias_con_diferencia} de ${cr.dias_con_cierre} ${cr.dias_con_cierre===1?"día":"días"}</span></p>`:`<p class="resu"><span class="chip ok">✓ Todas las cajas cuadraron (${cr.dias_con_cierre} ${cr.dias_con_cierre===1?"día":"días"})</span></p>`):"";
+      if(cr.abiertas)h+=`<p class="mu">${cr.abiertas} ${cr.abiertas===1?"caja sin cerrar":"cajas sin cerrar"}.</p>`;
+      if(cr.con_diferencia)h+=`<label class="chk"><input type="checkbox" id="sd"${soloDif?" checked":""}> Mostrar sólo los que tuvieron diferencia</label>`;
+      const dif=c=>c.diferencia||c.digital.some(g=>g.diferencia);
+      let l=soloDif?R.cierres.filter(dif):R.cierres;const total=l.length;
+      if(!verTodos)l=l.slice(0,40);
+      h+=`<ul class="cierres">${l.map(c=>liCierre(c,true)).join("")}</ul>`;
+      if(!verTodos&&total>40)h+=`<button id="vt">Mostrar los ${total-40} restantes</button>`;
+    }
+    $("#cierres").innerHTML=h;
+    const s=$("#sd");if(s)s.onchange=()=>{soloDif=s.checked;verTodos=false;pintar()};
+    const v=$("#vt");if(v)v.onclick=()=>{verTodos=true;pintar()};
+  };
+  pintar();
+}
+// ---------------------------------------------------------------- gráfico de barras (SVG, sin librerías)
+function bonito(max){const e=Math.pow(10,Math.floor(Math.log10(max))),f=max/e;return([1,1.2,1.5,2,2.5,3,4,5,6,8,10].find(x=>f<=x+1e-9))*e}
+function armarGrafico(R){
+  let items=R.dias,agr=false;
+  if(items.length>62){
+    agr=true;const g=new Map();
+    for(const d of R.dias){
+      const k=lunesDe(d.dia);let x=g.get(k);
+      if(!x){x={dia:k,desde:d.dia,hasta:d.dia,total:0,tickets:0,dif:0,dif_dig:0,estado:"futuro",faltan:0};g.set(k,x)}
+      x.hasta=d.dia;
+      if(d.estado==="datos"||d.estado==="vacio"){x.total+=d.total;x.tickets+=d.tickets;x.dif+=d.dif;x.dif_dig+=d.dif_dig;if(d.estado==="datos")x.estado="datos";else if(x.estado!=="datos")x.estado="vacio"}
+      else if(d.estado==="falta"){x.faltan++;if(x.estado==="futuro")x.estado="falta"}
+    }
+    items=[...g.values()];
+  }else items=items.map(d=>({...d,desde:d.dia,hasta:d.dia,faltan:d.estado==="falta"?1:0}));
+  const mj=R.mejor?`Mejor día: ${larga(R.mejor.dia)}, ${m(R.mejor.total)}.`:"";
+  const previa=G&&G.sel>=0&&G.items[G.sel]?G.items[G.sel].desde:null;       // si se recarga sola, se queda en la barra elegida
+  G={items,agr,sel:previa?items.findIndex(x=>x.desde===previa):-1,aria:`Gráfico de barras de lo vendido ${agr?"por semana":"por día"}, del ${larga(R.desde)} al ${larga(R.hasta)}. ${mj} Con las flechas del teclado podés recorrer ${agr?"las semanas":"los días"}.`};
+  dibujar();
+}
+function nombreBarra(x){
+  if(G.agr)return `Semana del ${dm(x.desde)} al ${dm(x.hasta)}`;
+  return mayus(larga(x.dia));
+}
+function textoBarra(x){
+  const n=nombreBarra(x);
+  if(x.estado==="falta")return `${n}: sin datos (la PC no lo subió)`;
+  if(x.estado==="futuro")return `${n}: todavía no llegó`;
+  if(x.estado==="vacio")return `${n}: sin movimiento`;
+  return `${n}: ${m(x.total)}, ${$$(x.tickets)} ${x.tickets===1?"ticket":"tickets"}`+(x.faltan?` (faltan ${x.faltan} ${x.faltan===1?"día":"días"} de datos)`:"");
+}
+function dibujar(){
+  const cont=$("#grafc");if(!cont||!G)return;
+  const h=hoyK(),W=Math.max(280,Math.floor(cont.clientWidth)),H=220,L=46,Rd=8,T=20,B=38;
+  const items=G.items,n=items.length,iw=W-L-Rd,slot=iw/n,bw=Math.max(2,Math.min(40,slot*.7));
+  const tope=bonito(Math.max(1,...items.map(x=>x.estado==="datos"||x.estado==="vacio"?x.total:0)));
+  const y=v=>T+(H-T-B)*(1-v/tope),y0=y(0);
+  G.geom={L,slot,n};G.paso=Math.max(1,Math.ceil(36/slot));
+  let s=`<svg class="graf" id="graf" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" tabindex="0" role="img" aria-label="${esc(G.aria)}"><defs><pattern id="rayas" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" style="stroke:var(--mu);stroke-width:1.5;opacity:.55"/></pattern></defs>`;
+  for(const f of[0,.5,1]){const yy=y(tope*f);s+=`<line class="gr" x1="${L}" x2="${W-Rd}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${f?corto(tope*f):"0"}</text>`}
+  items.forEach((x,i)=>{
+    const cx=L+slot*i,bx=cx+(slot-bw)/2,mid=cx+slot/2,esHoy=G.agr?(x.desde<=h&&h<=x.hasta):x.dia===h;
+    s+=`<g class="col${i===G.sel?" sel":""}" data-i="${i}"><title>${esc(textoBarra(x))}</title><rect class="sombra" x="${cx}" y="${T-6}" width="${slot}" height="${H-T-B+6}" rx="4"/>`;
+    if(x.estado==="falta")s+=`<rect class="rayas bar" x="${bx}" y="${y(tope)}" width="${bw}" height="${y0-y(tope)}" rx="2"/>`;
+    else if(x.estado==="vacio")s+=`<rect class="bar vacia" x="${bx}" y="${y0-2}" width="${bw}" height="2"/>`;
+    else if(x.estado==="datos"){
+      const top=Math.min(y0-2,y(x.total));
+      s+=`<rect class="bar${esHoy?" hoy":""}" x="${bx}" y="${top}" width="${bw}" height="${y0-top}" rx="2"/>`;
+      if(slot>=40&&x.total>0)s+=`<text class="v" x="${mid}" y="${top-4}" text-anchor="middle">${corto(x.total)}</text>`;
+    }
+    let l=null;
+    if(!G.agr&&n<=8)l=[sem(x.dia),String(+x.dia.slice(8))];
+    else if(G.agr)l=i%G.paso===0?[dm(x.desde)]:null;
+    else if(vista==="mes"){const d=+x.dia.slice(8);if(d===1||(d%5===0&&d<=25))l=[String(d)]}
+    else if(i%G.paso===0)l=[dm(x.dia)];
+    if(l)l.forEach((t,j)=>{s+=`<text class="${esHoy?"hoy":""}" x="${mid}" y="${H-B+15+j*14}" text-anchor="middle">${esc(t)}</text>`});
+    s+="</g>";
+  });
+  cont.innerHTML=s+"</svg>";
+  const svg=$("#graf");
+  const elegir=ev=>{const r=svg.getBoundingClientRect(),i=Math.floor((ev.clientX-r.left-L)/slot);if(i>=0&&i<n)seleccionar(i)};
+  svg.addEventListener("pointerdown",ev=>{abajo=true;elegir(ev)});
+  svg.addEventListener("pointermove",ev=>{if(abajo||ev.pointerType==="mouse")elegir(ev)});
+  svg.addEventListener("keydown",ev=>{
+    const d={ArrowLeft:-1,ArrowRight:1}[ev.key];
+    if(d){ev.preventDefault();seleccionar(Math.max(0,Math.min(n-1,(G.sel<0?(d>0?-1:n):G.sel)+d)))}
+    else if(ev.key==="Home"){ev.preventDefault();seleccionar(0)}else if(ev.key==="End"){ev.preventDefault();seleccionar(n-1)}
+  });
+  if(G.sel>=0)mostrarDetalle();
+}
+function seleccionar(i){
+  if(G.sel===i)return;
+  const svg=$("#graf");
+  if(G.sel>=0){const a=svg.querySelector(`.col[data-i="${G.sel}"]`);if(a)a.classList.remove("sel")}
+  G.sel=i;const b=svg.querySelector(`.col[data-i="${i}"]`);if(b)b.classList.add("sel");
+  mostrarDetalle();
+}
+function mostrarDetalle(){
+  const x=G.items[G.sel],box=$("#det");if(!x||!box)return;
+  let t=`<b>${esc(nombreBarra(x))}</b>`;
+  if(x.estado==="falta")t+=': <span class="warn">sin datos</span> · la PC no lo subió.';
+  else if(x.estado==="futuro")t+=": todavía no llegó.";
+  else if(x.estado==="vacio")t+=": sin movimiento (no hubo ventas ni caja).";
+  else{
+    t+=` · ${m(x.total)} · ${$$(x.tickets)} ${x.tickets===1?"ticket":"tickets"}`;
+    const df=x.dif+x.dif_dig;
+    if(df)t+=` · caja: <span class="bad">${df>0?"sobran":"faltan"} ${m(Math.abs(df))}</span>`;
+    if(x.faltan)t+=` · <span class="warn">faltan ${x.faltan} ${x.faltan===1?"día":"días"} de datos</span>`;
+  }
+  if(!G.agr&&x.estado!=="futuro")t+=` <button id="ver" data-d="${x.dia}">Ver este día</button>`;
+  box.innerHTML=t;
+  const v=$("#ver");if(v)v.onclick=()=>{ref=v.dataset.d;vista="dia";scrollTo(0,0);cambiar()};
+}
+// ---------------------------------------------------------------- CSV del período (una fila por día; separador ";" y BOM para que Excel en español lo abra bien)
+function celda(v){const s=String(v??"");return /[";\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function csvDelPeriodo(R){
+  const num=v=>String(Math.round((v||0)*100)/100).replace(".",",");
+  const est={datos:"Con datos",vacio:"Sin movimiento",falta:"Sin datos"};
+  const filas=[["Fecha","Día","Estado","Total vendido","Tickets","Ticket promedio","Descuentos","Cobrado neto","Diferencia de caja (efectivo)","Diferencia de medios digitales"]];
+  for(const d of R.dias){
+    if(d.estado==="futuro")continue;
+    const base=[d.dia,fmt(d.dia,{weekday:"long"}),est[d.estado]];
+    if(d.estado==="falta")filas.push([...base,"","","","","","",""]);
+    else filas.push([...base,num(d.total),d.tickets,d.tickets?num(Math.round(d.total/d.tickets)):"",num(d.descuentos),num(d.cobrado),num(d.dif),num(d.dif_dig)]);
+  }
+  return "﻿"+filas.map(f=>f.map(celda).join(";")).join("\r\n")+"\r\n";
+}
+function bajarCsv(){
+  if(!ult)return;
+  const {R,p}=ult;
+  const nombre=`reporte_${vista}_${p.desde}_a_${p.hasta}.csv`;
+  const blob=new Blob([csvDelPeriodo(R)],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nombre;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),10000);
 }
 </script></main></body></html>
