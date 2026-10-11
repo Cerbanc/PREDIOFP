@@ -26,9 +26,10 @@ def puerto_libre():
 def arrancar(datos, puerto):
     p = subprocess.Popen([sys.executable, "-m", "predio", "--datos", str(datos), "--sin-ventana", "--puerto", str(puerto)], cwd=RAIZ,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, PREDIO_ESPERA_INICIO="0.5"))
-    for _ in range(100):
+    limite = time.monotonic() + 40          # plazo largo: en una PC cargada (o la primera vez, sin cache) arrancar puede tardar bastante
+    while time.monotonic() < limite:
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{puerto}/api/ping", timeout=0.5).read()
+            urllib.request.urlopen(f"http://127.0.0.1:{puerto}/api/ping", timeout=2).read()
             return p
         except Exception:
             if p.poll() is not None:
@@ -41,7 +42,7 @@ def arrancar(datos, puerto):
 def parar(p):
     p.terminate()
     try:
-        p.wait(timeout=20)
+        p.wait(timeout=60)
     except subprocess.TimeoutExpired:
         p.kill()
         raise

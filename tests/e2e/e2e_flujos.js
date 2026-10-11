@@ -169,7 +169,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.ok(await ev(() => __pos.DB.config.usarTurnos), 'los turnos vienen activados');
   assert.ok(await page.locator('[data-act=nav][data-v=turnos]').count(), 'el menú tiene Turnos');
   await page.locator('[data-act=nav][data-v=turnos]').click();
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.querySelectorAll('.slot').length > 5, null, { timeout: 10000 }).catch(() => {});      // espera a que se dibuje el calendario (no un tiempo fijo); si no aparece, el assert de abajo cuenta qué se ve
   assert.ok(await page.locator('.slot').count() > 5, 'se ve el calendario: ' + await ev(() => JSON.stringify([__pos.UI.view, __pos.DB.canchas.length, document.querySelector('#main').innerText.slice(0, 120)])));
   await ev(() => { __pos.tx(() => { __pos.DB.mesas.push({ id: 'mfut1', nombre: 'FÚTBOL 1', tipo: 'futbol', x: 2, y: 3, w: 26, h: 20, rapido: false }); const c5 = __pos.DB.canchas.find(x => x.clave === 'f5a'); c5.lugarId = 'mfut1'; c5.ap = 0; }); });      // ap = 0: la prueba corre a cualquier hora del día
   const tid = await ev(() => {
