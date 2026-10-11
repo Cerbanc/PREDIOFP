@@ -1,5 +1,5 @@
-name = "predio-reportes"
-main = "src/index.js"
+name = "prediofp"
+main = "nube/src/index.js"
 compatibility_date = "2025-01-01"
 
 [[d1_databases]]
