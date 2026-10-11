@@ -1,0 +1,41 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Manual del dueño</title><link rel="stylesheet" href="estilo.css"></head><body>
+<div class="portada"><img src="../../predio/web/logo_completo.png"><h1>Manual del dueño</h1><div class="sub">Instalación, administración, copias, nube y reportes<br>Caja del Predio</div></div>
+
+<h2>1. Instalar y actualizar</h2>
+<ol class="pasos"><li>Bajá el instalador <b>Instalar-Caja-del-Predio-X.Y.Z.exe</b> desde la página de versiones de GitHub (<b>Cerbanc/PREDIOFP → Releases</b>).</li><li>Ejecutalo. Si Windows avisa «protegió su PC», tocá <b>Más información → Ejecutar de todas formas</b>. No pide ser administrador.</li><li>Quedan dos íconos: <b>Caja del Predio</b> (el real) y <b>Caja del Predio (demostración)</b>, con datos de ejemplo, para practicar sin tocar nada real.</li><li><b>Actualizar:</b> cuando hay una versión nueva aparece un cartel arriba con <b>Actualizar ahora</b>. Se baja una sola vez, se cierra y se vuelve a abrir solo. Tus datos no se tocan.</li></ol>
+<div class="caja">Todo vive en la carpeta <b>C:\Predio</b>. Ahí están la base de datos, las copias, los Excel de cada día y la configuración. Nunca la muevas con el programa abierto.</div>
+
+<h2>2. El primer día: cargar productos y stock</h2>
+<ol class="pasos"><li>Entrá a <b class="t">Admin</b> (código de fábrica <b>1234</b>; cambialo en <b>Admin → Datos y seguridad</b>).</li><li>La primera pestaña es la <b>Planilla</b>: escribí o pegá desde Excel una fila por producto (nombre, categoría, tipo, precio, costo, stock, mínimo). También se puede cargar un archivo de Excel; hay una plantilla vacía para bajar.</li><li>Lo que está en <b>rojo</b> hay que corregirlo. <b>Guardar</b> se habilita cuando no queda nada en rojo, y se guarda todo junto o nada.</li></ol>
+<img class="cap" src="img/admin_pin.png">
+<h3>Tipos de producto</h3><ul><li><b>Producto</b>: lleva su stock (gaseosas, golosinas).</li><li><b>Receta</b>: se arma con insumos (pancho = salchicha + pan).</li><li><b>Servicio</b>: sin stock (café, minutas).</li><li><b>Insumo</b>: solo se usa dentro de recetas.</li></ul>
+<p>Para borrar un producto: <b>Stock → Eliminar</b>. Si solo querés que no aparezca en la caja, usá <b>Ocultar</b>.</p>
+
+<h2>3. Cargar stock con la foto de un remito</h2>
+<ol class="pasos"><li>Sacá una clave gratis en <b>aistudio.google.com/apikey</b> (con una cuenta de Google).</li><li>Abrí <b>C:\Predio\configuracion.json</b> con el Bloc de notas y pegá la clave entre las comillas de <b>gemini_clave</b>. Guardá.</li><li>En <b class="t">Stock → Cargar por foto de remito</b>, elegí la foto. El programa lee los renglones y los empareja con tus productos, aunque el nombre esté escrito distinto.</li><li>Revisá la tabla: verde = seguro, amarillo = revisar, rojo = elegí el producto a mano (o escribilo/omitilo). Recién con <b>Cargar al stock</b> se suma.</li></ol>
+<div class="aviso">La foto se manda a Google para leerla. Con el plan gratis tiene límites por minuto y por día: si te avisa que se acabó el cupo, esperá y probá de nuevo.</div>
+
+<h2>4. Registro de todo lo que cambia</h2>
+<p><b>Admin → Todo lo que cambió</b> muestra, solo, cada cosa que se agrega, se cambia o se borra: ítems sacados de una cuenta, movimientos de caja, ajustes de stock, cambios de precio, turnos, descuentos y anulaciones, con quién y cuándo. Lo importante va marcado. <b>No se puede borrar ni editar.</b></p>
+
+<h2>5. Carpeta de cada día</h2>
+<p>Dentro de <b>C:\Predio\dias\AAAA-MM-DD</b> el programa deja solo, sin que exportes nada:</p><ul><li><b>…_resumen.xlsx</b>: ventas, detalle, caja, stock, turnos y cambios del día.</li><li><b>…_registro.txt</b>: todo lo que cambió ese día, en texto.</li><li><b>…_agenda.xlsx</b>: los turnos con el diseño de la planilla de papel, listo para imprimir en una hoja A4 apaisada (hoy y los próximos 7 días). Los fijos van en amarillo con (F). Las columnas $ y MP quedan vacías.</li></ul>
+<p>El botón <b>Carpeta de hoy</b> (abajo a la izquierda) abre esa carpeta.</p>
+
+<h2>6. Copias de seguridad</h2>
+<ul><li>Se hace una copia <b>al abrir</b> y otra <b>al cerrar</b> el programa. Se guardan 30 días.</li><li><b>Admin → Datos y seguridad</b>: <b>Hacer una copia ahora</b> y la lista con <b>Restaurar</b> (antes guarda otra copia de lo actual).</li><li>Una vez por semana, copiá <b>C:\Predio\copias</b> a un pendrive o a Drive.</li><li>Si la base se dañara, el programa lo detecta al abrir y vuelve a la última copia sana avisándote.</li></ul>
+<div class="aviso"><b>Si se rompe o se roba la PC:</b> instalá el programa en otra, copiá la carpeta <b>copias</b> a <b>C:\Predio\copias</b> y restaurá la última desde Admin → Datos y seguridad.</div>
+
+<h2>7. Reportes desde el celular y turnos en la nube</h2>
+<p>El programa sube solo, cuando hay internet, el reporte del día y sincroniza los turnos con una página privada. Para activarlo, en <b>C:\Predio\configuracion.json</b> están los campos <b>nube_url</b> (la dirección de la página) y <b>nube_token</b> (la clave de la PC). En <b>Admin → Datos y seguridad → Reportes en la nube</b> está el botón <b>Subir ahora</b> para probar.</p>
+<ul><li><b>Reportes</b> (la dirección): Día, Semana, Mes y Fechas, con comparación contra el período anterior, cierres de caja y botón para bajar el Excel. Muestra «sin datos» en los días en que la PC no subió nada.</li><li><b>Turnos</b> (la dirección + /turnos): calendario para el celular con vista de día y de semana, búsqueda, recordatorios de mañana por WhatsApp y registro de quién cargó cada turno. La primera vez cada persona escribe su nombre y queda guardado en su celular.</li><li>Las dos se pueden <b>instalar como app</b> en el celular (aparece un cartelito; en iPhone: Compartir → Agregar a pantalla de inicio).</li><li>La clave de entrada es una sola. Cambiala por una larga cuando termines de probar.</li></ul>
+
+<h2>8. Cierre de caja y diferencias</h2>
+<p>El cierre compara lo que <b>debería haber</b> con lo que contás, en efectivo y en cada medio digital. Se puede cerrar con diferencia; conviene dejar una nota. Para corregir antes de cerrar: <b>Caja → revisar pagos → Corregir ticket</b>. Si no aparece la causa, se registra una <b>pérdida</b> a mano. La página de reportes tiene un cuadro «De lo vendido a lo cobrado» que explica por qué el cobrado puede ser distinto del vendido (fiado, deudas pagadas, señas).</p>
+
+<h2>9. Nombre y logo</h2>
+<p>El logo es fijo. El nombre del negocio está en <b>C:\Predio\personalizar\marca.json</b>: cambialo con el Bloc de notas, guardá y apretá <b>F5</b> en el programa.</p>
+
+<h2>10. Empezar en serio después de probar</h2>
+<p><b>Admin → Datos y seguridad → Restablecer → Borrar ventas e historial</b>: hace una copia antes y pide escribir BORRAR. Se borran tickets, caja, movimientos, turnos y deudas; quedan productos con su stock, clientes, categorías, mesas y medios de pago.</p>
+</body></html>
