@@ -51,6 +51,15 @@ Se arma para **hoy y los 7 días siguientes**. Cada guardado le avisa a `Archivo
 
 Los de la planilla de papel (`CANCHAS_PAPEL` en `predio/web/index.html`): fútbol en turnos de 1 hora de 14:00 a 22:00 (el último termina 23:00) y pádel en turnos de 90 minutos, 10:00, 11:30 ... 22:00 (el último termina 23:30). Una base que ya existía se actualiza una sola vez al abrir (marca `horariosPapel` en la configuración; no toca los precios y amplía el rango si ya había turnos fuera de él). La nube se pone al día sola cuando la PC sincroniza las canchas; `nube/migraciones.sql` tiene los `UPDATE` equivalentes por si se quieren correr a mano.
 
+### Stock por foto de remito (`predio/remito.py`, `predio/emparejar.py`)
+
+Stock → «Cargar por foto de remito». La pantalla reduce la foto (lado mayor 1600 px, JPEG 0,85) y la manda a `POST /api/remito/leer`; el programa se la pide a la IA y devuelve los renglones ya emparejados con los productos de la base. La persona revisa una tabla (verde = seguro, amarillo = revisar, rojo = elegir el producto), corrige y recién ahí se carga el stock (`moverStock(…, 'ingreso', {motivo: 'Remito (foto) · …'})` en un solo `tx()`). Nunca se crea un producto solo ni se suma stock sin esa confirmación; un renglón dudoso o sin producto no se carga hasta que se elige. Si la misma foto ya se cargó hoy, avisa antes de duplicar.
+
+- **Proveedor de IA**: hoy sólo Gemini (plan gratis de Google AI Studio, modelo `gemini-flash-latest`, clave `gemini_clave` en `configuracion.json`; se vuelve a leer en cada uso, sin reiniciar). Otro proveedor = un archivo `predio/remito_<nombre>.py` con una clase que hereda de `ProveedorRemito` y se registra con `@proveedor("<nombre>")`, más `"remito_proveedor": "<nombre>"` en la configuración.
+- **Emparejador local** (`emparejar.py`): palabras con tolerancia de tipeo y abreviaturas, y muy estricto con los tamaños (500 ml ≠ 1,5 L, 2,25 ≠ 2,5, con gas ≠ sin gas). Se cruza con la elección de la IA: si no coinciden, queda en «revisar».
+- **Errores** (sin clave, clave inválida, cupo del minuto o del día, sin internet, respuesta ilegible, foto grande) se muestran en castellano. La clave nunca va a logs, pantalla ni registro de cambios.
+- **Pruebas**: `tests/fake_gemini.py` es un Gemini falso local; se usa con `PREDIO_API_GEMINI=<url>` (igual que `PREDIO_API_GITHUB`). `tests/test_remito.py` (emparejador, cliente, endpoint) y `tests/test_e2e_remito.py` (navegador real).
+
 ### Rendimiento con los años
 
 La pantalla sólo carga los últimos `ventana_dias` (35) de `ventas`, `caja`, `movimientos`, `movCaja` y `log`; lo anterior se pide a `/api/historia` cuando se mira un reporte o ticket viejo. Con un año de datos simulados (36 500 tickets, 146 000 líneas de registro, base de 140 MB): abre en 0,4 s y cada operación tarda ~70 ms (sin ventana eran 17 s y ~0,9 s).
@@ -60,11 +69,11 @@ La pantalla sólo carga los últimos `ventana_dias` (35) de `ventas`, `caja`, `m
 - El servidor escucha **sólo en 127.0.0.1**, valida el `Host`, el `Origin` y exige un token por sesión (`X-Predio-Token`, embebido en la página) en toda la API: otra página abierta en el navegador no puede leer ni escribir datos.
 - Cabeceras `Content-Security-Policy: default-src 'self'` (la pantalla no hace ningún pedido a internet), `X-Frame-Options: DENY`, `nosniff`.
 - Las imágenes se guardan como archivos con nombre por contenido (`sha256`) y sólo se sirven con ese patrón (sin recorridos de carpetas, sin SVG).
-- Los datos no se suben a ningún lado. El código de administración es una traba contra errores, no seguridad contra alguien con acceso a la PC.
+- Los datos no se suben a ningún lado (salvo lo que se configure a propósito: el reporte a la nube y, si se carga una clave de Google, la **foto de un remito** que la persona elige leer, que viaja a Google; la hace el programa, no la pantalla: la CSP sigue siendo `connect-src 'self'`). El código de administración es una traba contra errores, no seguridad contra alguien con acceso a la PC.
 
 ### API local (todo con token)
 
-`GET /api/estado` · `POST /api/guardar` · `GET /api/historia` · `GET /api/auditoria[/{id}]` · `GET /api/dia/{fecha}` · `GET|POST /api/copias[/crear|/restaurar]` · `POST /api/borrar-historial` · `GET /api/planilla/{plantilla|exportar}.xlsx` · `POST /api/planilla/leer` · `POST /api/imagen-desde-link` · `POST /api/abrir-carpeta` · `GET /api/salud` · `POST /api/cerrar`. `/api/dia` y `/api/auditoria` son de sólo lectura y devuelven JSON listo para un panel remoto.
+`GET /api/estado` · `POST /api/guardar` · `GET /api/historia` · `GET /api/auditoria[/{id}]` · `GET /api/dia/{fecha}` · `GET|POST /api/copias[/crear|/restaurar]` · `POST /api/borrar-historial` · `GET /api/planilla/{plantilla|exportar}.xlsx` · `POST /api/planilla/leer` · `POST /api/remito/leer` · `GET /api/remito/estado` · `POST /api/imagen-desde-link` · `POST /api/abrir-carpeta` · `GET /api/salud` · `POST /api/cerrar`. `/api/dia` y `/api/auditoria` son de sólo lectura y devuelven JSON listo para un panel remoto.
 
 ## Desarrollo
 
@@ -75,7 +84,7 @@ python -m predio --datos ./datos_de_prueba --demo            # con datos de ejem
 python -m pytest tests -q                                     # pruebas (las de navegador se saltan si no hay node + playwright)
 ```
 
-Opciones: `--datos`, `--demo`, `--sin-ventana`, `--puerto`. `configuracion.json` (en la carpeta de datos): `puerto`, `copias_conservar_dias`, `ventana_completa`, `ventana_dias`. Variable `PREDIO_DATOS` para elegir la carpeta.
+Opciones: `--datos`, `--demo`, `--sin-ventana`, `--puerto`. `configuracion.json` (en la carpeta de datos): `puerto`, `copias_conservar_dias`, `ventana_completa`, `ventana_dias`, `gemini_clave`, `gemini_modelo`, `remito_proveedor`. Cuando una versión nueva trae ajustes nuevos, el programa los agrega al archivo con su valor de fábrica (sin tocar lo que ya había). Variable `PREDIO_DATOS` para elegir la carpeta.
 
 La pantalla (`predio/web/index.html`) sigue funcionando abierta como archivo suelto (guarda en el navegador): es útil para probar cambios de interfaz sin levantar el programa.
 
@@ -91,4 +100,4 @@ Los datos van en `C:\Predio` (o `PREDIO_DATOS`) y **no** en Documentos, porque a
 
 ## Qué falta (a propósito)
 
-Turnos desde el celular (planilla en la nube), panel remoto de sólo lectura, espejo en Google Sheets, lectura real de remitos con IA, impresora de tickets. El diseño ya los contempla: la API de lectura, las vistas `v_*` y el número de revisión (`rev`) sirven para sincronizar.
+Turnos desde el celular (planilla en la nube), panel remoto de sólo lectura, espejo en Google Sheets, impresora de tickets. El diseño ya los contempla: la API de lectura, las vistas `v_*` y el número de revisión (`rev`) sirven para sincronizar.

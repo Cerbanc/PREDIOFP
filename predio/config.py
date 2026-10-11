@@ -25,7 +25,11 @@ AJUSTES_POR_DEFECTO = {
         "actualizaciones_repo: de dónde se bajan las versiones nuevas (usuario/repositorio de GitHub). "
         "nube_url y nube_token: dirección y clave para subir el reporte del día a la página de reportes (vacío = no se sube nada). "
         "nube_cada_minutos: cada cuánto se sube el reporte (10). nube_turnos_cada_segundos: cada cuánto se sincronizan los turnos (30). "
-        "nube_relleno_dias: hasta cuántos días atrás se completan en la nube los que le falten (90; 0 = no completar)."
+        "nube_relleno_dias: hasta cuántos días atrás se completan en la nube los que le falten (90; 0 = no completar). "
+        "gemini_clave: clave gratis de Google (aistudio.google.com/apikey) para cargar el stock leyendo la foto de un remito; pegala entre las comillas "
+        "(vacío = esa función avisa cómo conseguirla). La foto del remito se manda a Google para leerla; no se manda nada más. "
+        "gemini_modelo: qué modelo de Google lee la foto (gemini-flash-latest). remito_proveedor: quién lee la foto (gemini). "
+        "La clave del remito se toma sola: no hace falta cerrar el programa."
     ),
     "puerto": 8765,
     "copias_conservar_dias": 30,
@@ -37,6 +41,9 @@ AJUSTES_POR_DEFECTO = {
     "nube_cada_minutos": 10,
     "nube_turnos_cada_segundos": 30,
     "nube_relleno_dias": 90,
+    "gemini_clave": "",
+    "gemini_modelo": "gemini-flash-latest",
+    "remito_proveedor": "gemini",
 }
 
 
@@ -113,14 +120,30 @@ def carpeta_por_defecto() -> Path:
     return Path.home() / "Predio"
 
 
+def _completar_archivo(rutas: Rutas, leidos: dict) -> None:
+    """Una versión nueva puede traer ajustes nuevos: se agregan al archivo (con su valor de fábrica) para que se puedan encontrar y editar
+    con el Bloc de notas. Lo que la persona ya puso no se toca."""
+    faltan = [k for k in AJUSTES_POR_DEFECTO if k not in leidos]
+    if not faltan and leidos.get("_ayuda") == AJUSTES_POR_DEFECTO["_ayuda"]:
+        return
+    nuevo = {**AJUSTES_POR_DEFECTO, **{k: v for k, v in leidos.items() if k != "_ayuda"}}
+    try:
+        tmp = rutas.ajustes.with_name(rutas.ajustes.name + ".tmp")
+        tmp.write_text(json.dumps(nuevo, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, rutas.ajustes)
+    except OSError:
+        pass
+
+
 def leer_ajustes(rutas: Rutas) -> dict:
     """Lee configuracion.json; si no existe lo crea con los valores por defecto."""
     ajustes = dict(AJUSTES_POR_DEFECTO)
     if rutas.ajustes.exists():
         try:
-            leidos = json.loads(rutas.ajustes.read_text(encoding="utf-8"))
+            leidos = json.loads(rutas.ajustes.read_text(encoding="utf-8-sig"))      # el Bloc de notas viejo agrega una marca al principio
             if isinstance(leidos, dict):
                 ajustes.update({k: v for k, v in leidos.items() if k in AJUSTES_POR_DEFECTO})
+                _completar_archivo(rutas, leidos)
         except (OSError, ValueError):
             logging.getLogger("predio").warning("configuracion.json ilegible, se usan los valores por defecto")
     else:

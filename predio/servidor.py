@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
-from . import VERSION, actualizador, planilla
+from . import VERSION, actualizador, planilla, remito
 from .almacen import Almacen, ConflictoDeRevision, DatosInvalidos
 from .config import Rutas, leer_marca, ruta_logo
 from .copias import Copias, CopiaInvalida
@@ -60,6 +60,7 @@ class Aplicacion:
     html: str = ""
     puerto: int = 0
     nube: object = None
+    leyendo_remito: threading.Lock = field(default_factory=threading.Lock)     # una sola lectura de remito a la vez (no gastar el cupo gratis de más)
 
 
 def abrir_carpeta(ruta: Path) -> None:
@@ -128,6 +129,7 @@ class Manejador(BaseHTTPRequestHandler):
         except ValueError:
             raise Error(400, "Pedido inválido") from None
         if n > maximo:
+            self.close_connection = True        # el cuerpo no se lee: la conexión no se puede reusar
             raise Error(413, "El archivo es demasiado grande")
         return self.rfile.read(n) if n else b""
 
@@ -202,6 +204,8 @@ class Manejador(BaseHTTPRequestHandler):
             ("POST", "/api/guardar"): self.api_guardar,
             ("POST", "/api/latido"): self.api_latido,
             ("GET", "/api/salud"): self.api_salud,
+            ("GET", "/api/remito/estado"): self.api_remito_estado,
+            ("POST", "/api/remito/leer"): self.api_remito_leer,
             ("GET", "/api/nube"): self.api_nube_estado,
             ("POST", "/api/nube/subir"): self.api_nube_subir,
             ("POST", "/api/nube/sincronizar"): self.api_nube_sincronizar,
@@ -233,7 +237,8 @@ class Manejador(BaseHTTPRequestHandler):
         app = self.app
         marca = leer_marca(app.rutas)
         marca["logo"] = ruta_logo().is_file()
-        config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "marca": marca}, ensure_ascii=False).replace("<", "\\u003c")
+        config = json.dumps({"token": app.token, "version": VERSION, "modo": app.modo, "marca": marca,
+                             "remito": {"clave": remito.estado(app.rutas)["clave"]}}, ensure_ascii=False).replace("<", "\\u003c")
         icono = '<link rel="icon" href="/marca/logo">' if marca["logo"] else ""
         html = app.html.replace("<!--PREDIO-CONFIG-->", f"{icono}<script>window.PREDIO={config};</script>")
         self._enviar(200, html.encode("utf-8"), "text/html; charset=utf-8", {"Content-Security-Policy": CSP})
@@ -341,7 +346,7 @@ class Manejador(BaseHTTPRequestHandler):
             "copias": len(copias), "ultima_copia": copias[0] if copias else None,
             "diario": {"pendientes": app.diario.pendientes(), "error": app.diario.ultimo_error, "ultima": app.diario.ultima_generacion,
                        "agenda": {"pendientes": app.diario.agenda.fallidos(), "error": app.diario.agenda.ultimo_error, "ultima": app.diario.agenda.ultima_generacion}},
-            "avisos": app.avisos, "activo_desde": app.inicio,
+            "avisos": app.avisos, "activo_desde": app.inicio, "remito_clave": remito.estado(app.rutas)["clave"],
         })
 
     def api_auditoria(self, q: dict) -> None:
@@ -442,6 +447,45 @@ class Manejador(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, **planilla.leer_planilla(datos, nombre)})
         except planilla.PlanillaInvalida as e:
             raise Error(400, str(e)) from None
+
+    # ---- carga de stock leyendo la foto de un remito ----
+    def api_remito_estado(self, q: dict) -> None:
+        """¿Está cargada la clave de Google? (nunca se devuelve la clave) y dónde está el archivo donde se pega."""
+        self._json(200, remito.estado(self.app.rutas))
+
+    def api_remito_leer(self, q: dict) -> None:
+        """El cuerpo es la foto (JPEG, PNG o WEBP). Devuelve los renglones ya emparejados con los productos del negocio."""
+        app = self.app
+        try:
+            largo = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise Error(400, "Pedido inválido") from None
+        if largo > remito.MAX_IMAGEN:
+            if largo <= 64_000_000:              # se descarta lo que mandó para poder contestarle (si no, el navegador ve la conexión cortada)
+                while largo > 0:
+                    trozo = self.rfile.read(min(65536, largo))
+                    if not trozo:
+                        break
+                    largo -= len(trozo)
+            else:
+                self.close_connection = True
+            raise Error(413, "La foto es demasiado grande. Sacala de nuevo más lejos o con menos calidad.", codigo="imagen_grande")
+        imagen = self._leer_cuerpo(remito.MAX_IMAGEN)
+        if not imagen:
+            raise Error(400, "No llegó ninguna foto.", codigo="sin_foto")
+        mime = remito.tipo_de_imagen(imagen)
+        if mime is None:
+            raise Error(415, "La foto tiene que ser JPG, PNG o WEBP.", codigo="formato")
+        if not app.leyendo_remito.acquire(blocking=False):
+            raise Error(409, "Ya se está leyendo un remito. Esperá a que termine.", codigo="ocupado")
+        try:
+            ajustes = remito.ajustes_de_remito(app.rutas)
+            prods, _ = self._productos_y_categorias()
+            self._json(200, {"ok": True, **remito.leer_remito(imagen, mime, prods, ajustes)})
+        except remito.ErrorRemito as e:
+            raise Error(e.estado, e.mensaje, codigo=e.codigo) from None
+        finally:
+            app.leyendo_remito.release()
 
     def api_actualizacion(self, q: dict) -> None:
         """¿Hay una versión nueva? Se consulta a GitHub sólo si hace falta (se recuerda 6 horas, salvo que se pida de nuevo)."""
