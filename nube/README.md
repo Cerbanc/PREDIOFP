@@ -10,3 +10,11 @@ Las claves se guardan como huella SHA-256 en la tabla `config` (`hash_pc` para l
 ## Sincronización con la PC
 
 `/api/sync` (clave de la PC, `src/sync.js`): la PC baja lo que cambió (`GET ?desde=`) y sube lo suyo (`POST`, cada registro con `base_mod`, la versión de la nube sobre la que se basó; si cambió en el medio se rechaza y la PC baja la nueva). Un turno `bloqueado` (en una cuenta o con pagos en la caja) no se puede cambiar desde la web. La parte del programa está en `predio/nube_turnos.py`.
+
+## Web instalable en el celular (PWA)
+
+Reportes y Turnos se pueden instalar como app (ícono del Predio en la pantalla de inicio, sin barra del navegador). `src/pwa.js` sirve, **sin clave** (van antes del control de sesión en `src/index.js`, y no llevan ningún dato del negocio): `/manifest.webmanifest`, `/sw.js` (service worker mínimo: no guarda nada; sólo muestra «Sin conexión» si no hay internet) y los íconos (`/icono-192.png`, `/icono-512.png`, `/icono-maskable-512.png`, `/apple-touch-icon.png`, embebidos en base64 en `src/iconos.js`).
+
+El cartel «Instalar como app» es un script inline idéntico en las dos páginas (entre los comentarios `PWA-INICIO` y `PWA-FIN`, en el `<head>` y al final). Aparece sólo en celular o tablet táctil, después de entrar con la clave, y nunca si la web ya se abrió desde el ícono o si se cerró con la «x» (se recuerda en el celular). En Android/Chrome tiene el botón «Instalar»; en iPhone no existe ese botón, así que explica los pasos (Compartir, Agregar a pantalla de inicio). En iPhone la app instalada guarda sus datos aparte de Safari: hay que escribir la clave una vez dentro de la app.
+
+Para cambiar el logo: reemplazar `tools/isotipo.png` y correr `python nube/tools/hacer_iconos.py` (necesita Pillow, sólo para este script); regenera `src/iconos.js`. Pruebas: `tests/test_pwa.py` (levanta una nube local con wrangler y un celular simulado con Playwright; se saltea si faltan).
