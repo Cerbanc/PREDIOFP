@@ -326,7 +326,7 @@ function htmlPeriodo(R,an){
   h+=notas.length?`<p class="mu nota">${notas.join(" ")}</p>`:'<div class="sp"></div>';
   h+=`<div class="card"><h2>Ventas por día</h2><div id="grafc"></div><div class="det" id="det" aria-live="polite"><span class="mu">Tocá una barra para ver ese día.</span></div>
    <div class="ley"><span><i class="sw"></i>Con ventas</span>${R.dias.some(d=>d.dia===hoyK())?'<span><i class="sw h"></i>Hoy</span>':""}${faltan.length?'<span><i class="sw f"></i>Sin datos</span>':""}</div></div>`;
-  if(R.mejor)h+=`<div class="k3"><div class="k"><span>Mejor día</span><b>${cortaF(R.mejor.dia)}</b><span>${m(R.mejor.total)}</span></div>`+(R.peor?`<div class="k"><span>Día más flojo</span><b>${cortaF(R.peor.dia)}</b><span>${m(R.peor.total)}</span></div>`:"")+`<div class="k"><span>Promedio por día con ventas</span><b>${m(T.promedio_dia)}</b></div></div>`;
+  if(R.mejor)h+=`<p class="mu" style="margin:2px 2px 12px;font-size:14px">Más ventas: <b>${cortaF(R.mejor.dia)}</b> (${m(R.mejor.total)})`+(R.peor?` · Menos ventas: <b>${cortaF(R.peor.dia)}</b> (${m(R.peor.total)})`:"")+` · Promedio por día: <b>${m(T.promedio_dia)}</b></p>`;
   h+=`<div class="card"><h2>Cierres de caja</h2><div id="cierres"></div></div>`;
   const tc=R.por_categoria.reduce((a,x)=>a+x.importe,0);
   h+=`<div class="g2"><div class="card"><h2>Por medio de pago</h2>${tabla([{t:"Medio",f:x=>esc(x.medio)},{t:"Cobros",n:1,f:x=>m(x.cobros)},...(R.por_medio.some(x=>x.devoluciones)?[{t:"Devol.",n:1,f:x=>m(x.devoluciones)}]:[]),{t:"Neto",n:1,f:x=>`<b>${m(x.neto)}</b>`}],R.por_medio)}</div>
@@ -382,7 +382,7 @@ function armarGrafico(R){
     }
     items=[...g.values()];
   }else items=items.map(d=>({...d,desde:d.dia,hasta:d.dia,faltan:d.estado==="falta"?1:0}));
-  const mj=R.mejor?`Mejor día: ${larga(R.mejor.dia)}, ${m(R.mejor.total)}.`:"";
+  const mj=R.mejor?`Día con más ventas: ${larga(R.mejor.dia)}, ${m(R.mejor.total)}.`:"";
   const previa=G&&G.sel>=0&&G.items[G.sel]?G.items[G.sel].desde:null;       // si se recarga sola, se queda en la barra elegida
   G={items,agr,sel:previa?items.findIndex(x=>x.desde===previa):-1,aria:`Gráfico de barras de lo vendido ${agr?"por semana":"por día"}, del ${larga(R.desde)} al ${larga(R.hasta)}. ${mj} Con las flechas del teclado podés recorrer ${agr?"las semanas":"los días"}.`};
   dibujar();
