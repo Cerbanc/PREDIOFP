@@ -305,6 +305,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .tcol span{position:absolute;right:6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
 .ccol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% var(--hp)}
 .slot{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:color-mix(in srgb,var(--surface) 70%,transparent);line-height:1.25}
+.ahora{position:absolute;left:0;right:0;height:0;border-top:2px solid #e5484d;z-index:2;pointer-events:none}
+.ahora::before{content:"";position:absolute;left:-1px;top:-6px;width:10px;height:10px;border-radius:50%;background:#e5484d}
+.tcol span.ahora-t{background:#e5484d;color:#fff;border-radius:6px;padding:0 4px;transform:translateY(-50%);z-index:2;font-weight:700}
 .slot b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot.free:hover{border-color:var(--accent);background:var(--accent-soft)}
@@ -2086,16 +2089,25 @@ views.turnos = () => {
   const horas = []; for (let m = ap; m < ci; m += 60) horas.push(m);
   const dia = turnosDelDia(f);
   const heads = cs.map(c => `<div class="chead"><b>${esc(c.nombre)}</b><small>${c.dur} min · ${money(c.precio)} · fijo ${money(c.precioFijo)}</small>${c.clave === 'f7' ? '<small>ocupa también las dos de Fútbol 5</small>' : CLAVES_F5.includes(c.clave) ? '<small>si se usa, no hay Fútbol 7</small>' : ''}</div>`).join('');
-  const cols = cs.map(c => `<div class="ccol" style="height:${H}px">${slotsDe(c).map(s => slotHTML(c, s, f, ap, hoy, ahora)).join('')}</div>`).join('');
+  const enHora = f === hoy && ahora >= ap && ahora < ci;       // raya roja con la hora actual (como en la web de turnos)
+  const cols = cs.map(c => `<div class="ccol" style="height:${H}px">${slotsDe(c).map(s => slotHTML(c, s, f, ap, hoy, ahora)).join('')}${enHora ? `<i class="ahora" style="top:${(ahora - ap) / 60 * HP}px"></i>` : ''}</div>`).join('');
   $('#main').innerHTML = `<header class="ph"><div><h1>Turnos</h1><p class="muted">${esc(fechaLarga(f))} · ${dia.length} turnos (${dia.filter(t => t.esFijo).length} fijos) ${sincroTexto()}</p></div>
     <div class="row"><button class="icon" data-act="tur-dia" data-d="-1" aria-label="Día anterior">‹</button><input class="in" style="width:auto" type="date" data-in="turf" value="${f}" aria-label="Fecha">
       <button class="icon" data-act="tur-dia" data-d="1" aria-label="Día siguiente">›</button><button class="btn sm ghost" data-act="tur-hoy">Hoy</button>${SERVIDOR ? '<button class="btn sm" data-act="tur-sync" title="Trae los turnos cargados desde el celular y sube los de acá">Sincronizar</button>' : ''}</div></header>${sincroProblemas()}
     <div class="cal-wrap" id="cal-wrap"><div class="cal" style="grid-template-columns:54px repeat(${cs.length},minmax(150px,1fr));--hp:${HP}px">
       <div class="chead corner"></div>${heads}
-      <div class="tcol" style="height:${H}px">${horas.map((m, i) => `<span style="top:${i * HP}px">${hm(m)}</span>`).join('')}</div>${cols}</div></div>
+      <div class="tcol" style="height:${H}px">${horas.map((m, i) => `<span style="top:${i * HP}px">${hm(m)}</span>`).join('')}${enHora ? `<span class="ahora-t" style="top:${(ahora - ap) / 60 * HP}px">${hm(ahora)}</span>` : ''}</div>${cols}</div></div>
     <div class="legend"><span><span class="pill">libre</span> tocá para reservar</span><span><span class="pill good">fútbol</span></span><span><span class="pill" style="background:var(--info-soft);color:var(--info)">pádel</span></span><span>Borde grueso a la izquierda: turno FIJO.</span><span>Franja rayada: ocupada porque Fútbol 7 usa las dos canchas de Fútbol 5 (y al revés).</span></div>`;
   if (f === hoy) $('#cal-wrap').scrollTop = Math.max(0, ((ahora - ap) / 60 - 1) * HP);
 };
+/* La raya roja de «ahora» se corre sola cada medio minuto (sin volver a dibujar el calendario). */
+setInterval(() => {
+  if (UI.view !== 'turnos' || !DB.canchas.length) return;
+  const cs = DB.canchas, ap = Math.min(...cs.map(c => c.ap)), ci = Math.max(...cs.map(c => c.ci)), n = new Date(), m = n.getHours() * 60 + n.getMinutes();
+  if (UI.turFecha !== dayKey(Date.now()) || m < ap || m >= ci) return;
+  document.querySelectorAll('.ahora').forEach(e => { e.style.top = (m - ap) / 60 * HP + 'px'; });
+  const t = document.querySelector('.ahora-t'); if (t) { t.style.top = (m - ap) / 60 * HP + 'px'; t.textContent = hm(m); }
+}, 30000);
 /* Turnos cargados desde el celular: la nube los trae al programa (ver nube_turnos.py) y la pantalla los suma sin recargarse. */
 let NUBE_EST = null;
 function estadoNube() { try { NUBE_EST = http('GET', '/api/nube'); } catch (e) { /* sin estado */ } return NUBE_EST; }
@@ -2349,6 +2361,21 @@ const rmEstado = () => rmPedir('/api/remito/estado').then(r => r.json());
 function rmCancelar() { const R = UI.rm; if (!R) return; R.cancelado = true; if (R.ctrl) R.ctrl.abort(); }
 function rmAbrirCarpeta() { try { http('POST', '/api/abrir-carpeta', { que: 'datos' }); } catch (e) { toast(e.message, 'warn'); } }
 
+/* La foto del remito puede venir del selector de archivos o pegada desde el portapapeles (Ctrl+V). */
+function rmElegirFoto(f, el) {
+  const R = UI.rm, b = $('#mact-1'); if (!R) return;
+  R.archivo = null; $('#foto-prev').innerHTML = ''; if (b) b.disabled = true;
+  if (!f) return;
+  if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || '')) { toast('Ese archivo no es una foto', 'warn'); if (el) el.value = ''; return; }
+  R.archivo = f; if (b) b.disabled = false;
+  $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`;
+}
+document.addEventListener('paste', e => {
+  if (!UI.rm || !document.getElementById('foto-file') || !e.clipboardData) return;
+  const it = [...e.clipboardData.items].find(i => i.kind === 'file' && /^image\//.test(i.type)); if (!it) return;
+  e.preventDefault();
+  const f = it.getAsFile(); if (f) { const inp = $('#foto-file'); if (inp) inp.value = ''; rmElegirFoto(f, null); toast('Imagen pegada'); }
+});
 function modalFoto() {
   if (!SERVIDOR) { modal({ title: 'Cargar stock con foto del remito', body: '<p>Esta función sólo anda con el programa instalado en la PC, no con la pantalla abierta como archivo suelto.</p>', actions: [{ label: 'Entendido', kind: 'primary' }] }); return; }
   const R = UI.rm = { id: ++RM_SEQ, archivo: null, ctrl: null, cancelado: false, lineas: [], huella: '', yaCargado: null };
@@ -2381,7 +2408,7 @@ function rmElegirFoto() {
   const R = UI.rm; R.archivo = null;
   modal({ title: 'Cargar stock con foto del remito', onClose: rmCancelar,
     body: `<p class="muted">Sacale una foto al remito o a la factura del proveedor, que se lea bien. El programa la lee y vos revisás todo antes de que se cargue algo al stock.</p>
-      <label class="fld">Foto del remito o factura<input class="in" type="file" id="foto-file" accept="image/*" data-in="foto-file"></label><div id="foto-prev"></div>
+      <label class="fld">Foto del remito o factura<input class="in" type="file" id="foto-file" accept="image/*" data-in="foto-file"></label><p class="muted" style="margin:4px 0">También podés <b>pegar la imagen</b> copiada (Ctrl+V), por ejemplo una captura de pantalla o una foto copiada de WhatsApp Web.</p><div id="foto-prev"></div>
       <p class="muted" style="font-size:12px">La foto se manda a Google para que la lea (plan gratis); no se manda nada más.</p>`,
     actions: [{ label: 'Cancelar', onClick: rmCancelar }, { label: 'Leer remito', kind: 'primary', disabled: true, onClick: () => { rmLeer(); return false; } }] });
 }
@@ -3942,14 +3969,7 @@ const I = {
   'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
   'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
   'mesa-rapido': el => { const m = mesaSel(); if (m) { m.rapido = el.checked; persist(); renderSide(); views.mesas(); } },
-  'foto-file': el => {
-    const f = el.files && el.files[0], R = UI.rm, b = $('#mact-1'); if (!R) return;
-    R.archivo = null; $('#foto-prev').innerHTML = ''; if (b) b.disabled = true;
-    if (!f) return;
-    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Ese archivo no es una foto', 'warn'); el.value = ''; return; }
-    R.archivo = f; if (b) b.disabled = false;
-    $('#foto-prev').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Foto del remito" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)">`;
-  },
+  'foto-file': el => rmElegirFoto(el.files && el.files[0], el),
   'rm-ck': el => {
     const i = +el.id.split('-')[2], l = UI.rm.lineas[i]; if (!l.prodId) { el.checked = false; return; }
     l.cargar = el.checked; if (l.estado !== 'seguro') l.confirmado = el.checked;
