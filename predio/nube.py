@@ -142,6 +142,28 @@ class SubidaNube:
                 if self.app.apagar.wait(5):          # junta varios cambios seguidos
                     break
 
+    def subir_agendas(self) -> None:
+        """Sube la planilla (Excel de la agenda, con el diseño del papel) de hoy y los 7 días siguientes, sólo las que cambiaron."""
+        from . import agenda as ag
+        hoy = dt.date.today()
+        dias = ag.ventana(hoy)
+        con = self.app.db.lectura()
+        try:
+            datos = ag.leer_datos(con, dias[0], dias[-1])
+            modelos = {d: ag.armar_dia(d, datos) for d in dias}
+        finally:
+            con.close()
+        for d, modelo in modelos.items():
+            huella = ag.firma(modelo)
+            if self._huellas.get("agenda:" + d) == huella:
+                continue
+            with tempfile.TemporaryDirectory() as tmp:
+                ruta = Path(tmp) / "a.xlsx"
+                ag.construir_agenda(modelo, ruta)
+                cuerpo = {"dia": d, "xlsx": base64.b64encode(ruta.read_bytes()).decode("ascii")}
+            self.llamar("POST", "/api/agenda", cuerpo)
+            self._huellas["agenda:" + d] = huella
+
     def subir_ahora(self, forzar: bool = False) -> bool:
         hoy = dia_de(ahora_ms())
         ayer = (dt.date.today() - dt.timedelta(days=1)).isoformat()
@@ -163,6 +185,10 @@ class SubidaNube:
             ok = self._enviar(pedido) and ok
             if ok:
                 self._huellas[dia] = huella
+        try:
+            self.subir_agendas()
+        except Exception as e:      # noqa: BLE001 - la planilla es un extra: nunca debe romper la subida del reporte
+            log.warning("No se pudieron subir las planillas de turnos: %s", e)
         return ok
 
     def estado(self) -> dict:

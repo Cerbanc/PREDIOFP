@@ -7,6 +7,14 @@ from conftest import base_inicial, op
 from predio import nube
 from predio.nube import SubidaNube, armar_pedido
 from predio.util import ahora_ms, dia_de
+
+
+def ts_de_hoy():
+    """Un instante de HOY con margen: si la prueba corre justo después de medianoche, «hace 10 minutos» caería en el día anterior."""
+    import datetime as _dt
+    inicio = int(_dt.datetime.combine(_dt.date.today(), _dt.time()).timestamp() * 1000)
+    return max(ahora_ms(), inicio + 4 * 3_600_000)
+
 from test_diario_copias import venta
 
 
@@ -30,7 +38,7 @@ def servidor_falso(respuestas):
 
 def preparar(almacen, db):
     almacen.aplicar(base_inicial(), "Caja", 0)
-    ts = ahora_ms()
+    ts = ts_de_hoy()
     almacen.aplicar({"ops": [op("cajas", "cx1", {"id": "cx1", "abierta": ts - 3_600_000, "fondo": 100, "responsable": "Ana", "cerrada": None}),
                              op("ventas", "v1", venta("v1", 1, ts - 60_000, 4400))]}, "Caja", None)
     return SimpleNamespace(db=db, ajustes={}, modo="real", apagar=threading.Event())

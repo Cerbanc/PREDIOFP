@@ -43,6 +43,20 @@ export default {
       return json({ ok: true });
     }
 
+    // --- la PC sube la planilla (Excel) de cada día de la agenda ---
+    if (ruta === "/api/agenda" && req.method === "POST") {
+      const t = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (!igual(await sha(t), cfg.hash_pc)) return json({ error: "clave incorrecta" }, 401);
+      const texto = await req.text();
+      if (texto.length > 1_500_000) return json({ error: "demasiado grande" }, 413);
+      let p; try { p = JSON.parse(texto); } catch { return json({ error: "json inválido" }, 400); }
+      if (!DIA.test(p.dia || "") || typeof p.xlsx !== "string") return json({ error: "pedido inválido" }, 400);
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS agendas (dia TEXT PRIMARY KEY, xlsx TEXT NOT NULL, subido INTEGER NOT NULL)").run();
+      await env.DB.prepare("INSERT INTO agendas (dia, xlsx, subido) VALUES (?1, ?2, ?3) ON CONFLICT(dia) DO UPDATE SET xlsx = ?2, subido = ?3").bind(p.dia, p.xlsx, Date.now()).run();
+      await env.DB.prepare("DELETE FROM agendas WHERE dia < ?").bind(new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10)).run();
+      return json({ ok: true });
+    }
+
     // --- la PC sincroniza los turnos ---
     if (ruta === "/api/sync") {
       const t = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -66,6 +80,13 @@ export default {
     if (ruta === "/" || ruta === "/index.html" || ruta === "/turnos") {
       const mal = url.searchParams.get("mal") ? "1" : "0";
       return new Response((ruta === "/turnos" ? PAGINA_TURNOS : PAGINA).replace("__DENTRO__", dentro ? "1" : "0").replace("__MAL__", mal), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...SEG, "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; worker-src 'self'; img-src 'self' data:; form-action 'self'" } });
+    }
+    if (!dentro && /^\/agenda\/\d{4}-\d{2}-\d{2}$/.test(ruta)) return new Response("Entrá con tu clave", { status: 401 });
+    if (dentro && /^\/agenda\/\d{4}-\d{2}-\d{2}$/.test(ruta)) {      // la planilla de turnos del día (la arma el programa de la PC, con el diseño de la planilla de papel)
+      const dia = ruta.slice(-10);
+      const r = await env.DB.prepare("SELECT xlsx FROM agendas WHERE dia = ?").bind(dia).first().catch(() => null);
+      if (!r) return new Response("Todavía no está la planilla de ese día. La arma la PC del predio (hoy y los próximos 7 días) cuando está prendida y con internet.", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+      return new Response(Uint8Array.from(atob(r.xlsx), (c) => c.charCodeAt(0)), { headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "content-disposition": `attachment; filename="${dia}_agenda.xlsx"`, "cache-control": "no-store" } });
     }
     if (!dentro) return json({ error: "no autorizado" }, 401);
 

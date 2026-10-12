@@ -10,6 +10,14 @@ from predio.diario import ArchivosDiarios, ArchivoEnUso, datos_del_dia, texto_re
 from predio.util import ahora_ms, dia_de
 
 
+def ts_de_hoy():
+    """Un instante de HOY con margen: si la prueba corre justo después de medianoche, «hace 10 minutos» caería en el día anterior."""
+    import datetime as _dt
+    inicio = int(_dt.datetime.combine(_dt.date.today(), _dt.time()).timestamp() * 1000)
+    return max(ahora_ms(), inicio + 4 * 3_600_000)
+
+
+
 def venta(id_, nro, ts, total, destino="Mesa 1", pagos=None, estado="ok", items=None, descuento=0, ajuste=None):
     return {"id": id_, "nro": nro, "ts": ts, "destino": destino, "subtotal": total + descuento, "descuento": descuento, "ajuste": ajuste, "total": total, "estado": estado,
             "items": items or [{"prodId": "p1", "nombre": "Coca-Cola 500 ml", "catId": "c1", "cant": 2, "precio": total // 2, "costo": 1400, "nota": ""}],
@@ -19,7 +27,7 @@ def venta(id_, nro, ts, total, destino="Mesa 1", pagos=None, estado="ok", items=
 @pytest.fixture()
 def con_datos(almacen):
     almacen.aplicar(base_inicial(), "Caja", 0)
-    ts = ahora_ms()
+    ts = ts_de_hoy()
     almacen.aplicar({"ops": [
         op("cajas", "cx1", {"id": "cx1", "abierta": ts - 3_600_000, "fondo": 15000, "responsable": "Marcos", "cerrada": None}),
         op("ventas", "v1", venta("v1", 1, ts - 600_000, 4400)),
@@ -170,7 +178,7 @@ def test_restaurar_no_borra_lo_anotado_en_el_registro(con_datos, rutas):
 def test_texto_raro_en_el_excel_no_lo_rompe(con_datos, rutas):
     from predio.util import ahora_ms, dia_de
 
-    ts = ahora_ms()
+    ts = ts_de_hoy()
     v = venta("v9", 9, ts - 1000, 500)
     v["cliente"] = "=1+1"
     v["nota"] = "con\x0bcaracter ilegal"

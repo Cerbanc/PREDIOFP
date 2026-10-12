@@ -286,6 +286,13 @@ class SincroTurnos:
                     problemas.append(f"El turno de {t.get('cliente') or 'sin nombre'} del {t.get('fecha', '')[8:]}/{t.get('fecha', '')[5:7]} choca con otro cargado desde el celular: {res.get('con', '')}. Revisalo en Turnos.")
         self.problemas = problemas
         self._guardar(st)
+        if ops or envio["turnos"] or envio["fijos"]:       # cambió algo de los turnos: se actualiza también la planilla Excel de la web
+            nube = getattr(self.app, "nube", None)
+            if nube is not None:
+                try:
+                    nube.subir_agendas()
+                except Exception as e:      # noqa: BLE001
+                    log.warning("No se pudieron subir las planillas de turnos: %s", e)
 
     # ---- para la pantalla ----
     def resumen(self) -> dict:
