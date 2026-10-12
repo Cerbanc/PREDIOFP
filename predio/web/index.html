@@ -305,6 +305,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .tcol span{position:absolute;right:6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;transform:translateY(-1px)}
 .ccol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% var(--hp)}
 .slot{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 8px;text-align:left;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:1px;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:color-mix(in srgb,var(--surface) 70%,transparent);line-height:1.25}
+.avanz summary{cursor:pointer;padding:2px 0}.avanz[open] summary{margin-bottom:10px}.avanz .card{box-shadow:none;margin-top:10px}.chips-sep{width:1px;background:var(--line);margin:0 4px}
+.nav-mas{margin-left:10px;padding-left:6px;border-left:2px solid var(--line)}
 .ahora{position:absolute;left:0;right:0;height:0;border-top:2px solid #e5484d;z-index:2;pointer-events:none}
 .ahora::before{content:"";position:absolute;left:-1px;top:-6px;width:10px;height:10px;border-radius:50%;background:#e5484d}
 .tcol span.ahora-t{background:#e5484d;color:#fff;border-radius:6px;padding:0 4px;transform:translateY(-50%);z-index:2;font-weight:700}
@@ -434,6 +436,7 @@ const ICON = {
   clientes: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M21.5 19c0-2.7-1.6-4.6-4-5.4"/>',
   tema: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   carpeta: '<path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  mas: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   salir: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
 };
 const ic = n => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
@@ -1905,11 +1908,13 @@ function renderSide() {
   const rap = DB.mesas.filter(m => m.rapido);
   const enRap = UI.view === 'venta' && rap.some(m => m.id === UI.com);
   const btn = (attrs, label, icon, badge, warn, cur) => `<button ${attrs} ${cur ? 'aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<span class="badge ${warn ? 'warn' : ''}">${badge}</span>` : ''}</button>`;
+  const masAbierto = UI.mas || ['clientes', 'tickets', 'reportes', 'admin'].includes(UI.view);      // lo menos usado queda detrás de «Más»
   const nav = (v, n, i, b, w) => btn(`data-act="nav" data-v="${v}"`, n, i, b, w, UI.view === v);
   $('#nav').innerHTML = btn('data-act="nav" data-v="venta"', 'Vender', 'venta', 0, 0, UI.view === 'venta' && !enRap) +
     rap.map(m => btn(`data-act="ir-lugar" data-id="${m.id}"`, m.nombre, 'mesas', DB.comandas[m.id] && DB.comandas[m.id].items.length ? '●' : '', 0, UI.view === 'venta' && UI.com === m.id)).join('') +
-    nav('mesas', 'Mesas', 'mesas', ocup, 0) + (DB.config.usarTurnos ? nav('turnos', 'Turnos', 'cal', turHoy, 0) : '') + nav('caja', 'Caja', 'cajaic', cajaAbierta() ? 0 : '!', 1) + nav('clientes', 'Clientes', 'clientes', deudores, 1) + nav('stock', 'Stock', 'stock', bajo, 1) +
-    nav('tickets', 'Tickets', 'tickets', 0, 0) + nav('reportes', 'Reportes', 'rep', 0, 0) + nav('admin', 'Admin', 'admin', 0, 0);
+    nav('mesas', 'Mesas', 'mesas', ocup, 0) + (DB.config.usarTurnos ? nav('turnos', 'Turnos', 'cal', turHoy, 0) : '') + nav('caja', 'Caja', 'cajaic', cajaAbierta() ? 0 : '!', 1) + nav('stock', 'Stock', 'stock', bajo, 1) +
+    btn('data-act="mas"', 'Más', 'mas', masAbierto ? 0 : deudores, 1, false).replace('<button ', `<button aria-expanded="${masAbierto}" `) +
+    (masAbierto ? `<div class="nav-mas">${nav('clientes', 'Clientes', 'clientes', deudores, 1) + nav('tickets', 'Tickets', 'tickets', 0, 0) + nav('reportes', 'Reportes', 'rep', 0, 0) + nav('admin', 'Admin', 'admin', 0, 0)}</div>` : '');
   const aviso = SERVIDOR
     ? `${PREDIO.modo === 'demo' ? '<div class="demo-tag">Modo demostración: datos de ejemplo, separados de los reales.</div>' : ''}
        <div class="guardado ${ESTADO_GUARDADO.ok ? 'ok' : 'mal'}" id="estado-guardado">${esc(textoGuardado())}</div>
@@ -2362,7 +2367,7 @@ function rmCancelar() { const R = UI.rm; if (!R) return; R.cancelado = true; if 
 function rmAbrirCarpeta() { try { http('POST', '/api/abrir-carpeta', { que: 'datos' }); } catch (e) { toast(e.message, 'warn'); } }
 
 /* La foto del remito puede venir del selector de archivos o pegada desde el portapapeles (Ctrl+V). */
-function rmElegirFoto(f, el) {
+function rmPonerFoto(f, el) {
   const R = UI.rm, b = $('#mact-1'); if (!R) return;
   R.archivo = null; $('#foto-prev').innerHTML = ''; if (b) b.disabled = true;
   if (!f) return;
@@ -2374,7 +2379,7 @@ document.addEventListener('paste', e => {
   if (!UI.rm || !document.getElementById('foto-file') || !e.clipboardData) return;
   const it = [...e.clipboardData.items].find(i => i.kind === 'file' && /^image\//.test(i.type)); if (!it) return;
   e.preventDefault();
-  const f = it.getAsFile(); if (f) { const inp = $('#foto-file'); if (inp) inp.value = ''; rmElegirFoto(f, null); toast('Imagen pegada'); }
+  const f = it.getAsFile(); if (f) { const inp = $('#foto-file'); if (inp) inp.value = ''; rmPonerFoto(f, null); toast('Imagen pegada'); }
 });
 function modalFoto() {
   if (!SERVIDOR) { modal({ title: 'Cargar stock con foto del remito', body: '<p>Esta función sólo anda con el programa instalado en la PC, no con la pantalla abierta como archivo suelto.</p>', actions: [{ label: 'Entendido', kind: 'primary' }] }); return; }
@@ -2960,7 +2965,11 @@ views.admin = () => {
     return;
   }
   const t = UI.admTab;
-  const tabs = [['planilla', 'Planilla (productos y stock)'], ['productos', 'Productos'], ['categorias', 'Categorías'], ['pagos', 'Medios de pago'], ['registro', 'Registro de cambios']].concat(DB.config.usarTurnos ? [['canchas', 'Canchas y precios'], ['fijos', 'Turnos fijos']] : []).concat(SERVIDOR ? [['auditoria', 'Todo lo que cambió']] : []).concat([['datos', 'Datos y seguridad']]).map(([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`).join('');
+  const todas = [['planilla', 'Planilla (productos y stock)'], ['productos', 'Productos'], ['categorias', 'Categorías'], ['pagos', 'Medios de pago'], ['registro', 'Registro de cambios']].concat(DB.config.usarTurnos ? [['canchas', 'Canchas y precios'], ['fijos', 'Turnos fijos']] : []).concat(SERVIDOR ? [['auditoria', 'Todo lo que cambió']] : []).concat([['datos', 'Datos y seguridad']]);
+  const principales = ['planilla', 'productos', 'canchas', 'datos'];       // lo de todos los días; el resto queda detrás de «Más opciones»
+  const masTabs = !principales.includes(t) || UI.admMas;
+  const chip = ([k, n]) => `<button class="chip" data-act="adm-tab" data-v="${k}" aria-pressed="${t === k}">${n}</button>`;
+  const tabs = todas.filter(([k]) => principales.includes(k)).map(chip).join('') + `<button class="chip" data-act="adm-mas" aria-pressed="${masTabs}">Más opciones ${masTabs ? '▴' : '▾'}</button>` + (masTabs ? '<span class="chips-sep"></span>' + todas.filter(([k]) => !principales.includes(k)).map(chip).join('') : '');
   $('#main').innerHTML = `<header class="ph"><div><h1>Administración</h1><p class="muted">Sesión desbloqueada por 5 minutos desde la última acción.</p></div><button class="btn sm ghost" data-act="adm-lock">Bloquear ahora</button></header>
     <div class="chips" style="margin-bottom:14px">${tabs}</div><div id="adm-body"></div>`;
   admBody[t]();
@@ -3063,10 +3072,12 @@ admBody.datos = () => {
       <label class="fld">Mensaje<textarea class="in" rows="3" data-in="cfg-wa-msg">${esc(DB.config.msgTurno)}</textarea><small>Podés usar {nombre}, {cancha}, {fecha} y {hora}.</small></label></div></div>` : ''}
     ${SERVIDOR ? tarjetasServidor() : `<div class="card"><h2>Copia de seguridad</h2><div class="stack"><p class="muted">En el programa instalado es un archivo de la base de datos que se copia solo todos los días. Acá podés ver y restaurar el contenido.</p>
       <div class="row"><button class="btn" data-act="bk-ver">Ver copia (JSON)</button><button class="btn" data-act="bk-rest">Restaurar copia</button></div></div></div>`}
+    <details class="card avanz"><summary><b>Opciones avanzadas</b> <span class="muted">(casos especiales: probar fallas, borrar historial)</span></summary>
     <div class="card"><h2>Probar la seguridad de los datos</h2><div class="stack"><p class="muted">Simula una falla en medio de una venta (se descuenta stock y justo después "se corta"). El sistema tiene que volver todo atrás.</p>
       <button class="btn" data-act="sim-falla" style="align-self:flex-start">Simular falla</button></div></div>
     <div class="card"><h2>Restablecer</h2><div class="stack"><p class="muted">${SERVIDOR ? 'Para empezar a usar el programa en serio después de probar. Antes se hace una copia de seguridad y el borrado queda anotado.' : 'Empezar de nuevo. Esto no se puede deshacer.'}</p>
       <div class="row"><button class="btn" data-act="reset-hist">Borrar ventas e historial</button>${SERVIDOR ? '' : '<button class="btn danger" data-act="reset-demo">Volver a datos de ejemplo</button>'}</div></div></div>
+    </details>
     ${SERVIDOR ? `<div class="card"><h2>Cerrar el programa</h2><div class="stack"><p class="muted">Se guarda todo y se cierra. Para volver a abrirlo usá el ícono del escritorio.</p><button class="btn" data-act="cerrar-programa" style="align-self:flex-start">Cerrar el programa</button></div></div>` : ''}</div>`;
 };
 
@@ -3630,6 +3641,8 @@ function eliminarProducto(id) {
 /* ---------- acciones de los botones ---------- */
 const A = {
   'act-buscar': () => consultarActualizacion(true, true),
+  'adm-mas': () => { UI.admMas = !UI.admMas; views.admin(); },
+  mas: () => { UI.mas = !UI.mas; renderSide(); },
   'tur-sync': () => {
     toast('Sincronizando con el celular…');
     setTimeout(() => {
@@ -3969,7 +3982,7 @@ const I = {
   'mesa-w': el => { const m = mesaSel(); if (!m) return; m.w = +el.value; if (m.x + m.w > 100) m.x = 100 - m.w; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.width = m.w + '%'; n.style.left = m.x + '%'; },
   'mesa-h': el => { const m = mesaSel(); if (!m) return; m.h = +el.value; if (m.y + m.h > 100) m.y = 100 - m.h; persistSoon(); const n = $(`.mesa[data-id="${m.id}"]`); n.style.height = m.h + '%'; n.style.top = m.y + '%'; },
   'mesa-rapido': el => { const m = mesaSel(); if (m) { m.rapido = el.checked; persist(); renderSide(); views.mesas(); } },
-  'foto-file': el => rmElegirFoto(el.files && el.files[0], el),
+  'foto-file': el => rmPonerFoto(el.files && el.files[0], el),
   'rm-ck': el => {
     const i = +el.id.split('-')[2], l = UI.rm.lineas[i]; if (!l.prodId) { el.checked = false; return; }
     l.cargar = el.checked; if (l.estado !== 'seguro') l.confirmado = el.checked;

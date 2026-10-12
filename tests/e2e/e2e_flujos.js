@@ -12,6 +12,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push('CONSOLE ' + m.text()); });
   const ev = (f, a) => page.evaluate(f, a);
+  const irMas = async v => { const b = page.locator(`[data-act=nav][data-v=${v}]`); if (!(await b.count())) await page.locator('[data-act=mas]').click(); await b.click(); };      // Admin, Clientes, Tickets y Reportes están detrás de «Más»
   const cargar = async () => { await page.goto(URL); await page.waitForFunction(() => window.__pos && window.__pos.DB); };
   const audit = async (q = '') => (await ev(async q => (await (await fetch('/api/auditoria?limite=500&q=' + encodeURIComponent(q) + '&t=' + encodeURIComponent(PREDIO.token))).json()).filas.map(f => f.resumen), q));
   await cargar();
@@ -38,7 +39,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.waitForFunction(() => __pos.DB.ventas.length === 1);
   assert.strictEqual(await ev(() => __pos.DB.productos[0].stock), 7);
   await page.keyboard.press('Escape');
-  await page.locator('[data-act=nav][data-v=tickets]').click();
+  await irMas('tickets');
   await page.locator('[data-act=tk-ver]').first().click();
   await page.locator('.modal footer button', { hasText: 'Anular ticket' }).click();
   await page.locator('#pin').fill('1234'); await page.locator('#mact-1').click();
@@ -73,7 +74,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.keyboard.press('Escape');
   const t2b = await audit('precio');
   assert.ok(t2b.some(t => /PRECIO de Coca-Cola 500 ml cambiado a \$ 1\.800 c\/u/.test(t)) && t2b.some(t => /PRECIO MODIFICADO en Coca-Cola/.test(t)), JSON.stringify(t2b));
-  await page.locator('[data-act=nav][data-v=reportes]').click();
+  await irMas('reportes');
   assert.ok(/descuentos otorgados[\s\S]*800/i.test(await page.locator('.kpis').innerText()), 'el total de descuentos del día incluye la diferencia');
 
   // ---- 2c. Mercado Pago se lee como el efectivo: cuánto debería haber, pérdida y cierre
@@ -111,7 +112,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.ok((await audit('PÉRDIDA')).length >= 1);
 
   // ---- 3. producto con foto: la imagen pasa a ser un archivo de la carpeta imagenes
-  await page.locator('[data-act=nav][data-v=admin]').click();
+  await irMas('admin');
   await page.locator('[data-act=adm-tab][data-v=productos]').click();
   await page.locator('[data-act=prod-new]').click();
   await page.locator('#pf-nombre').fill('Agua con foto'); await page.locator('#pf-precio').fill('1500');
@@ -127,7 +128,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.waitForFunction(() => { const i = document.querySelector('.tile img.th'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });   // la foto se ve en la caja
 
   // ---- 4. copias: hacer una, cambiar algo y restaurar
-  await page.locator('[data-act=nav][data-v=admin]').click();
+  await irMas('admin');
   await page.locator('[data-act=adm-tab][data-v=datos]').click();
   await page.locator('[data-act=bk-crear]').click();
   await page.waitForSelector('[data-act=bk-restaurar]');
@@ -201,11 +202,11 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await ev(() => { __pos.tx(() => { __pos.DB.config.pedirPinAjuste = !__pos.DB.config.pedirPinAjuste; }); });
 
   // ---- 5. borrar el historial: pide escribir BORRAR, hace copia y deja los productos
-  await page.locator('[data-act=nav][data-v=admin]').click();
+  await irMas('admin');
   await page.locator('[data-act=adm-entrar]').click();
   await page.locator('#pin').fill('1234'); await page.locator('#mact-1').click();
   await page.locator('[data-act=adm-tab][data-v=datos]').click();
-  await page.locator('[data-act=reset-hist]').click();
+  await page.evaluate(() => document.querySelectorAll('details.avanz').forEach(d => { d.open = true; })); await page.locator('[data-act=reset-hist]').click();
   assert.ok(await page.locator('#mact-1').isDisabled(), 'confirmar está bloqueado hasta escribir la palabra');
   await page.locator('#conf-txt').fill('borrar');
   assert.ok(!(await page.locator('#mact-1').isDisabled()));

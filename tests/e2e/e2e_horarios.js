@@ -13,6 +13,7 @@ const FASE = process.env.FASE;
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push('CONSOLE ' + m.text()); });
   const ev = (f, a) => page.evaluate(f, a);
+  const irMas = async v => { const b = page.locator(`[data-act=nav][data-v=${v}]`); if (!(await b.count())) await page.locator('[data-act=mas]').click(); await b.click(); };      // Admin, Clientes, Tickets y Reportes están detrás de «Más»
   const cargar = async () => { await page.goto(URL); await page.waitForFunction(() => window.__pos && window.__pos.DB); };
   const canchas = () => ev(() => __pos.DB.canchas.map(c => ({ clave: c.clave, nombre: c.nombre, dur: c.dur, ap: c.ap, ci: c.ci, precio: c.precio, precioFijo: c.precioFijo })));
   const porClave = lista => Object.fromEntries(lista.map(c => [c.clave, c]));
@@ -77,7 +78,7 @@ const FASE = process.env.FASE;
   }
 
   // ---- Admin: Abre/Cierra muestran el horario real (pádel cierra 23:30, no una hora entera) y se pueden cambiar
-  await page.locator('[data-act=nav][data-v=admin]').click();
+  await irMas('admin');
   await page.locator('[data-act=adm-entrar]').click();
   await page.locator('#pin').fill('1234'); await page.locator('#mact-1').click();
   await page.locator('[data-act=adm-tab][data-v=canchas]').click();
@@ -87,7 +88,7 @@ const FASE = process.env.FASE;
   assert.strictEqual(await page.locator(`select[data-f=ap][data-id="${idPT}"]`).evaluate(s => s.selectedOptions[0].textContent), '10:00');
   await cierra.selectOption('23');
   assert.strictEqual(await ev(() => __pos.DB.canchas.find(x => x.clave === 'padelT').ci), 1380);
-  await page.locator('[data-act=adm-tab][data-v=fijos]').click(); await page.locator('[data-act=adm-tab][data-v=canchas]').click();      // se vuelve a dibujar la pantalla
+  if (!(await page.locator('[data-act=adm-tab][data-v=fijos]').count())) await page.locator('[data-act=adm-mas]').click(); await page.locator('[data-act=adm-tab][data-v=fijos]').click(); await page.locator('[data-act=adm-tab][data-v=canchas]').click();      // se vuelve a dibujar la pantalla
   assert.strictEqual(await page.locator(`select[data-f=ci][data-id="${idPT}"] option[value="23.5"]`).count(), 1, 'la opción 23:30 sigue estando: se puede volver al horario de papel');
   assert.deepStrictEqual(await page.locator(`select[data-f=ci][data-id="${idPT}"] option`).evaluateAll(o => o.map(x => x.textContent).slice(-3)), ['23:00', '23:30', '24:00 (medianoche)'], 'las opciones van de media en media hora y en orden');
   await cierra.selectOption('23.5');

@@ -16,6 +16,7 @@ const FOTO = process.env.FOTOS || '';
   page.on('requestfailed', r => { if (!r.url().startsWith(URL)) errs.push('PEDIDO A INTERNET: ' + r.url()); });
   page.on('request', r => { if (!r.url().startsWith(URL) && !r.url().startsWith('data:') && !r.url().startsWith('blob:')) errs.push('PEDIDO A INTERNET: ' + r.url()); });
   const ev = f => page.evaluate(f);
+  const irMas = async v => { const b = page.locator(`[data-act=nav][data-v=${v}]`); if (!(await b.count())) await page.locator('[data-act=mas]').click(); await b.click(); };      // Admin, Clientes, Tickets y Reportes están detrás de «Más»
   const foto = n => FOTO ? page.screenshot({ path: `${FOTO}/${n}.png` }) : null;
   await page.goto(URL);
   await page.waitForFunction(() => window.__pos && window.__pos.DB);
@@ -107,9 +108,9 @@ const FOTO = process.env.FOTOS || '';
 
     // ---- una operación que falla en el medio no deja nada a medias (rollback con el servidor)
     const antes = await ev(() => JSON.stringify([__pos.DB.productos.map(p => p.stock), __pos.REV]));
-    await page.locator('[data-act=nav][data-v=admin]').click();
+    await irMas('admin');
     await page.locator('[data-act=adm-tab][data-v=datos]').click();
-    await page.locator('[data-act=sim-falla]').click();
+    await page.evaluate(() => document.querySelectorAll('details.avanz').forEach(d => { d.open = true; })); await page.locator('[data-act=sim-falla]').click();
     assert.ok(/Todo quedó igual/.test(await page.locator('.modal .note').innerText()));
     await page.locator('#mact-0').click();
     assert.strictEqual(await ev(() => JSON.stringify([__pos.DB.productos.map(p => p.stock), __pos.REV])), antes);
@@ -131,14 +132,14 @@ const FOTO = process.env.FOTOS || '';
     // el orden de las listas se conserva
     assert.deepStrictEqual(await ev(() => __pos.DB.productos.map(p => p.nombre)), ['Coca-Cola 500 ml', 'Salchicha', 'Pan de pancho', 'Pancho', 'Alfajor', 'Café']);
     // el panel de Datos y seguridad muestra la carpeta y las copias
-    await page.locator('[data-act=nav][data-v=admin]').click();
+    await irMas('admin');
     await page.locator('[data-act=adm-entrar]').click();
     await page.locator('#pin').fill('1234'); await page.locator('#mact-1').click();
     await page.locator('[data-act=adm-tab][data-v=datos]').click();
     const txt = await page.locator('#adm-body').innerText();
     assert.ok(/Dónde están tus datos/.test(txt) && /Copias de seguridad/.test(txt));
     // auditoría automática en pantalla
-    await page.locator('[data-act=adm-tab][data-v=auditoria]').click();
+    if (!(await page.locator('[data-act=adm-tab][data-v=auditoria]').count())) await page.locator('[data-act=adm-mas]').click(); await page.locator('[data-act=adm-tab][data-v=auditoria]').click();
     assert.ok(await page.locator('#adm-body tbody tr').count() > 5);
     await page.locator('#adm-body tbody tr').first().locator('[data-act=aud-det]').click();
     assert.ok(/Detalle del cambio/.test(await page.locator('.modal h3').innerText()));
