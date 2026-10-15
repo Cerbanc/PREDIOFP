@@ -4,6 +4,7 @@ import PAGINA from "./pagina.html";
 import PAGINA_TURNOS from "./pagina_turnos.html";
 import { manejarTurnos } from "./turnos.js";
 import { manejarSync } from "./sync.js";
+import { excelDelDia } from "./excel_dia.js";
 import { manejarReportes } from "./reportes.js";
 import { manejarPwa } from "./pwa.js";
 
@@ -102,9 +103,9 @@ export default {
       return json({ resumen: JSON.parse(r.resumen), subido: r.subido, ahora: Date.now() });
     }
     if ((m = ruta.match(/^\/excel\/(\d{4}-\d{2}-\d{2})$/))) {
-      const r = await env.DB.prepare("SELECT xlsx FROM dias WHERE dia = ?").bind(m[1]).first();
-      if (!r || !r.xlsx) return new Response("No hay Excel de ese día", { status: 404 });
-      return new Response(Uint8Array.from(atob(r.xlsx), (c) => c.charCodeAt(0)), { headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "content-disposition": `attachment; filename="${m[1]}_resumen.xlsx"`, "cache-control": "no-store" } });
+      const r = await env.DB.prepare("SELECT resumen, subido FROM dias WHERE dia = ?").bind(m[1]).first();       // el Excel se arma ahora, con lo último que subió la PC
+      if (!r) return new Response("No hay datos de ese día", { status: 404 });
+      return new Response(excelDelDia(m[1], JSON.parse(r.resumen), r.subido), { headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "content-disposition": `attachment; filename="${m[1]}_resumen.xlsx"`, "cache-control": "no-store" } });
     }
     return json({ error: "no existe" }, 404);
   },
