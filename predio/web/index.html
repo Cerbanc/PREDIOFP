@@ -1622,12 +1622,24 @@ function subtotalDividir() {
   return Math.round(sum(P.lineas, (l, i) => 0) + P.lineas.reduce((a, l, i) => { const q = +(P.div[i] || 0); return a + (l.turnoId ? (q > 0 ? l.precio * l.cant / q : 0) : l.precio * q); }, 0));
 }
 function dividirHTML() { return ''; }
+/* A quién se le fía: una casilla donde se escribe; sólo aparecen los que coinciden (nunca la lista de todos), o se crea uno nuevo. */
+function fiadoSugerencias(P) {
+  const q = norm(P.fiBusca || '').trim();
+  if (!q) return '<p class="muted" style="margin:6px 0 0;font-size:13px">Escribí el nombre para buscarlo.</p>';
+  const hay = DB.clientes.filter(c => norm(c.nombre).includes(q)).sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre))).slice(0, 6);
+  const exacto = DB.clientes.some(c => norm(c.nombre).trim() === q);
+  return hay.map(c => { const d = saldoCliente(c.id); return `<button class="btn" style="width:100%;justify-content:space-between;margin-top:6px" data-act="fi-elegir" data-id="${c.id}"><span>${esc(c.nombre)}${c.tipo === 'empleado' ? ' (empleado)' : ''}</span>${d > 0 ? `<span class="muted">debe ${money(d)}</span>` : ''}</button>`; }).join('')
+    + (exacto ? '' : `<button class="btn primary" style="width:100%;margin-top:6px" data-act="fi-nuevo-de">+ Crear cliente nuevo «${esc((P.fiBusca || '').trim())}»</button>`);
+}
 function fiadoHTML(P) {
   if (!P.rows.some(r => metodo(r.metodoId).fiado)) return '';
-  const cs = DB.clientes.slice().sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre)));
   const sel = P.clienteId && P.clienteId !== '__nuevo' ? clienteDe(P.clienteId) : null;
-  return `<div class="card" style="padding:12px"><div class="stack"><label class="fld">Se le fía a<select id="fi-cli" class="in" data-in="fi-cli"><option value="">Elegí un cliente…</option>${cs.map(c => { const d = saldoCliente(c.id); return `<option value="${c.id}" ${P.clienteId === c.id ? 'selected' : ''}>${esc(c.nombre)}${c.tipo === 'empleado' ? ' (empleado)' : ''}${d > 0 ? ' · debe ' + money(d) : ''}</option>`; }).join('')}<option value="__nuevo" ${P.clienteId === '__nuevo' ? 'selected' : ''}>+ Cliente nuevo…</option></select></label>
-    ${P.clienteId === '__nuevo' ? `<div class="grid2"><label class="fld">Nombre<input class="in" id="fi-nom" data-in="fi-nuevo" value="${esc(P.nuevoCli.nombre)}"></label><label class="fld">Teléfono<input class="in" id="fi-tel" data-in="fi-nuevo" value="${esc(P.nuevoCli.tel)}"></label></div>` : ''}
+  let cuerpo;
+  if (sel) cuerpo = `<div class="row" style="justify-content:space-between"><span>Se le fía a <b>${esc(sel.nombre)}</b>${sel.tipo === 'empleado' ? ' (empleado)' : ''}</span><button class="btn sm ghost" data-act="fi-cambiar">cambiar</button></div>`;
+  else if (P.clienteId === '__nuevo') cuerpo = `<div class="row" style="justify-content:space-between"><span>Cliente <b>nuevo</b></span><button class="btn sm ghost" data-act="fi-cambiar">cambiar</button></div>
+    <div class="grid2"><label class="fld">Nombre<input class="in" id="fi-nom" data-in="fi-nuevo" value="${esc(P.nuevoCli.nombre)}"></label><label class="fld">Teléfono<input class="in" id="fi-tel" data-in="fi-nuevo" value="${esc(P.nuevoCli.tel)}"></label></div>`;
+  else cuerpo = `<label class="fld">Se le fía a<input class="in" id="fi-q" data-in="fi-q" autocomplete="off" placeholder="Escribí el nombre…" value="${esc(P.fiBusca || '')}"></label><div id="fi-sug">${fiadoSugerencias(P)}</div>`;
+  return `<div class="card" style="padding:12px"><div class="stack">${cuerpo}
     ${sel && saldoCliente(sel.id) > 0 ? `<div class="note warn">${esc(sel.nombre)} ya debe ${money(saldoCliente(sel.id))}.</div>` : ''}</div></div>`;
 }
 function renderCobro(focusIdx) {
@@ -3692,6 +3704,9 @@ function eliminarProducto(id) {
 /* ---------- acciones de los botones ---------- */
 const A = {
   'act-buscar': () => consultarActualizacion(true, true),
+  'fi-elegir': d => { UI.pago.clienteId = d.id; renderCobro(); },
+  'fi-cambiar': () => { UI.pago.clienteId = ''; UI.pago.fiBusca = ''; renderCobro(); },
+  'fi-nuevo-de': () => { UI.pago.clienteId = '__nuevo'; UI.pago.nuevoCli = { nombre: (UI.pago.fiBusca || '').trim(), tel: '' }; renderCobro(); },
   'adm-mas': () => { UI.admMas = !UI.admMas; views.admin(); },
   mas: () => { UI.mas = !UI.mas; renderSide(); },
   'tur-sync': () => {
@@ -3995,7 +4010,7 @@ const I = {
   'sp-quien': el => { UI.sep.quien = el.value; },
   'pf-file': el => { procesarImagen(el.files && el.files[0]); },
   'rep-cob': el => { UI.repCob = Math.max(1, num(el.value) || 7); views.reportes(); const n = $('[data-in="rep-cob"]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); },
-  'fi-cli': el => { UI.pago.clienteId = el.value; renderCobro(); },
+  'fi-q': el => { UI.pago.fiBusca = el.value; const z = $('#fi-sug'); if (z) z.innerHTML = fiadoSugerencias(UI.pago); },
   'fi-nuevo': () => { UI.pago.nuevoCli = { nombre: $('#fi-nom').value, tel: $('#fi-tel').value }; updateCobro(); },
   'pg-quien': el => { UI.pago.quien = el.value; },
   'dv-sel': el => { UI.pago.div[+el.dataset.i] = +el.value; $('#dv-sub').textContent = money(subtotalDividir()); },
