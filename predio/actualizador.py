@@ -11,6 +11,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -38,10 +40,41 @@ def version_tupla(texto: str) -> tuple[int, ...]:
     return tuple(int(n) for n in nums[:4]) or (0,)
 
 
-def _pedir(url: str, timeout: float = 8.0) -> bytes:
+def _curl() -> str | None:
+    return shutil.which("curl.exe") or shutil.which("curl")
+
+
+def _curl_pedir(url: str, timeout: float, destino: Path | None = None) -> bytes:
+    """Respaldo: el curl que trae Windows 10 usa los certificados y la configuración de red del sistema (a veces Python no logra conectarse y el navegador sí)."""
+    exe = _curl()
+    if not exe:
+        raise OSError("no hay curl")
+    args = [exe, "-sSLf", "--max-time", str(int(timeout)), "-A", "CajaPredio-actualizador", "-H", "Accept: application/vnd.github+json"]
+    args += ["-o", str(destino)] if destino else []
+    r = subprocess.run(args + [url], capture_output=True, timeout=timeout + 15, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))   # noqa: S603
+    if r.returncode != 0:
+        raise OSError((r.stderr or b"").decode("utf-8", "replace").strip()[:200] or f"curl falló ({r.returncode})")
+    return b"" if destino else r.stdout
+
+
+def _detalle(e: BaseException) -> str:
+    return f"{type(e).__name__}: {getattr(e, 'reason', None) or e}"[:160]
+
+
+def _pedir(url: str, timeout: float = 15.0) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "CajaPredio-actualizador", "Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:      # noqa: S310 - hosts verificados más abajo
-        return r.read()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:      # noqa: S310 - hosts verificados más abajo
+            return r.read()
+    except urllib.error.HTTPError:
+        raise
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        log.warning("No se pudo consultar %s con Python (%s); se prueba con curl", url, _detalle(e))
+        try:
+            return _curl_pedir(url, timeout)
+        except Exception as e2:      # noqa: BLE001
+            log.warning("Tampoco con curl: %s", _detalle(e2))
+            raise e from None
 
 
 def buscar(repo: str) -> dict:
@@ -55,8 +88,8 @@ def buscar(repo: str) -> dict:
         if e.code == 404:
             return {**base, "error": "No hay versiones publicadas para descargar (o el repositorio es privado)."}
         return {**base, "error": f"GitHub respondió con un error ({e.code})."}
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        return {**base, "error": "No se pudo consultar. ¿Hay internet?"}
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+        return {**base, "error": f"No se pudo consultar. ¿Hay internet? (detalle: {_detalle(e)})"}
     tag = str(datos.get("tag_name") or "")
     asset = next((a for a in datos.get("assets") or [] if PATRON_INSTALADOR.match(str(a.get("name") or ""))), None)
     res = {**base, "version": tag.lstrip("vV"), "notas": str(datos.get("body") or "")[:4000], "publicada": datos.get("published_at")}
@@ -103,7 +136,14 @@ def descargar(info: dict, carpeta: Path) -> Path:
         raise
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         tmp.unlink(missing_ok=True)
-        raise ErrorActualizacion("Se cortó la descarga. Probá de nuevo cuando haya internet.") from e
+        log.warning("Falló la descarga con Python (%s); se prueba con curl", _detalle(e))
+        try:
+            _curl_pedir(url, 600, tmp)
+            total = tmp.stat().st_size
+            h = hashlib.sha256(tmp.read_bytes())
+        except Exception as e2:      # noqa: BLE001
+            tmp.unlink(missing_ok=True)
+            raise ErrorActualizacion(f"Se cortó la descarga. Probá de nuevo cuando haya internet. (detalle: {_detalle(e)}; {_detalle(e2)})") from e
     if info.get("bytes") and total != int(info["bytes"]):
         tmp.unlink(missing_ok=True)
         raise ErrorActualizacion("La descarga quedó incompleta. Probá de nuevo.")

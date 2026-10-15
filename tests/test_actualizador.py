@@ -157,3 +157,19 @@ def test_primero_se_responde_y_despues_se_pide_cerrar(github, programa, ruta):
     assert estado == 200 and r["ok"] is True
     app.apagar.respuesta_llego.set()
     assert app.apagar.wait(10) and app.apagar.llego_antes is True
+
+
+def test_si_python_no_puede_conectarse_se_usa_curl(github, monkeypatch):
+    """En algunas PC con Windows Python no logra salir a internet (certificados, proxy, antivirus) y el navegador sí: se prueba con el curl del sistema."""
+    import shutil
+    import urllib.error
+    import urllib.request
+    if not shutil.which("curl"):
+        pytest.skip("no hay curl")
+    def roto(*a, **k):
+        raise urllib.error.URLError("CERTIFICATE_VERIFY_FAILED")
+    monkeypatch.setattr(urllib.request, "urlopen", roto)
+    info = actualizador.buscar("club/predio")
+    assert info["hay"] and info["version"] == "9.9.9" and "error" not in info
+    monkeypatch.setattr(actualizador, "_curl", lambda: None)       # sin respaldo: el mensaje dice qué pasó
+    assert "CERTIFICATE_VERIFY_FAILED" in actualizador.buscar("club/predio")["error"]
