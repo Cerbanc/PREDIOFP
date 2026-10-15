@@ -91,7 +91,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.locator('[data-act=nav][data-v=caja]').click();
   const qrId = await ev(() => DB.metodos.find(m => /QR/.test(m.nombre)).id);
   assert.strictEqual(await ev(id => saldoDigital(cajaAbierta(), id), qrId), 2200, 'la caja dice cuánto debería haber en el QR');
-  assert.ok(/QR[\s\S]*2\.200/.test(await page.locator('#main').innerText()));
+  assert.ok(/Mercado Pago[\s\S]*2\.200/.test(await page.locator('#main').innerText()));
   await page.locator('[data-act=pagos-medio]').first().click();                                // lista de pagos para revisar
   assert.ok(/Ticket #3/.test(await page.locator('.modal').innerText()) && await page.locator('.modal [data-act=corr-tk]').count() === 1);
   await page.keyboard.press('Escape');
@@ -107,8 +107,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.locator('#mact-1').click();
   await page.waitForFunction(() => !cajaAbierta());
   const dg = await ev(() => DB.cajas[DB.cajas.length - 1].digital.map(d => [d.nombre, d.esperado, d.informado, d.diferencia]));
-  assert.deepStrictEqual(dg.find(x => /QR/.test(x[0])), ['MP · QR', 2000, 1900, -100]);
-  assert.ok((await audit('Medios digitales')).some(t => /MP · QR debía \$ 2\.000 · faltan \$ 100/.test(t)));
+  assert.deepStrictEqual(dg.find(x => /Mercado Pago/.test(x[0])), ['Mercado Pago', 2000, 1900, -100]);      // QR y transferencia son un solo medio
+  assert.ok((await audit('Medios digitales')).some(t => /Mercado Pago debía \$ 2\.000 · faltan \$ 100/.test(t)));
   assert.ok((await audit('PÉRDIDA')).length >= 1);
 
   // ---- 3. producto con foto: la imagen pasa a ser un archivo de la carpeta imagenes
@@ -200,6 +200,22 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   assert.ok(!(await ev(() => __pos.refrescarDesdeLaNube())), 'sin novedades no repinta');
   await ev(() => { __pos.tx(() => { __pos.DB.config.pedirPinAjuste = !__pos.DB.config.pedirPinAjuste; }); });      // una venta/guardado cualquiera sigue andando después
   await ev(() => { __pos.tx(() => { __pos.DB.config.pedirPinAjuste = !__pos.DB.config.pedirPinAjuste; }); });
+
+  // ---- 4e. recetas con decimales, turno viejo con mesa y Mercado Pago unido
+  const dec = await ev(() => {
+    const ins = __pos.DB.productos.find(p => p.tipo === 'directo'), rec = { id: 'precdec', nombre: 'Fernet con coca', tipo: 'receta', receta: [{ id: ins.id, cant: 0.125 }], activo: true };
+    return { x8: __pos.consumo(rec, 8)[0].cant, x3: __pos.consumo(rec, 3)[0].cant, num: __pos.numDec('0,125'), pr: __pos.plParseReceta('0,125 ' + ins.nombre, [{ k: 1, v: { nombre: ins.nombre, tipo: 'directo' } }], {}) };
+  });
+  assert.deepStrictEqual([dec.x8, dec.x3, dec.num, dec.pr.items[0].cant, dec.pr.errores.length], [1, 0.375, 0.125, 0.125, 0], 'las recetas aceptan decimales');
+  const mesaViej = await ev(() => {
+    const c = __pos.DB.canchas.find(x => x.clave === 'f5b'); let id, m;
+    __pos.tx(() => { id = __pos.crearTurno({ canchaId: c.id, fecha: __pos.dayKey(Date.now() - 864e5), ini: c.ap, cliente: 'Se olvidaron', tel: '', nota: '', pagos: [] }); });
+    __pos.tx(() => { m = __pos.crearMesaDeTurno(id); });
+    const mesa = __pos.DB.mesas.find(x => x.id === m);
+    return { temporal: mesa && mesa.temporal, items: __pos.DB.comandas[m].items.map(i => i.turnoId === id) };
+  });
+  assert.deepStrictEqual([mesaViej.temporal, mesaViej.items[0]], [true, true], 'un turno viejo puede abrir su mesa');
+  assert.strictEqual(await ev(() => __pos.gruposDigitales().filter(g => g.id === 'mp').length), 1, 'Mercado Pago es un solo medio');
 
   // ---- 5. borrar el historial: pide escribir BORRAR, hace copia y deja los productos
   await irMas('admin');

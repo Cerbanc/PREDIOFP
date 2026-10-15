@@ -411,6 +411,10 @@ const hhmm = ts => { const d = new Date(ts); return pad(d.getHours()) + ':' + pa
 const fechaHora = ts => { const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + hhmm(ts); };
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const num = v => Math.max(0, Math.round(parseFloat(String(v).replace(',', '.')) || 0));
+/* Cantidad con decimales (recetas: un fernet con coca lleva 0,125 de cada uno). Hasta 3 decimales; acepta coma o punto. */
+const numDec = v => Math.max(0, Math.round((parseFloat(String(v).replace(',', '.')) || 0) * 1000) / 1000);
+const r3 = n => Math.round(n * 1000) / 1000;
+const cantTxt = n => String(r3(n)).replace('.', ',');
 const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
 const hace = ts => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min'; };
 const hm = m => pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
@@ -691,6 +695,11 @@ function normalizar() {
     });
     DB.config.horariosPapel = true;        // ya nacen con los horarios de papel
   }
+  if (SERVIDOR && PREDIO.modo !== 'demo' && !DB.config.barraUnificada) {        // la «Barra» aparte ya no existe: es lo mismo que Vender (se saca si está vacía)
+    const b = DB.mesas.find(m => m.tipo === 'barra' && norm(m.nombre) === 'barra'), com = b && DB.comandas[b.id];
+    if (!b) DB.config.barraUnificada = true;
+    else if (!com || !com.items.length) { DB.mesas = DB.mesas.filter(m => m.id !== b.id); delete DB.comandas[b.id]; DB.config.barraUnificada = true; if (UI.com === b.id) UI.com = 'M'; }
+  }
   DB.cajas = DB.cajas || []; DB.movCaja = DB.movCaja || []; DB.clientes = DB.clientes || []; DB.cc = DB.cc || [];
   DB.mesas.forEach(m => { m.tipo = m.tipo || 'mesa'; m.w = m.w || 14; m.h = m.h || 17; });
   ponerHorariosDePapel();
@@ -726,7 +735,7 @@ const stk = id => { const p = prod(id); return p ? p.stock : 0; };
 /* Qué stock real consume vender `cant` unidades de un producto */
 function consumo(p, cant) {
   if (p.tipo === 'servicio') return [];
-  if (p.tipo === 'receta') return (p.receta || []).map(r => ({ id: r.id, cant: r.cant * cant }));
+  if (p.tipo === 'receta') return (p.receta || []).map(r => ({ id: r.id, cant: r3(r.cant * cant) }));
   return [{ id: p.id, cant }];
 }
 function consumoItems(items) {
@@ -761,9 +770,10 @@ function restante(p, res) {
 function moverStock(id, delta, tipo, o = {}) {
   const p = prod(id);
   if (!p) throw new Error('Producto inexistente');
-  const antes = p.stock, despues = antes + delta;
+  const antes = p.stock, despues = r3(antes + delta);
   if (despues < 0 && !o.permitirNegativo) throw new Error(`Stock insuficiente de ${p.nombre} (hay ${antes}, se necesitan ${-delta})`);
   p.stock = despues;
+  if (tipo !== 'venta' && UI.negOk) delete UI.negOk[id];       // si se repuso o contó, vuelve a avisar cuando falte
   DB.movimientos.push({ id: uid('mv'), ts: o.ts || Date.now(), prodId: id, nombre: p.nombre, tipo, cant: delta, antes, despues, ref: o.ref || null, motivo: (o.motivo || '') + (despues < 0 ? ' · stock en negativo' : '') });
 }
 
@@ -813,10 +823,24 @@ function abrirCaja(fondo, responsable) {
 /* Efectivo de una caja: lo que había + cobros − devoluciones + correcciones + ingresos − egresos */
 /* Medios digitales (Mercado Pago QR, transferencia): se llevan igual que el efectivo. Debería haber = lo cobrado en el turno (con devoluciones y correcciones) + ingresos − egresos y pérdidas. */
 const metodosDigitales = () => DB.metodos.filter(m => m.activo && !m.efectivo && !m.fiado);
-function saldoDigital(c, metodoId) {
+/* Mercado Pago (QR y transferencia) se lleva como UN solo medio: «Mercado Pago». Otros medios digitales, si hubiera, van cada uno por su lado. */
+const GRUPO_MP = /mercado\s*pago|^mp\b/i;
+function gruposDigitales() {
+  const g = [];
+  metodosDigitales().forEach(m => {
+    const mp = GRUPO_MP.test(m.nombre), id = mp ? 'mp' : m.id;
+    let x = g.find(y => y.id === id);
+    if (!x) { x = { id, nombre: mp ? 'Mercado Pago' : m.nombre, ids: [] }; g.push(x); }
+    x.ids.push(m.id);
+  });
+  return g;
+}
+const grupoDigital = id => gruposDigitales().find(g => g.id === id || g.ids.includes(id)) || null;
+function saldoDigital(c, metodoId) {                 // acepta el id del grupo («mp») o el de cualquier medio del grupo: devuelve el total del grupo
+  const g = grupoDigital(metodoId), ids = g ? g.ids : [metodoId];
   const ini = c.abierta, fin = c.cerrada || Infinity;
-  const led = sum(DB.caja.filter(e => e.metodoId === metodoId && e.ts >= ini && e.ts <= fin), e => e.monto);
-  const movs = DB.movCaja.filter(m => m.cajaId === c.id && !m.anulado && m.metodoId === metodoId);
+  const led = sum(DB.caja.filter(e => ids.includes(e.metodoId) && e.ts >= ini && e.ts <= fin), e => e.monto);
+  const movs = DB.movCaja.filter(m => m.cajaId === c.id && !m.anulado && ids.includes(m.metodoId));
   return led + sum(movs.filter(m => m.tipo === 'ingreso'), m => m.monto) - sum(movs.filter(m => m.tipo !== 'ingreso'), m => m.monto);
 }
 function efectivoDeCaja(c) {
@@ -835,7 +859,7 @@ function movimientoCaja(o) {
   if (!o.concepto) throw new Error('Poné el concepto');
   const mid = o.metodoId || efectivoId(), me = metodo(mid);
   if (!me || me.fiado) throw new Error('Elegí un medio de pago válido');
-  if (o.tipo !== 'ingreso') { const hay = me.efectivo ? efectivoDeCaja(c).esperado : saldoDigital(c, mid); if (o.monto > hay) throw new Error(`En ${me.efectivo ? 'la caja' : me.nombre} debería haber ${money(hay)}: no alcanza para sacar ${money(o.monto)}`); }
+  if (o.tipo !== 'ingreso') { const hay = me.efectivo ? efectivoDeCaja(c).esperado : saldoDigital(c, mid); if (o.monto > hay) throw new Error(`En ${me.efectivo ? 'la caja' : (grupoDigital(mid) || me).nombre} debería haber ${money(hay)}: no alcanza para sacar ${money(o.monto)}`); }
   DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: o.tipo, metodoId: mid, concepto: o.concepto, proveedor: o.proveedor || '', monto: o.monto, nota: o.nota || '' });
   logPush('caja', MOV_TIPOS[o.tipo][0], `${MOV_TIPOS[o.tipo][0]}${me.efectivo ? '' : ' en ' + me.nombre}: ${money(o.monto)} · ${o.proveedor ? o.proveedor + ' · ' : ''}${o.concepto}${o.nota ? ' (' + o.nota + ')' : ''}`);
 }
@@ -843,7 +867,7 @@ function cerrarCaja(contado, dejado, nota, digitales) {
   const c = cajaAbierta();
   if (!c) throw new Error('La caja ya está cerrada');
   const ef = efectivoDeCaja(c), dif = contado - ef.esperado;
-  const dig = (digitales || []).map(d => { const esp = saldoDigital(c, d.metodoId), m = metodo(d.metodoId); return { metodoId: d.metodoId, nombre: m ? m.nombre : '?', esperado: esp, informado: d.informado, diferencia: d.informado === null ? null : d.informado - esp }; });
+  const dig = (digitales || []).map(d => { const esp = saldoDigital(c, d.metodoId), m = grupoDigital(d.metodoId) || metodo(d.metodoId); return { metodoId: d.metodoId, nombre: m ? m.nombre : '?', esperado: esp, informado: d.informado, diferencia: d.informado === null ? null : d.informado - esp }; });
   if (dejado > contado) throw new Error('No se puede dejar más de lo que hay contado');
   const retiro = contado - dejado;
   if (retiro > 0) DB.movCaja.push({ id: uid('mc'), ts: Date.now(), cajaId: c.id, tipo: 'retiro', concepto: 'Retiro de cierre a caja mayor', proveedor: '', monto: retiro, nota: '' });
@@ -1184,6 +1208,25 @@ function moverTerminados() {
   });
   return r.ok ? r.value : [];
 }
+/* Un turno que ya empezó (o ya pasó) y nadie agendó a tiempo: se le abre una mesa suelta con su costo, para poder cargar consumos y cobrar. */
+const turnoYaEmpezo = t => t.fecha < dayKey(Date.now()) || (t.fecha === dayKey(Date.now()) && t.ini <= new Date().getHours() * 60 + new Date().getMinutes());
+function crearMesaDeTurno(id) {
+  const t = turnoReal(id);
+  if (t.estado !== 'reservado') throw new Error('Ese turno ya no está abierto');
+  if (cuentaDe(t)) throw new Error('El turno ya está en una cuenta');
+  const c = cancha(t.canchaId), lugar = DB.mesas.find(m => m.id === c.lugarId), base = lugar ? lugar.nombre : c.nombre;
+  const nm = { id: uid('m'), nombre: `${base} ${t.fecha === dayKey(Date.now()) ? '' : t.fecha.slice(8) + '/' + t.fecha.slice(5, 7) + ' '}${hm(t.ini)}hs`, tipo: 'mesa', temporal: true, x: 0, y: 0, w: 10, h: 10, rapido: false };
+  DB.mesas.push(nm);
+  DB.comandas[nm.id] = { ts: Date.now(), items: [{ turnoId: t.id, cant: 1, nota: '' }], pagos: (t.pagos || []).slice(), turnoCliente: t.cliente };
+  t.pagos = [];
+  logPush('turno', c.nombre, `Se abrió la mesa "${nm.nombre}" para el turno de ${t.cliente || 'sin nombre'} (${c.nombre}, ${t.fecha} ${hm(t.ini)}), que no se había agendado a tiempo.`);
+  return nm.id;
+}
+function crearMesaUI(id) {
+  const r = tx(() => crearMesaDeTurno(id));
+  if (!r.ok) return false;
+  UI.com = r.value; UI.view = 'venta'; UI.editSalon = false; toast('Mesa abierta para el turno'); render();
+}
 /* Cuando empieza un turno, su costo se carga solo en la cuenta del lugar de la cancha; ahí se suman los consumos.
    Al terminar, la cuenta sale de la cancha y se sienta en una mesa (o se cobra). El turno y la cuenta quedan siempre juntos. */
 const cuentaDe = t => Object.keys(DB.comandas).find(k => DB.comandas[k].items.some(i => i.turnoId === t.id)) || null;
@@ -1228,7 +1271,7 @@ function revisarTurnos() {
 }
 
 /* ---------- base inicial: lo mínimo para empezar a trabajar (sin productos, ventas ni clientes) ---------- */
-function crearBase() {
+function crearBase(conBarra) {
   const d = { v: 7, seq: 1, pin: '1234', negocio: 'Predio Deportivo', config: { pedirPinAjuste: true, usarTurnos: true, horariosPapel: true, paisWa: '54', msgTurno: 'Hola {nombre}! Te recordamos tu turno de {cancha} el {fecha} a las {hora}. ¡Te esperamos!' }, cajas: [], movCaja: [], clientes: [], cc: [], categorias: [], metodos: [], productos: [], mesas: [], comandas: { M: { items: [] } }, ventas: [], movimientos: [], caja: [], canchas: [], turnos: [], fijos: [], log: [], contadores: { venta: 0 } };
   DB = d;
   const cat = (nombre, color) => { const c = { id: uid('c'), nombre, color }; d.categorias.push(c); return c.id; };
@@ -1244,7 +1287,7 @@ function crearBase() {
   const mesas = [];
   [2, 22, 42, 62, 82].forEach((x, i) => mesas.push(L('Mesa ' + (i + 1), 'mesa', x, 34, 14, 17)));
   [2, 22, 42].forEach((x, i) => mesas.push(L('Mesa ' + (i + 6), 'mesa', x, 58, 14, 17)));
-  const barra = L('Barra', 'barra', 62, 60, 34, 14, true);
+  const barra = conBarra ? L('Barra', 'barra', 62, 60, 34, 14, true) : null;      // el mostrador y la barra son lo mismo: se vende desde «Vender» (sólo la demostración tiene una barra aparte)
 
   // canchas del calendario: horarios y nombres de la planilla de papel (CANCHAS_PAPEL), precio común y precio de fijo (de ejemplo: se corrigen en Admin)
   const cn = (clave, deporte, precio, precioFijo, catId) => { const p = CANCHAS_PAPEL[clave], c = { id: uid('cn'), clave, nombre: p.nombre, deporte, dur: p.dur, ap: p.ap, ci: p.ci, precio, precioFijo, catId }; d.canchas.push(c); return c.id; };
@@ -1258,7 +1301,7 @@ function crearBase() {
 }
 /* ---------- datos de ejemplo (sólo para la demostración) ---------- */
 function seed() {
-  const { d, kiosco, padel, buffet, futbol, efe, qr, tr, fia, futbol1, futbol2, padel1, padel2, mesas, barra, f5a, f5b, f7, pT, pA } = crearBase();
+  const { d, kiosco, padel, buffet, futbol, efe, qr, tr, fia, futbol1, futbol2, padel1, padel2, mesas, barra, f5a, f5b, f7, pT, pA } = crearBase(true);
   const t0 = Date.now() - 9 * 3600e3, hoy = dayKey(Date.now()), manana = dayKey(Date.now() + 864e5);
   // cierre de ayer (para ver el historial) y caja de hoy, abierta hace 9 horas
   d.cajas.push({ id: uid('cx'), abierta: Date.now() - 33 * 3600e3, fondo: 15000, responsable: 'Marcos', cerrada: Date.now() - 24.5 * 3600e3, esperado: 128400, contado: 128200, diferencia: -200, dejado: 15000, retiroFinal: 113200, nota: 'Faltaron $200 de vuelto', desglose: null });
@@ -1480,8 +1523,10 @@ function cambiarCantidad(items, idx, delta) {
 }
 /* Si lo que se pide supera el stock del sistema, pide confirmación humana: contar, o vender igual y dejar el stock en negativo */
 function chequearStock(nuevo, key, conReservas, cuando, onOk) {
-  const f = faltantes(nuevo, key, conReservas);
-  if (!f.length) return onOk();
+  const todos = faltantes(nuevo, key, conReservas);
+  const f = todos.filter(x => !(UI.negOk && UI.negOk[x.id]));        // si ya se eligió «vender igual» para ese producto, no se vuelve a preguntar
+  if (!todos.length) return onOk();
+  if (!f.length) return onOk(true);
   modalFaltante(f, nuevo, key, conReservas, cuando, onOk);
 }
 function modalFaltante(f, items, key, conReservas, cuando, onOk, errorMsg) {
@@ -1495,7 +1540,7 @@ function modalFaltante(f, items, key, conReservas, cuando, onOk, errorMsg) {
   modal({
     title: 'El stock no alcanza: confirmá en persona',
     body: `<div class="note warn"><b>Si hay</b> en la góndola o la heladera, poné el conteo real: el sistema se corrige y queda registrado como ajuste.<br><b>Si es que falta cargar el remito</b>, tocá "Vender igual": el stock queda en negativo y se compensa solo cuando cargues la mercadería.</div>${filas}${errorMsg ? `<p class="err">${esc(errorMsg)}</p>` : ''}`,
-    actions: [{ label: 'Cancelar, no hay' }, { label: 'Vender igual (queda en negativo)', onClick: () => { onOk(true); } }, { label: 'Confirmar conteo y seguir', kind: 'primary', onClick: () => {
+    actions: [{ label: 'Cancelar, no hay' }, { label: 'Vender igual (queda en negativo)', onClick: () => { UI.negOk = UI.negOk || {}; f.forEach(x => { UI.negOk[x.id] = true; }); onOk(true); } }, { label: 'Confirmar conteo y seguir', kind: 'primary', onClick: () => {
       const reales = f.map(x => ({ x, real: num($('#real-' + x.id).value) }));
       const r = tx(() => reales.forEach(({ x, real }) => { const d = real - stk(x.id); if (d !== 0) moverStock(x.id, d, 'ajuste', { motivo: 'Conteo real confirmado al ' + (cuando === 'cobrar' ? 'cobrar' : 'vender') }); }));
       if (!r.ok) return false;
@@ -2151,7 +2196,7 @@ function modalNuevoTurno(canchaId, ini) {
     body: `<p><b>${esc(fechaLarga(f))}</b> · ${hm(ini)} a ${hm(ini + c.dur)} (${c.dur} min)</p>
       ${rel.length ? `<div class="note">Al reservar esta cancha, en ese horario también quedan ocupadas: <b>${rel.map(x => esc(x.nombre)).join(' y ')}</b>.</div>` : ''}
       <label class="fld">Tipo de turno<select id="tn-tipo" class="in" data-in="tn-tipo"><option value="comun">Común · ${money(c.precio)}</option><option value="fijo">FIJO, todos los ${DIAS[dowDe(f)]} · ${money(c.precioFijo)} por turno</option></select></label>
-      <div class="grid2"><label class="fld">A nombre de<input id="tn-cli" class="in" list="dl-cli" data-in="cli-pick" data-tel="#tn-tel" placeholder="Ej: Los Pibes" autocomplete="off">${datalistClientes()}<small>Si ya es cliente, elegilo de la lista y se completa el teléfono.</small></label><label class="fld">Teléfono (para avisar por WhatsApp)<input id="tn-tel" class="in" inputmode="tel" placeholder="Ej: 11 5555-1234"></label></div>
+      <div class="grid2"><label class="fld">A nombre de<input id="tn-cli" class="in" data-in="cli-pick" data-tel="#tn-tel" placeholder="Ej: Los Pibes" autocomplete="off"><small>Si ya es cliente, elegilo de la lista y se completa el teléfono.</small></label><label class="fld">Teléfono (para avisar por WhatsApp)<input id="tn-tel" class="in" inputmode="tel" placeholder="Ej: 11 5555-1234"></label></div>
       <label class="fld">Nota (opcional)<input id="tn-nota" class="in"></label>
       <div class="grid2" id="tn-sena-box"><label class="fld">Seña ahora (opcional)<input id="tn-sena" class="in" inputmode="numeric" placeholder="0"></label><label class="fld">Medio de la seña<select id="tn-med" class="in">${metodos}</select></label></div>
       <div class="note" id="tn-fijo-note" hidden>Turno fijo: no lleva seña. Aparece todas las semanas con el precio de fijo. Si un día no juegan, lo suspendés o lo posponés desde el turno; si se terminan, terminás el fijo y el horario queda libre.</div>`,
@@ -2166,10 +2211,12 @@ function modalNuevoTurno(canchaId, ini) {
       const r = tx(() => crearTurno({ ...conCliente(datos), pagos: sena > 0 ? [{ metodoId: $('#tn-med').value, monto: sena }] : [] }));
       if (!r.ok) return false;
       toast('Turno reservado'); render();
+      if (turnoYaEmpezo({ fecha: f, ini }) && r.value) {       // se agenda un turno que ya empezó o ya pasó: lo normal es que alguien se olvidó de anotarlo
+        ask('Este turno ya empezó', 'Lo anotaste después de la hora. ¿Querés abrirle una mesa para cargar consumos y cobrarlo?', 'Sí, crear la mesa', () => crearMesaUI(r.value));
+      }
     } }],
   });
 }
-const datalistClientes = () => `<datalist id="dl-cli">${DB.clientes.map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>`;
 const conCliente = d => { const cl = buscarOCrearCliente(d.cliente, d.tel); return cl ? { ...d, clienteId: cl.id, cliente: cl.nombre, tel: cl.tel || d.tel } : d; };
 function verTurno(id) {
   const t = turnoPorId(id); if (!t) return toast('Ese turno ya no existe', 'warn');
@@ -2185,6 +2232,7 @@ function verTurno(id) {
   else if (!abierto) acciones = [{ label: 'Cerrar' }, { label: 'Ver ticket', kind: 'primary', onClick: () => verTicket(t.ventaId, false) }];
   else if (t.esFijo) acciones = [{ label: 'Cerrar' }, { label: 'Terminar el fijo', kind: 'danger', onClick: () => terminarFijoUI(id) }, { label: 'Reprogramar', onClick: () => modalReprogramar(id) }, { label: 'Suspender este día', onClick: () => suspenderUI(id) }, { label: 'Cobrar', kind: 'primary', onClick: () => cobrarTurnoUI(id, false) }];
   else acciones = [{ label: 'Cerrar' }, { label: 'Suspender turno', kind: 'danger', onClick: () => cancelarTurnoUI(id) }, { label: 'Reprogramar', onClick: () => modalReprogramar(id) }, { label: 'Editar datos', onClick: () => editarTurno(id) }, { label: 'Pago parcial', onClick: () => abrirCobroTurno(id, true) }, { label: 'Cobrar saldo', kind: 'primary', onClick: () => abrirCobroTurno(id, false) }];
+  if (abierto && !kCuenta && turnoYaEmpezo(t)) acciones.splice(1, 0, { label: 'Crear mesa', onClick: () => crearMesaUI(id) });      // se les pasó anotarlo a tiempo
   modal({
     title: c.nombre + (t.esFijo ? ' · FIJO' : ''),
     body: `<p><b>${esc(fechaLarga(t.fecha))}</b> · ${hm(t.ini)} a ${hm(t.fin)}</p>
@@ -2265,7 +2313,7 @@ function editarTurno(id) {
   modal({
     title: 'Editar turno',
     body: `<p class="muted">El precio lo define la cancha. Los descuentos se ponen al cobrar y quedan en el registro de cambios.</p>
-      <div class="grid2"><label class="fld">A nombre de<input id="et-cli" class="in" list="dl-cli" data-in="cli-pick" data-tel="#et-tel" value="${esc(t.cliente)}">${datalistClientes()}</label><label class="fld">Teléfono<input id="et-tel" class="in" inputmode="tel" value="${esc((cl && cl.tel) || t.tel)}"></label></div>
+      <div class="grid2"><label class="fld">A nombre de<input id="et-cli" class="in" data-in="cli-pick" data-tel="#et-tel" value="${esc(t.cliente)}"></label><label class="fld">Teléfono<input id="et-tel" class="in" inputmode="tel" value="${esc((cl && cl.tel) || t.tel)}"></label></div>
       <label class="fld">Nota<input id="et-nota" class="in" value="${esc(t.nota)}"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Guardar', kind: 'primary', onClick: () => {
       const r = tx(() => {
@@ -2346,7 +2394,7 @@ function modalAjuste(id) {
       <div class="grid2"><label class="fld">Cantidad real<input class="in" id="aj-real" inputmode="numeric" value="${p.stock}"></label>
       <label class="fld">Motivo<select class="in" id="aj-motivo"><option>Conteo físico</option><option>Rotura o vencimiento</option><option>Consumo propio</option><option>Pérdida</option><option>Otro</option></select></label></div>`,
     actions: [{ label: 'Cancelar' }, { label: 'Guardar conteo', kind: 'primary', onClick: () => {
-      const real = num($('#aj-real').value), d = real - p.stock;
+      const real = numDec($('#aj-real').value), d = r3(real - p.stock);
       if (d === 0) { toast('El conteo coincide, no hay cambios'); return; }
       const r = tx(() => moverStock(id, d, 'ajuste', { motivo: $('#aj-motivo').value }));
       if (r.ok) { toast(`Stock de ${p.nombre} corregido a ${real}`); render(); }
@@ -2624,12 +2672,14 @@ views.caja = () => {
     top = `<div class="card" style="max-width:600px"><h2>La caja está cerrada</h2><p class="muted" style="margin-bottom:14px">${ult ? `Último cierre: ${fechaHora(ult.cerrada)}. Se contaron ${money(ult.contado)}, se retiraron ${money(ult.retiroFinal)} y quedaron ${money(ult.dejado)} de cambio.` : 'Todavía no hay cierres.'}</p><button class="btn primary lg" data-act="caja-abrir">Abrir caja</button></div>`;
   } else {
     const ef = efectivoDeCaja(c);
-    const otros = metodosDigitales().map(m => `<div class="l2"><span>${esc(m.nombre)} <button class="btn sm ghost" data-act="pagos-medio" data-id="${m.id}">revisar pagos</button></span><b>${money(saldoDigital(c, m.id))}</b></div>`).join('');
-    top = `<div class="kpis"><div class="kpi"><span>Efectivo que debería haber</span><b>${money(ef.esperado)}</b></div><div class="kpi"><span>Efectivo inicial</span><b>${money(c.fondo)}</b></div>
-      <div class="kpi"><span>Cobros en efectivo</span><b>${money(ef.cobros + ef.devol + ef.corr)}</b></div><div class="kpi"><span>Ingresos</span><b>${money(ef.ingresos)}</b></div><div class="kpi"><span>Egresos y retiros</span><b>${money(ef.egresos)}</b></div></div>
+    const grupos = gruposDigitales();
+    const otros = grupos.map(g => `<div class="l2"><span>${esc(g.nombre)} <button class="btn sm ghost" data-act="pagos-medio" data-id="${g.id}">revisar pagos</button></span><b>${money(saldoDigital(c, g.id))}</b></div>`).join('');
+    const kpisDig = grupos.map(g => `<div class="kpi"><span>${esc(g.nombre)} que debería haber</span><b>${money(saldoDigital(c, g.id))}</b></div>`).join('');
+    top = `<div class="kpis"><div class="kpi"><span>Efectivo que debería haber</span><b>${money(ef.esperado)}</b></div>${kpisDig}<div class="kpi"><span>Efectivo inicial</span><b>${money(c.fondo)}</b></div>
+      <div class="kpi"><span>Cobros en efectivo</span><b>${money(ef.cobros + ef.devol + ef.corr)}</b></div><div class="kpi"><span>Egresos y retiros</span><b>${money(ef.egresos)}</b></div></div>
       <div class="row" style="margin-bottom:16px"><button class="btn" data-act="mv-new" data-t="perdida">+ Registrar pérdida</button><button class="btn" data-act="mv-new" data-t="gasto">+ Gasto varios</button><button class="btn" data-act="mv-new" data-t="proveedor">+ Pago a proveedor</button><button class="btn" data-act="mv-new" data-t="retiro">+ Retiro a caja mayor</button><button class="btn" data-act="mv-new" data-t="ingreso">+ Ingreso</button><button class="btn primary" style="margin-left:auto" data-act="caja-cerrar">Cerrar caja</button></div>
       <div class="cols" style="margin-bottom:16px"><div class="card"><h2>Esta caja</h2><div class="l2"><span>Abierta por</span><b>${esc(c.responsable)} · ${fechaHora(c.abierta)}</b></div>
-        <p class="muted" style="margin:10px 0 4px;font-size:12px">Lo que debería haber en cada medio digital (comparalo con la app de Mercado Pago; si no da, revisá los pagos y corregilos, o cargá un movimiento o una pérdida):</p>${otros}</div></div>`;
+        <p class="muted" style="margin:10px 0 4px;font-size:12px">Lo que debería haber en Mercado Pago (comparalo con la app; si no da, revisá los pagos y corregilos, o cargá un movimiento o una pérdida):</p>${otros}</div></div>`;
     const lista = DB.movCaja.filter(m => m.cajaId === c.id).slice().reverse();
     movs = `<h2 style="margin:6px 0 10px">Movimientos de caja</h2><div class="tbl-wrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Detalle</th><th>Nota</th><th class="r">Monto</th><th></th></tr></thead><tbody>
       ${lista.map(m => `<tr style="${m.anulado ? 'opacity:.5;text-decoration:line-through' : ''}"><td class="num">${hhmm(m.ts)}</td><td><span class="pill ${MOV_TIPOS[m.tipo][1]}">${MOV_TIPOS[m.tipo][0]}</span></td><td>${m.proveedor ? '<b>' + esc(m.proveedor) + '</b> · ' : ''}${esc(m.concepto)}${m.metodoId && metodo(m.metodoId) && !metodo(m.metodoId).efectivo ? ` <span class="pill">${esc(metodo(m.metodoId).nombre)}</span>` : ''}</td><td class="muted">${esc(m.nota)}</td>
@@ -2643,8 +2693,9 @@ views.caja = () => {
 };
 /* Pagos del turno en un medio digital: para encontrar el que se cargó con otro medio y corregirlo (queda anotado en el registro de cambios) */
 function modalPagosMedio(metodoId) {
-  const c = cajaAbierta(), m = metodo(metodoId); if (!c || !m) return;
-  const filas = DB.caja.filter(e => e.metodoId === metodoId && e.ts >= c.abierta).slice().reverse();
+  const c = cajaAbierta(), m = grupoDigital(metodoId) || metodo(metodoId); if (!c || !m) return;
+  const ids = m.ids || [metodoId];
+  const filas = DB.caja.filter(e => ids.includes(e.metodoId) && e.ts >= c.abierta).slice().reverse();
   modal({
     title: m.nombre + ' · pagos de este turno', wide: true,
     body: `<p class="muted">Debería haber <b>${money(saldoDigital(c, metodoId))}</b>. Si en la app de Mercado Pago no coincide, buscá acá el pago que se cargó con otro medio y corregilo.</p>
@@ -2673,7 +2724,7 @@ function modalMovimiento(tipo) {
   if (!c) return modalAbrirCaja(() => modalMovimiento(tipo));
   const ef = efectivoDeCaja(c);
   const titulos = { gasto: 'Gasto varios', proveedor: 'Pago a proveedor', retiro: 'Retiro a caja mayor', ingreso: 'Ingreso', perdida: 'Registrar una pérdida' };
-  const medios = [DB.metodos.find(m => m.efectivo && m.activo)].concat(metodosDigitales()).filter(Boolean);
+  const medios = [DB.metodos.find(m => m.efectivo && m.activo)].concat(gruposDigitales().map(g => ({ id: g.ids[0], nombre: g.nombre }))).filter(Boolean);
   const provs = [...new Set(DB.movCaja.filter(m => m.proveedor).map(m => m.proveedor))];
   const conceptos = { gasto: ['Limpieza', 'Mantenimiento', 'Librería', 'Flete', 'Comida del personal', 'Otro'], proveedor: ['Bebidas', 'Comida', 'Kiosco', 'Otro'], retiro: ['Retiro a caja mayor'], ingreso: ['Cambio', 'Aporte', 'Sobrante / diferencia a favor', 'Otro'], perdida: ['Diferencia sin explicar', 'Faltante', 'Billete falso', 'Otro'] };
   modal({
@@ -2694,7 +2745,7 @@ function modalMovimiento(tipo) {
 function modalCerrarCaja() {
   const c = cajaAbierta(), ef = efectivoDeCaja(c);
   const abiertas = Object.entries(DB.comandas).filter(([k, x]) => x.items.length);
-  UI.cierre = { esperado: ef.esperado, dig: metodosDigitales().map(m => ({ id: m.id, nombre: m.nombre, esperado: saldoDigital(c, m.id) })) };
+  UI.cierre = { esperado: ef.esperado, dig: gruposDigitales().map(g => ({ id: g.id, nombre: g.nombre, esperado: saldoDigital(c, g.id) })) };
   modal({
     title: 'Cerrar caja',
     body: `${abiertas.length ? `<div class="note warn">Hay <b>${abiertas.length} cuentas abiertas</b> sin cobrar (${money(sum(abiertas, ([, x]) => saldoDe(x)))}). Siguen abiertas después del cierre.</div>` : ''}
@@ -3147,7 +3198,7 @@ function numSigno(v) {
   const n = parseFloat(t);
   return isFinite(n) ? Math.round(n) : NaN;
 }
-const plRecetaTexto = r => (r || []).map(x => x.cant + ' ' + ((prod(x.id) || {}).nombre || '?')).join(' + ');
+const plRecetaTexto = r => (r || []).map(x => cantTxt(x.cant) + ' ' + ((prod(x.id) || {}).nombre || '?')).join(' + ');
 function plValoresDe(p) {
   const cs = plConStock(p.tipo);
   return {
@@ -3194,15 +3245,15 @@ function plParseReceta(txt, filas, yo) {
   const items = [], errores = [];
   partes.forEach(p => {
     let cant = 1, nom = p, m;
-    if ((m = p.match(/^(\d+)\s*[x×*]\s*(.+)$/i)) || (m = p.match(/^(\d+)\s+(.+)$/))) { cant = +m[1]; nom = m[2]; }
-    else if ((m = p.match(/^(.+?)\s*[x×*]\s*(\d+)$/i))) { cant = +m[2]; nom = m[1]; }
+    if ((m = p.match(/^(\d+(?:[.,]\d+)?)\s*[x×*]\s*(.+)$/i)) || (m = p.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/))) { cant = numDec(m[1]); nom = m[2]; }
+    else if ((m = p.match(/^(.+?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)$/i))) { cant = numDec(m[2]); nom = m[1]; }
     const n = norm(nom).trim();
     const cand = filas.filter(r => r !== yo && r.v.nombre.trim());
     let hit = cand.filter(r => norm(r.v.nombre).trim() === n);
     if (!hit.length) hit = cand.filter(r => norm(r.v.nombre).startsWith(n));
     if (!hit.length) hit = cand.filter(r => norm(r.v.nombre).includes(n));
     if (hit.length !== 1) { errores.push(hit.length ? `«${nom}» coincide con varios productos: escribí el nombre completo` : `No existe el producto «${nom}»`); return; }
-    if (!(cant >= 1)) { errores.push(`La cantidad de «${nom}» tiene que ser 1 o más`); return; }
+    if (!(cant > 0)) { errores.push(`La cantidad de «${nom}» tiene que ser mayor a cero (se pueden usar decimales: 0,125)`); return; }
     if (!plConStock(hit[0].v.tipo)) { errores.push(`«${hit[0].v.nombre}» no puede ser ingrediente (es ${PL_TIPOS[hit[0].v.tipo]})`); return; }
     items.push({ fila: hit[0], cant });
   });
@@ -3570,14 +3621,14 @@ function leerPF() {
   if ($('#pf-min')) f.minimo = num($('#pf-min').value);
   if ($('#pf-stock')) f.stock = num($('#pf-stock').value);
   if ($('#pf-paqn')) { f.paqueteNombre = $('#pf-paqn').value.trim(); f.paqueteUnidades = Math.max(1, num($('#pf-paqu').value)); }
-  if (f.tipo === 'receta') f.receta = f.receta.map((r, i) => ({ id: $('#pf-ri-' + i).value, cant: Math.max(1, num($('#pf-rc-' + i).value)) }));
+  if (f.tipo === 'receta') f.receta = f.receta.map((r, i) => ({ id: $('#pf-ri-' + i).value, cant: Math.max(0.001, numDec($('#pf-rc-' + i).value)) }));
 }
 function mostrarFormProducto() {
   setTimeout(pintarImgPF, 0);
   const f = UI.pf, editando = !!UI.pfId, conStock = ['directo', 'insumo'].includes(f.tipo);
   const insumos = DB.productos.filter(p => (p.tipo === 'insumo' || p.tipo === 'directo') && p.id !== UI.pfId);
   const receta = f.tipo === 'receta' ? `<div class="stack"><b>Ingredientes (se descuentan al vender)</b>
-    ${f.receta.map((r, i) => `<div class="rrow"><select class="in" id="pf-ri-${i}">${insumos.map(x => `<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select><input class="in" id="pf-rc-${i}" inputmode="numeric" value="${r.cant}" aria-label="Cantidad"><button class="icon" data-act="pf-rdel" data-i="${i}" aria-label="Quitar">×</button></div>`).join('')}
+    ${f.receta.map((r, i) => `<div class="rrow"><select class="in" id="pf-ri-${i}">${insumos.map(x => `<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select><input class="in" id="pf-rc-${i}" inputmode="decimal" value="${cantTxt(r.cant)}" aria-label="Cantidad"><button class="icon" data-act="pf-rdel" data-i="${i}" aria-label="Quitar">×</button></div>`).join('')}
     <button class="btn sm" data-act="pf-radd" style="align-self:flex-start">+ Ingrediente</button></div>` : '';
   const costoCampo = f.tipo === 'receta' ? `<div class="note">Costo calculado con los ingredientes: <b>${costoReceta(f.receta) ? money(costoReceta(f.receta)) : 'faltan los costos de algún ingrediente'}</b></div>` : `<label class="fld">Costo unitario (sólo se ve en Administración)<input class="in" id="pf-costo" inputmode="numeric" value="${f.costo || 0}"><small>Sirve para vender "al costo" a empleados y para ver el margen.</small></label>`;
   const imgCampos = `<div class="grid2"><div class="fld"><span>Imagen (opcional)</span><div class="row"><div id="pf-img-prev" class="imgprev"></div>
@@ -4097,7 +4148,7 @@ if (SERVIDOR) {
     } catch (e) { /* si falla, ya se vio en pantalla */ }
   }, 600);
 }
-window.__pos = { get DB() { return DB; }, get REV() { return REV; }, UI, tx, http, guardarSync, revisarTurnos, crearTurno, refrescarDesdeLaNube, cancha, dayKey };
+window.__pos = { get DB() { return DB; }, get REV() { return REV; }, UI, tx, http, guardarSync, revisarTurnos, crearTurno, refrescarDesdeLaNube, cancha, dayKey, crearMesaDeTurno, consumo, moverStock, plParseReceta, numDec, gruposDigitales };
 </script>
 </body>
 </html>
