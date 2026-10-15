@@ -326,7 +326,7 @@ function htmlPeriodo(R,an){
   h+=notas.length?`<p class="mu nota">${notas.join(" ")}</p>`:'<div class="sp"></div>';
   h+=`<div class="card"><h2>Ventas por día</h2><div id="grafc"></div><div class="det" id="det" aria-live="polite"><span class="mu">Tocá una barra para ver ese día.</span></div>
    <div class="ley"><span><i class="sw"></i>Con ventas</span>${R.dias.some(d=>d.dia===hoyK())?'<span><i class="sw h"></i>Hoy</span>':""}${faltan.length?'<span><i class="sw f"></i>Sin datos</span>':""}</div></div>`;
-  if(R.mejor)h+=`<p class="mu" style="margin:2px 2px 12px;font-size:14px">Más ventas: <b>${cortaF(R.mejor.dia)}</b> (${m(R.mejor.total)})`+(R.peor?` · Menos ventas: <b>${cortaF(R.peor.dia)}</b> (${m(R.peor.total)})`:"")+` · Promedio por día: <b>${m(T.promedio_dia)}</b></p>`;
+  if(R.mejor)h+=`<p class="mu k3" style="margin:2px 2px 12px;font-size:14px">Más ventas: <b>${cortaF(R.mejor.dia)}</b> (${m(R.mejor.total)})`+(R.peor?` · Menos ventas: <b>${cortaF(R.peor.dia)}</b> (${m(R.peor.total)})`:"")+` · Promedio por día: <b>${m(T.promedio_dia)}</b></p>`;
   h+=`<div class="card"><h2>Cierres de caja</h2><div id="cierres"></div></div>`;
   const tc=R.por_categoria.reduce((a,x)=>a+x.importe,0);
   h+=`<div class="g2"><div class="card"><h2>Por medio de pago</h2>${tabla([{t:"Medio",f:x=>esc(x.medio)},{t:"Cobros",n:1,f:x=>m(x.cobros)},...(R.por_medio.some(x=>x.devoluciones)?[{t:"Devol.",n:1,f:x=>m(x.devoluciones)}]:[]),{t:"Neto",n:1,f:x=>`<b>${m(x.neto)}</b>`}],R.por_medio)}</div>

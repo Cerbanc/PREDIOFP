@@ -82,7 +82,7 @@ const limpio = s => s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   for (const t of ['De lo vendido a lo cobrado', 'Por medio de pago', 'Por categoría', 'Por destino', 'Lo más vendido', 'Fiado y movimientos de caja', 'Día por día']) {
     assert.ok((await p.locator('#cont').innerText()).toLowerCase().includes(t.toLowerCase()), 'falta la sección ' + t);
   }
-  assert.ok((await texto(p, '#cont .k3')).includes('Mejor día'), 'mejor día');
+  assert.ok((await texto(p, '#cont .k3')).includes('Más ventas'), 'más ventas');
   // CSV de la semana
   let [dl] = await Promise.all([p.waitForEvent('download'), p.click('#csv')]);
   assert.ok(/^reporte_semana_\d{4}-\d{2}-\d{2}_a_\d{4}-\d{2}-\d{2}\.csv$/.test(dl.suggestedFilename()), dl.suggestedFilename());
