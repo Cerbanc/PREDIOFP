@@ -12,6 +12,7 @@ import logging
 import logging.handlers
 import os
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -180,6 +181,12 @@ def preparar_log_tecnico(rutas: Rutas) -> logging.Logger:
         s = logging.StreamHandler(sys.stderr)
         s.setFormatter(fmt)
         log.addHandler(s)
+
+    def _anotar(tipo, valor, traza):      # un error que mataría un hilo o el programa queda escrito en el log en vez de perderse
+        log.error("Error no controlado", exc_info=(tipo, valor, traza))
+
+    sys.excepthook = _anotar
+    threading.excepthook = lambda a: _anotar(a.exc_type, a.exc_value, a.exc_traceback)
     return log
 
 

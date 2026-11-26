@@ -27,6 +27,8 @@ from .ventana import abrir_ventana
 
 log = logging.getLogger("predio.app")
 
+SIN_VENTANA_SEG = 600      # tras cerrarse el lanzador de la ventana, tiempo sin señales de la pantalla para dar el programa por cerrado
+
 LEEME = """CAJA DEL PREDIO - carpeta de datos
 ===================================
 
@@ -270,8 +272,16 @@ def main(argv: list[str] | None = None) -> int:
 
     proceso = None if args.sin_ventana else abrir_ventana(servidor.url, rutas.perfil_navegador, ajustes["ventana_completa"])
     t0 = time.time()
+    app.ultimo_pedido = t0
+    ultimo_giro = t0
     while not app.apagar.wait(0.5):
-        if proceso is not None and proceso.poll() is not None and time.time() - t0 > 6:
+        ahora = time.time()
+        if ahora - ultimo_giro > 5:       # la PC estuvo suspendida: la ventana todavía no tuvo tiempo de volver a dar señales
+            app.ultimo_pedido = ahora
+        ultimo_giro = ahora
+        # el lanzador puede terminar con la ventana todavía abierta (Edge): solo se cierra si además la ventana dejó de dar señales
+        if proceso is not None and proceso.poll() is not None and ahora - t0 > 6 and ahora - app.ultimo_pedido > SIN_VENTANA_SEG:
+            log.info("La ventana se cerró (sin señales hace %d s): se cierra el programa", ahora - app.ultimo_pedido)
             time.sleep(1.0)
             break
     log.info("Cerrando...")

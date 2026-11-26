@@ -387,7 +387,7 @@ class ArchivosDiarios:
     # --- uso ---
     def iniciar(self) -> None:
         self._parar = False
-        self._hilo = threading.Thread(target=self._bucle, name="archivos-diarios", daemon=True)
+        self._hilo = threading.Thread(target=self._bucle_seguro, name="archivos-diarios", daemon=True)
         self._hilo.start()
 
     def marcar(self, dias: Iterable[str], agenda: bool = True) -> None:
@@ -452,6 +452,16 @@ class ArchivosDiarios:
         self.ultimo_error = None
         self.ultima_generacion = time.time()
         return {"excel": str(self.ruta_excel(dia)), "registro": str(self.ruta_registro(dia))}
+
+    def _bucle_seguro(self) -> None:
+        """Si el ciclo falla por algo inesperado se anota y se reinicia: los archivos del día no deben dejar de actualizarse."""
+        while not self._parar:
+            try:
+                self._bucle()
+                return
+            except Exception:      # noqa: BLE001
+                log.exception("Falló el ciclo de archivos diarios: se reinicia")
+                time.sleep(5)
 
     def _bucle(self) -> None:
         while True:

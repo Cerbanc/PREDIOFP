@@ -43,6 +43,7 @@ def abrir_ventana(url: str, perfil: Path, completa: bool = True) -> subprocess.P
         perfil.mkdir(parents=True, exist_ok=True)
         args = [exe, f"--app={url}", f"--user-data-dir={perfil}", "--no-first-run", "--no-default-browser-check",
                 "--disable-background-mode", "--disable-session-crashed-bubble", "--hide-crash-restore-bubble",
+                "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows",
                 "--disable-features=Translate,msEdgeShoppingUI", "--disable-sync", "--lang=es-AR"]
         if completa:
             args.append("--start-maximized")

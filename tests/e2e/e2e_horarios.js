@@ -58,7 +58,7 @@ const FASE = process.env.FASE;
   await page.locator('[data-act=nav][data-v=turnos]').click();
   await page.waitForSelector('.ccol');
   const columnas = await ev(() => [...document.querySelectorAll('.ccol')].map(col => col.querySelectorAll('.slot').length));
-  const horas = await ev(() => [...document.querySelectorAll('.tcol span')].map(s => s.textContent));
+  const horas = await ev(() => [...document.querySelectorAll('.tcol span:not(.ahora-t)')].map(s => s.textContent));
   if (FASE === 'nueva') {
     assert.deepStrictEqual(columnas, [9, 9, 9, 9, 9], 'fútbol: 14 a 22 (9 turnos de 1 hora); pádel: 9 turnos de 90 minutos');
     assert.deepStrictEqual(horas, ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00']);

@@ -471,6 +471,7 @@ const nombreNegocio = () => (SERVIDOR && PREDIO.marca && PREDIO.marca.nombre) ||
 function uid(prefix) { return prefix + (DB.seq++).toString(36); }
 
 /* Pedido al programa. Es sincrónico a propósito: una venta no se da por hecha hasta que quedó escrita en disco. */
+let FALLOS_RED = 0;
 function http(metodo, ruta, cuerpo, cabeceras) {
   const x = new XMLHttpRequest();
   const url = ruta + (metodo === 'GET' ? (ruta.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(PREDIO.token) : '');
@@ -482,8 +483,14 @@ function http(metodo, ruta, cuerpo, cabeceras) {
     else { datos = JSON.stringify(cuerpo); x.setRequestHeader('Content-Type', 'application/json'); }
   }
   Object.entries(cabeceras || {}).forEach(([k, v]) => x.setRequestHeader(k, v));
-  try { x.send(datos); }
-  catch (e) { const er = new Error('No se pudo hablar con el programa (¿se cerró?). Lo último NO se guardó.'); er.red = true; programaCaido(); throw er; }
+  try { x.send(datos); FALLOS_RED = 0; }
+  catch (e) {
+    const er = new Error('No se pudo hablar con el programa (¿se cerró?). Lo último NO se guardó.'); er.red = true;
+    FALLOS_RED++;
+    /* los avisos de fondo (latido, salud, cambios) no tapan la pantalla por un tropiezo: solo si fallan varias veces seguidas */
+    if (!/^\/api\/(latido|salud|cambios)/.test(ruta) || FALLOS_RED >= 3) programaCaido();
+    throw er;
+  }
   let r = null;
   try { r = JSON.parse(x.responseText); } catch (e) { /* la respuesta no era JSON */ }
   if (x.status >= 200 && x.status < 300 && !(r && r.ok === false)) return r;

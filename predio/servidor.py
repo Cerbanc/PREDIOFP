@@ -55,6 +55,7 @@ class Aplicacion:
     modo: str = "real"                  # "real" o "demo"
     token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
     apagar: threading.Event = field(default_factory=threading.Event)
+    ultimo_pedido: float = 0.0          # última vez que la pantalla le habló al programa
     avisos: list[str] = field(default_factory=list)
     inicio: float = field(default_factory=time.time)
     html: str = ""
